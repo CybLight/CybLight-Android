@@ -1,6 +1,7 @@
 package org.cyblight.android.ui.components
 
 import android.annotation.SuppressLint
+import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -28,6 +29,7 @@ fun TurnstileWebView(
             .height(84.dp),
         factory = { context ->
             WebView(context).apply {
+                importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 webViewClient = WebViewClient()

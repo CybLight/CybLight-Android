@@ -6,6 +6,8 @@
     <string name="signing_in">Signing in…</string>
     <string name="username">Username</string>
     <string name="password">Password</string>
+    <string name="show_password">Show password</string>
+    <string name="hide_password">Hide password</string>
     <string name="turnstile_hint">Confirm you are not a robot (Turnstile).</string>
     <string name="friends">Friends</string>
     <string name="messages">Messages</string>
@@ -44,4 +46,18 @@
     <string name="update_downloading_percent">Downloading… %1$d%%</string>
     <string name="update_error_generic">Failed to download the update</string>
     <string name="update_error_permission">Allow installs from this source in settings</string>
+    <string name="menu_app">App menu</string>
+    <string name="menu_about">About</string>
+    <string name="menu_check_updates">Check for updates</string>
+    <string name="menu_report_bug">Report a bug</string>
+    <string name="about_title">About</string>
+    <string name="about_description">CybLight mobile app for Android: sign in, friends list, and messaging.</string>
+    <string name="about_creator">Creator: %1$s</string>
+    <string name="about_creator_value">CybLight</string>
+    <string name="about_website_link">cyblight.org</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="close">Close</string>
+    <string name="update_check_title">Checking for updates</string>
+    <string name="update_up_to_date">You have the latest version</string>
+    <string name="update_check_error">Failed to check for updates</string>
 </resources>

@@ -6,6 +6,8 @@
     <string name="signing_in">Входжу…</string>
     <string name="username">Логін</string>
     <string name="password">Пароль</string>
+    <string name="show_password">Показати пароль</string>
+    <string name="hide_password">Приховати пароль</string>
     <string name="turnstile_hint">Підтвердь, що ти не робот (Turnstile).</string>
     <string name="friends">Друзі</string>
     <string name="messages">Повідомлення</string>
@@ -44,4 +46,18 @@
     <string name="update_downloading_percent">Завантаження… %1$d%%</string>
     <string name="update_error_generic">Не вдалося завантажити оновлення</string>
     <string name="update_error_permission">Дозвольте встановлення з цього джерела в налаштуваннях</string>
+    <string name="menu_app">Меню застосунку</string>
+    <string name="menu_about">Про застосунок</string>
+    <string name="menu_check_updates">Перевірити оновлення</string>
+    <string name="menu_report_bug">Повідомити про помилку</string>
+    <string name="about_title">Про застосунок</string>
+    <string name="about_description">Мобільний застосунок CybLight для Android: вхід в акаунт, список друзів та обмін повідомленнями.</string>
+    <string name="about_creator">Творець: %1$s</string>
+    <string name="about_creator_value">CybLight</string>
+    <string name="about_website_link">cyblight.org</string>
+    <string name="about_version">Версія %1$s</string>
+    <string name="close">Закрити</string>
+    <string name="update_check_title">Перевірка оновлень</string>
+    <string name="update_up_to_date">У вас встановлена остання версія</string>
+    <string name="update_check_error">Не вдалося перевірити оновлення</string>
 </resources>

@@ -21,6 +21,7 @@ import org.cyblight.android.data.repository.MessagesRepository
 import org.cyblight.android.data.session.SessionManager
 import org.cyblight.android.i18n.LocaleManager
 import org.cyblight.android.update.AppUpdateInfo
+import org.cyblight.android.update.ManualUpdateCheckState
 import org.cyblight.android.update.UpdatePreferences
 import org.cyblight.android.update.UpdateRepository
 import org.cyblight.android.update.UpdateStatus
@@ -51,6 +52,7 @@ data class AppUiState(
     val isChatLoading: Boolean = false,
     val isSending: Boolean = false,
     val update: UpdateUiState = UpdateUiState(),
+    val manualUpdateCheck: ManualUpdateCheckState = ManualUpdateCheckState(),
 )
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -102,24 +104,64 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     val dismissed = updatePreferences.getDismissedVersion()
                     if (dismissed == info.versionName) return@onSuccess
 
-                    pendingUpdate = info
-                    val alreadyDownloaded = updateRepository.hasDownloadedApk(info.versionName)
+                    showUpdateDialog(info)
+                }
+        }
+    }
 
+    fun checkForUpdatesManual() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                manualUpdateCheck = ManualUpdateCheckState(visible = true, checking = true),
+            )
+
+            updateRepository.checkForUpdate()
+                .onSuccess { info ->
+                    if (info == null) {
+                        _uiState.value = _uiState.value.copy(
+                            manualUpdateCheck = ManualUpdateCheckState(visible = true, upToDate = true),
+                        )
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            manualUpdateCheck = ManualUpdateCheckState(visible = false),
+                        )
+                        showUpdateDialog(info)
+                    }
+                }
+                .onFailure { error ->
                     _uiState.value = _uiState.value.copy(
-                        update = UpdateUiState(
+                        manualUpdateCheck = ManualUpdateCheckState(
                             visible = true,
-                            versionName = info.versionName,
-                            releaseNotes = info.releaseNotes,
-                            downloadUrl = info.downloadUrl,
-                            status = if (alreadyDownloaded) {
-                                UpdateStatus.ReadyToInstall
-                            } else {
-                                UpdateStatus.Available
-                            },
+                            errorMessage = error.message,
                         ),
                     )
                 }
         }
+    }
+
+    fun dismissManualUpdateCheck() {
+        _uiState.value = _uiState.value.copy(
+            manualUpdateCheck = ManualUpdateCheckState(visible = false),
+        )
+    }
+
+    private fun showUpdateDialog(info: AppUpdateInfo) {
+        pendingUpdate = info
+        val alreadyDownloaded = updateRepository.hasDownloadedApk(info.versionName)
+
+        _uiState.value = _uiState.value.copy(
+            update = UpdateUiState(
+                visible = true,
+                versionName = info.versionName,
+                releaseNotes = info.releaseNotes,
+                downloadUrl = info.downloadUrl,
+                status = if (alreadyDownloaded) {
+                    UpdateStatus.ReadyToInstall
+                } else {
+                    UpdateStatus.Available
+                },
+            ),
+        )
     }
 
     fun downloadUpdate() {

@@ -26,6 +26,7 @@ import org.cyblight.android.data.api.FriendDto
 import org.cyblight.android.data.api.MessageDto
 import org.cyblight.android.data.api.UserDto
 import org.cyblight.android.data.repository.ConversationPreview
+import org.cyblight.android.ui.components.AppMenu
 import org.cyblight.android.ui.components.CybLightLogo
 import org.cyblight.android.ui.components.LanguageMenu
 import org.cyblight.android.ui.friends.FriendsScreen
@@ -47,6 +48,9 @@ fun MainScreen(
     isChatLoading: Boolean,
     isSending: Boolean,
     onLocaleSelected: (String) -> Unit,
+    onAbout: () -> Unit,
+    onCheckUpdates: () -> Unit,
+    onReportBug: () -> Unit,
     onLogout: () -> Unit,
     onRefresh: () -> Unit,
     onOpenChat: (friendId: String, username: String) -> Unit,
@@ -76,6 +80,11 @@ fun MainScreen(
                 navigationIcon = { CybLightLogo(size = 36.dp) },
                 actions = {
                     LanguageMenu(currentLocale = locale, onLocaleSelected = onLocaleSelected)
+                    AppMenu(
+                        onAbout = onAbout,
+                        onCheckUpdates = onCheckUpdates,
+                        onReportBug = onReportBug,
+                    )
                     IconButton(onClick = onLogout) {
                         Icon(Icons.Outlined.Logout, contentDescription = stringResource(R.string.logout))
                     }

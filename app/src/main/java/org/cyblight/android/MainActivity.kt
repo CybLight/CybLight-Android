@@ -1,8 +1,9 @@
 package org.cyblight.android
 
 import android.os.Bundle
+import android.view.autofill.AutofillManager
 import android.widget.Toast
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -11,20 +12,29 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import org.cyblight.android.update.ApkInstaller
+import androidx.compose.ui.platform.LocalContext
 import org.cyblight.android.ui.AppScreen
+import org.cyblight.android.update.ApkInstaller
+import org.cyblight.android.i18n.AppLocaleProvider
 import org.cyblight.android.ui.AppViewModel
 import org.cyblight.android.ui.login.LoginScreen
 import org.cyblight.android.ui.login.TwoFactorScreen
 import org.cyblight.android.ui.main.MainScreen
+import org.cyblight.android.ui.components.AboutDialog
 import org.cyblight.android.ui.theme.CybLightTheme
+import org.cyblight.android.ui.update.UpdateCheckDialog
 import org.cyblight.android.ui.update.UpdateDialog
+import org.cyblight.android.util.BugReport
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     private val viewModel: AppViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,7 +42,31 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val uiState by viewModel.uiState.collectAsState()
+            val context = LocalContext.current
+            var pendingAutofillCommit by remember { mutableStateOf(false) }
+            var showAbout by remember { mutableStateOf(false) }
 
+            LaunchedEffect(uiState.screen) {
+                if (uiState.screen == AppScreen.Login || uiState.screen == AppScreen.TwoFactor) {
+                    pendingAutofillCommit = true
+                }
+            }
+
+            LaunchedEffect(uiState.screen, uiState.user, uiState.isSubmitting) {
+                if (pendingAutofillCommit &&
+                    uiState.screen == AppScreen.Main &&
+                    uiState.user != null &&
+                    !uiState.isSubmitting
+                ) {
+                    val autofillManager = context.getSystemService(AutofillManager::class.java)
+                    if (autofillManager?.isAutofillSupported == true) {
+                        autofillManager.commit()
+                    }
+                    pendingAutofillCommit = false
+                }
+            }
+
+            AppLocaleProvider(localeTag = uiState.locale) {
             CybLightTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -54,6 +88,9 @@ class MainActivity : ComponentActivity() {
                                 isSubmitting = uiState.isSubmitting,
                                 errorCode = uiState.loginError,
                                 onLocaleSelected = viewModel::setLocale,
+                                onAbout = { showAbout = true },
+                                onCheckUpdates = viewModel::checkForUpdatesManual,
+                                onReportBug = { BugReport.open(context) },
                                 onLogin = viewModel::login,
                             )
                         }
@@ -63,6 +100,9 @@ class MainActivity : ComponentActivity() {
                                 isSubmitting = uiState.isSubmitting,
                                 errorCode = uiState.loginError,
                                 onLocaleSelected = viewModel::setLocale,
+                                onAbout = { showAbout = true },
+                                onCheckUpdates = viewModel::checkForUpdatesManual,
+                                onReportBug = { BugReport.open(context) },
                                 onVerify = viewModel::verify2FA,
                             )
                         }
@@ -82,6 +122,9 @@ class MainActivity : ComponentActivity() {
                                     isChatLoading = uiState.isChatLoading,
                                     isSending = uiState.isSending,
                                     onLocaleSelected = viewModel::setLocale,
+                                    onAbout = { showAbout = true },
+                                    onCheckUpdates = viewModel::checkForUpdatesManual,
+                                    onReportBug = { BugReport.open(context) },
                                     onLogout = viewModel::logout,
                                     onRefresh = viewModel::refreshSocialData,
                                     onOpenChat = viewModel::openChat,
@@ -92,6 +135,15 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    if (showAbout) {
+                        AboutDialog(onDismiss = { showAbout = false })
+                    }
+
+                    UpdateCheckDialog(
+                        state = uiState.manualUpdateCheck,
+                        onDismiss = viewModel::dismissManualUpdateCheck,
+                    )
+
                     UpdateDialog(
                         state = uiState.update,
                         onDownload = viewModel::downloadUpdate,
@@ -100,6 +152,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 }
+            }
             }
         }
     }

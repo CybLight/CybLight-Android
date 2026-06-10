@@ -8,7 +8,7 @@
     <path
         android:fillColor="#0F0B1F"
         android:pathData="M16,8h88c4.4,0 8,3.6 8,8v88c0,4.4 -3.6,8 -8,8h-88c-4.4,0 -8,-3.6 -8,-8v-88c0,-4.4 3.6,-8 8,-8z" />
-    <!-- Рамка (увеличена) -->
+    <!-- Рамка -->
     <path
         android:fillColor="#00000000"
         android:pathData="M12,8h96v96h-96z"
@@ -22,9 +22,9 @@
     <!-- C -->
     <path
         android:fillColor="#FF7F27"
-        android:pathData="M32,40h18v9h-11c-4,0 -7,4 -7,14s3,14 7,14h11v9h-18c-8,0 -12,-10 -12,-23s4,-23 12,-23z" />
+        android:pathData="M38,37h15v8h-9c-3,0 -5.5,3 -5.5,11.5s2.5,11.5 5.5,11.5h9v8h-15c-6.5,0 -10,-8.5 -10,-20s3.5,-20 10,-20z" />
     <!-- L -->
     <path
         android:fillColor="#0EFFF3"
-        android:pathData="M62,40h9v40h22v9h-31z" />
+        android:pathData="M58,37h8v32h20v8h-28z" />
 </vector>

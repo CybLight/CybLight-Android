@@ -6,6 +6,8 @@
     <string name="signing_in">Вхожу…</string>
     <string name="username">Логин</string>
     <string name="password">Пароль</string>
+    <string name="show_password">Показать пароль</string>
+    <string name="hide_password">Скрыть пароль</string>
     <string name="turnstile_hint">Подтверди, что ты не робот (Turnstile).</string>
     <string name="friends">Друзья</string>
     <string name="messages">Сообщения</string>
@@ -44,4 +46,18 @@
     <string name="update_downloading_percent">Загрузка… %1$d%%</string>
     <string name="update_error_generic">Не удалось загрузить обновление</string>
     <string name="update_error_permission">Разрешите установку из этого источника в настройках</string>
+    <string name="menu_app">Меню приложения</string>
+    <string name="menu_about">О приложении</string>
+    <string name="menu_check_updates">Проверить обновления</string>
+    <string name="menu_report_bug">Сообщить об ошибке</string>
+    <string name="about_title">О приложении</string>
+    <string name="about_description">Мобильное приложение CybLight для Android: вход в аккаунт, список друзей и обмен сообщениями.</string>
+    <string name="about_creator">Создатель: %1$s</string>
+    <string name="about_creator_value">CybLight</string>
+    <string name="about_website_link">cyblight.org</string>
+    <string name="about_version">Версия %1$s</string>
+    <string name="close">Закрыть</string>
+    <string name="update_check_title">Проверка обновлений</string>
+    <string name="update_up_to_date">У вас установлена последняя версия</string>
+    <string name="update_check_error">Не удалось проверить обновления</string>
 </resources>

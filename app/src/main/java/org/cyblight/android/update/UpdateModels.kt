@@ -24,3 +24,10 @@ data class UpdateUiState(
     val progress: Float = 0f,
     val errorMessage: String? = null,
 )
+
+data class ManualUpdateCheckState(
+    val visible: Boolean = false,
+    val checking: Boolean = false,
+    val upToDate: Boolean = false,
+    val errorMessage: String? = null,
+)

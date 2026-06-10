@@ -4,11 +4,17 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Только буквы CL, без рамки -->
-    <path
-        android:fillColor="#FF7F27"
-        android:pathData="M24,32h18v9h-11c-4,0 -7,4 -7,14s3,14 7,14h11v9h-18c-8,0 -12,-10 -12,-23s4,-23 12,-23z" />
-    <path
-        android:fillColor="#0EFFF3"
-        android:pathData="M54,32h9v40h26v9h-35z" />
+    <!-- Только буквы CL, уменьшены для adaptive icon -->
+    <group
+        android:scaleX="0.62"
+        android:scaleY="0.62"
+        android:translateX="22"
+        android:translateY="20">
+        <path
+            android:fillColor="#FF7F27"
+            android:pathData="M24,32h18v9h-11c-4,0 -7,4 -7,14s3,14 7,14h11v9h-18c-8,0 -12,-10 -12,-23s4,-23 12,-23z" />
+        <path
+            android:fillColor="#0EFFF3"
+            android:pathData="M54,32h9v40h26v9h-35z" />
+    </group>
 </vector>

@@ -2,6 +2,7 @@ package org.cyblight.android.ui.login
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,10 +25,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import org.cyblight.android.R
+import org.cyblight.android.ui.components.AppMenu
 import org.cyblight.android.ui.components.CybLightLogo
+import org.cyblight.android.ui.components.CybAutofillType
 import org.cyblight.android.ui.components.CybOutlinedTextField
 import org.cyblight.android.ui.components.LanguageMenu
 import org.cyblight.android.ui.components.TurnstileWebView
@@ -38,6 +40,9 @@ fun LoginScreen(
     isSubmitting: Boolean,
     errorCode: String?,
     onLocaleSelected: (String) -> Unit,
+    onAbout: () -> Unit,
+    onCheckUpdates: () -> Unit,
+    onReportBug: () -> Unit,
     onLogin: (login: String, password: String, turnstileToken: String) -> Unit,
 ) {
     var login by rememberSaveable { mutableStateOf("") }
@@ -52,8 +57,17 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top,
     ) {
-        Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             LanguageMenu(currentLocale = locale, onLocaleSelected = onLocaleSelected)
+            AppMenu(
+                onAbout = onAbout,
+                onCheckUpdates = onCheckUpdates,
+                onReportBug = onReportBug,
+            )
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -71,10 +85,19 @@ fun LoginScreen(
         )
         Spacer(modifier = Modifier.height(24.dp))
 
+        Text(
+            text = stringResource(R.string.turnstile_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TurnstileWebView(onToken = { turnstileToken = it })
+        Spacer(modifier = Modifier.height(16.dp))
+
         CybOutlinedTextField(
             value = login,
             onValueChange = { login = it },
             label = stringResource(R.string.username),
+            autofillType = CybAutofillType.Username,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(modifier = Modifier.height(12.dp))
@@ -82,18 +105,12 @@ fun LoginScreen(
             value = password,
             onValueChange = { password = it },
             label = stringResource(R.string.password),
-            visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            showPasswordToggle = true,
+            autofillType = CybAutofillType.Password,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = stringResource(R.string.turnstile_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        TurnstileWebView(onToken = { turnstileToken = it })
-        Spacer(modifier = Modifier.height(8.dp))
 
         if (!errorCode.isNullOrBlank()) {
             Text(
@@ -133,6 +150,9 @@ fun TwoFactorScreen(
     isSubmitting: Boolean,
     errorCode: String?,
     onLocaleSelected: (String) -> Unit,
+    onAbout: () -> Unit,
+    onCheckUpdates: () -> Unit,
+    onReportBug: () -> Unit,
     onVerify: (code: String) -> Unit,
 ) {
     var code by rememberSaveable { mutableStateOf("") }
@@ -144,8 +164,17 @@ fun TwoFactorScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             LanguageMenu(currentLocale = locale, onLocaleSelected = onLocaleSelected)
+            AppMenu(
+                onAbout = onAbout,
+                onCheckUpdates = onCheckUpdates,
+                onReportBug = onReportBug,
+            )
         }
         CybLightLogo()
         Spacer(modifier = Modifier.height(16.dp))

@@ -12,13 +12,19 @@ android {
         applicationId = "org.cyblight.android"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "0.2.2"
+        versionCode = 4
+        versionName = "0.2.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "API_BASE_URL", "\"https://api.cyblight.org\"")
         buildConfigField("String", "TURNSTILE_SITEKEY", "\"0x4AAAAAACIMk1fcGPcs3NLf\"")
+        buildConfigField("String", "WEBSITE_URL", "\"https://cyblight.org\"")
+        buildConfigField(
+            "String",
+            "BUG_REPORT_URL",
+            "\"https://github.com/CybLight/CybLight-Android/issues/new\"",
+        )
         buildConfigField(
             "String",
             "GITHUB_RELEASES_URL",
