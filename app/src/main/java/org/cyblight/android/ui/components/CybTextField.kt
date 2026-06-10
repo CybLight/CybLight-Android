@@ -81,8 +81,7 @@ fun CybOutlinedTextField(
         DisposableEffect(autofillNode, autofillTree) {
             autofillTree += autofillNode
             onDispose {
-                @Suppress("UNCHECKED_CAST")
-                (autofillTree.children as MutableCollection<AutofillNode>).remove(autofillNode)
+                autofillTree.children.values.remove(autofillNode)
             }
         }
     }
