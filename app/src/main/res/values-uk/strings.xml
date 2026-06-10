@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CybLight</string>
+    <string name="app_tagline">Керування пристроями</string>
+    <string name="sign_in">Увійти</string>
+    <string name="signing_in">Входжу…</string>
+    <string name="username">Логін</string>
+    <string name="password">Пароль</string>
+    <string name="turnstile_hint">Підтвердь, що ти не робот (Turnstile).</string>
+    <string name="friends">Друзі</string>
+    <string name="messages">Повідомлення</string>
+    <string name="my_friends">Мої друзі</string>
+    <string name="no_friends">У вас поки немає друзів</string>
+    <string name="no_friends_hint">Знайдіть користувачів і додайте їх у друзі</string>
+    <string name="no_conversations">Немає діалогів</string>
+    <string name="online">В мережі</string>
+    <string name="offline">Не в мережі</string>
+    <string name="write_message">Написати</string>
+    <string name="message_placeholder">Повідомлення…</string>
+    <string name="send">Надіслати</string>
+    <string name="loading">Завантаження…</string>
+    <string name="logout">Вийти</string>
+    <string name="language">Мова</string>
+    <string name="error_login">Неправильний пароль або логін. Спробуй ще раз.</string>
+    <string name="error_turnstile">Перевірка Turnstile не пройшла. Онови капчу і спробуй знову.</string>
+    <string name="error_rate_limit">Забагато спроб. Зачекай трохи і спробуй знову.</string>
+    <string name="error_generic">Не вдалося увійти. Спробуй пізніше.</string>
+    <string name="error_load_friends">Не вдалося завантажити друзів</string>
+    <string name="error_load_messages">Не вдалося завантажити повідомлення</string>
+    <string name="error_send_message">Не вдалося надіслати повідомлення</string>
+    <string name="two_factor_title">Двофакторна аутентифікація</string>
+    <string name="two_factor_code">Код 2FA</string>
+    <string name="verify">Підтвердити</string>
+    <string name="welcome_user">Привіт, %1$s</string>
+    <string name="unread_count">%1$d непрочитаних</string>
+    <string name="logo_content_desc">Логотип CybLight</string>
+    <string name="update_title">Доступне оновлення</string>
+    <string name="update_version_available">Нова версія %1$s</string>
+    <string name="update_download">Завантажити</string>
+    <string name="update_install">Оновити</string>
+    <string name="update_later">Пізніше</string>
+    <string name="update_retry">Повторити</string>
+    <string name="update_downloading_percent">Завантаження… %1$d%%</string>
+    <string name="update_error_generic">Не вдалося завантажити оновлення</string>
+    <string name="update_error_permission">Дозвольте встановлення з цього джерела в налаштуваннях</string>
+</resources>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CybLight</string>
+    <string name="app_tagline">Управление устройствами</string>
+    <string name="sign_in">Войти</string>
+    <string name="signing_in">Вхожу…</string>
+    <string name="username">Логин</string>
+    <string name="password">Пароль</string>
+    <string name="turnstile_hint">Подтверди, что ты не робот (Turnstile).</string>
+    <string name="friends">Друзья</string>
+    <string name="messages">Сообщения</string>
+    <string name="my_friends">Мои друзья</string>
+    <string name="no_friends">У вас пока нет друзей</string>
+    <string name="no_friends_hint">Найдите пользователей и добавьте их в друзья</string>
+    <string name="no_conversations">Нет диалогов</string>
+    <string name="online">В сети</string>
+    <string name="offline">Не в сети</string>
+    <string name="write_message">Написать</string>
+    <string name="message_placeholder">Сообщение…</string>
+    <string name="send">Отправить</string>
+    <string name="loading">Загрузка…</string>
+    <string name="logout">Выйти</string>
+    <string name="language">Язык</string>
+    <string name="error_login">Неправильный пароль или логин. Попробуй ещё раз.</string>
+    <string name="error_turnstile">Проверка Turnstile не прошла. Обнови капчу и попробуй снова.</string>
+    <string name="error_rate_limit">Слишком много попыток. Подожди немного и попробуй снова.</string>
+    <string name="error_generic">Не удалось войти. Попробуй позже.</string>
+    <string name="error_load_friends">Не удалось загрузить друзей</string>
+    <string name="error_load_messages">Не удалось загрузить сообщения</string>
+    <string name="error_send_message">Не удалось отправить сообщение</string>
+    <string name="two_factor_title">Двухфакторная аутентификация</string>
+    <string name="two_factor_code">Код 2FA</string>
+    <string name="verify">Подтвердить</string>
+    <string name="welcome_user">Привет, %1$s</string>
+    <string name="unread_count">%1$d непрочитанных</string>
+    <string name="logo_content_desc">Логотип CybLight</string>
+    <string name="update_title">Доступно обновление</string>
+    <string name="update_version_available">Новая версия %1$s</string>
+    <string name="update_download">Скачать</string>
+    <string name="update_install">Обновить</string>
+    <string name="update_later">Позже</string>
+    <string name="update_retry">Повторить</string>
+    <string name="update_downloading_percent">Загрузка… %1$d%%</string>
+    <string name="update_error_generic">Не удалось загрузить обновление</string>
+    <string name="update_error_permission">Разрешите установку из этого источника в настройках</string>
+</resources>

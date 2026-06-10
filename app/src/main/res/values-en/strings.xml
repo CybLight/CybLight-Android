@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CybLight</string>
+    <string name="app_tagline">Device management</string>
+    <string name="sign_in">Sign in</string>
+    <string name="signing_in">Signing in…</string>
+    <string name="username">Username</string>
+    <string name="password">Password</string>
+    <string name="turnstile_hint">Confirm you are not a robot (Turnstile).</string>
+    <string name="friends">Friends</string>
+    <string name="messages">Messages</string>
+    <string name="my_friends">My friends</string>
+    <string name="no_friends">You have no friends yet</string>
+    <string name="no_friends_hint">Find users and add them as friends</string>
+    <string name="no_conversations">No conversations</string>
+    <string name="online">Online</string>
+    <string name="offline">Offline</string>
+    <string name="write_message">Message</string>
+    <string name="message_placeholder">Message…</string>
+    <string name="send">Send</string>
+    <string name="loading">Loading…</string>
+    <string name="logout">Sign out</string>
+    <string name="language">Language</string>
+    <string name="error_login">Wrong password or username. Try again.</string>
+    <string name="error_turnstile">Turnstile verification failed. Refresh the captcha and try again.</string>
+    <string name="error_rate_limit">Too many attempts. Wait a bit and try again.</string>
+    <string name="error_generic">Failed to sign in. Try again later.</string>
+    <string name="error_load_friends">Failed to load friends</string>
+    <string name="error_load_messages">Failed to load messages</string>
+    <string name="error_send_message">Failed to send message</string>
+    <string name="two_factor_title">Two-factor authentication</string>
+    <string name="two_factor_code">2FA code</string>
+    <string name="verify">Verify</string>
+    <string name="welcome_user">Hello, %1$s</string>
+    <string name="unread_count">%1$d unread</string>
+    <string name="logo_content_desc">CybLight logo</string>
+    <string name="update_title">Update available</string>
+    <string name="update_version_available">New version %1$s</string>
+    <string name="update_download">Download</string>
+    <string name="update_install">Update</string>
+    <string name="update_later">Later</string>
+    <string name="update_retry">Retry</string>
+    <string name="update_downloading_percent">Downloading… %1$d%%</string>
+    <string name="update_error_generic">Failed to download the update</string>
+    <string name="update_error_permission">Allow installs from this source in settings</string>
+</resources>
