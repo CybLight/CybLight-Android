@@ -20,7 +20,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -36,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.cyblight.android.R
+import org.cyblight.android.ui.components.CybOutlinedTextField
 import org.cyblight.android.data.api.MessageDto
 import java.text.DateFormat
 import java.util.Date
@@ -132,11 +132,12 @@ fun ChatScreen(
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedTextField(
+                CybOutlinedTextField(
                     value = draft,
                     onValueChange = { draft = it },
-                    placeholder = { Text(stringResource(R.string.message_placeholder)) },
+                    placeholder = stringResource(R.string.message_placeholder),
                     modifier = Modifier.weight(1f),
+                    singleLine = false,
                     maxLines = 4,
                 )
                 IconButton(

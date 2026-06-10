@@ -11,9 +11,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,6 +28,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import org.cyblight.android.R
 import org.cyblight.android.ui.components.CybLightLogo
+import org.cyblight.android.ui.components.CybOutlinedTextField
 import org.cyblight.android.ui.components.LanguageMenu
 import org.cyblight.android.ui.components.TurnstileWebView
 
@@ -70,19 +71,17 @@ fun LoginScreen(
         )
         Spacer(modifier = Modifier.height(24.dp))
 
-        OutlinedTextField(
+        CybOutlinedTextField(
             value = login,
             onValueChange = { login = it },
-            label = { Text(stringResource(R.string.username)) },
-            singleLine = true,
+            label = stringResource(R.string.username),
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(modifier = Modifier.height(12.dp))
-        OutlinedTextField(
+        CybOutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text(stringResource(R.string.password)) },
-            singleLine = true,
+            label = stringResource(R.string.password),
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             modifier = Modifier.fillMaxWidth(),
@@ -109,6 +108,12 @@ fun LoginScreen(
             onClick = { onLogin(login, password, turnstileToken) },
             enabled = !isSubmitting && login.isNotBlank() && password.isNotBlank() && turnstileToken.isNotBlank(),
             modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
         ) {
             if (isSubmitting) {
                 CircularProgressIndicator(
@@ -146,11 +151,10 @@ fun TwoFactorScreen(
         Spacer(modifier = Modifier.height(16.dp))
         Text(stringResource(R.string.two_factor_title), style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(16.dp))
-        OutlinedTextField(
+        CybOutlinedTextField(
             value = code,
             onValueChange = { code = it },
-            label = { Text(stringResource(R.string.two_factor_code)) },
-            singleLine = true,
+            label = stringResource(R.string.two_factor_code),
             modifier = Modifier.fillMaxWidth(),
         )
         if (!errorCode.isNullOrBlank()) {

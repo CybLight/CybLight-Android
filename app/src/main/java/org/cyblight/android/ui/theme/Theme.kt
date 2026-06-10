@@ -11,20 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = CybOrange,
-    onPrimary = Color.White,
-    secondary = CybGreen,
-    onSecondary = Color.White,
-    tertiary = CybCyan,
-    background = CybDarkBackground,
-    onBackground = Color.White,
-    surface = CybDarkSurface,
-    onSurface = Color.White,
-    surfaceVariant = CybDarkSurfaceVariant,
-    onSurfaceVariant = CybTextMuted,
-)
-
 private val LightColorScheme = lightColorScheme(
     primary = CybOrange,
     onPrimary = Color.White,
@@ -37,6 +23,22 @@ private val LightColorScheme = lightColorScheme(
     onSurface = Color(0xFF111827),
     surfaceVariant = Color(0xFFE8ECF4),
     onSurfaceVariant = Color(0xFF6B7280),
+    outline = Color(0xFF9CA3AF),
+)
+
+private val DarkColorSchemeWithOutline = darkColorScheme(
+    primary = CybOrange,
+    onPrimary = Color.White,
+    secondary = CybGreen,
+    onSecondary = Color.White,
+    tertiary = CybCyan,
+    background = CybDarkBackground,
+    onBackground = Color.White,
+    surface = CybDarkSurface,
+    onSurface = Color.White,
+    surfaceVariant = CybDarkSurfaceVariant,
+    onSurfaceVariant = CybTextMuted,
+    outline = CybTextMuted,
 )
 
 @Composable
@@ -50,7 +52,7 @@ fun CybLightTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        darkTheme -> DarkColorScheme
+        darkTheme -> DarkColorSchemeWithOutline
         else -> LightColorScheme
     }
 
