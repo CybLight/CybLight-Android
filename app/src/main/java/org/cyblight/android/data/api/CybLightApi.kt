@@ -11,7 +11,7 @@ interface CybLightApi {
     suspend fun login(@Body body: LoginRequest): Response<ApiEnvelope<LoginData>>
 
     @POST("auth/2fa/verify")
-    suspend fun verifyTwoFactor(@Body body: TwoFactorRequest): Response<ApiEnvelope<LoginData>>
+    suspend fun verifyTwoFactor(@Body body: TwoFactorRequest): Response<TwoFactorVerifyResponse>
 
     @GET("auth/me")
     suspend fun me(): MeResponse

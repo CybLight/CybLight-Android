@@ -25,6 +25,7 @@
     <string name="error_turnstile">Перевірка Turnstile не пройшла. Онови капчу і спробуй знову.</string>
     <string name="error_rate_limit">Забагато спроб. Зачекай трохи і спробуй знову.</string>
     <string name="error_generic">Не вдалося увійти. Спробуй пізніше.</string>
+    <string name="error_2fa_code">Невірний код 2FA. Перевір застосунок-аутентифікатор і спробуй знову.</string>
     <string name="error_load_friends">Не вдалося завантажити друзів</string>
     <string name="error_load_messages">Не вдалося завантажити повідомлення</string>
     <string name="error_send_message">Не вдалося надіслати повідомлення</string>

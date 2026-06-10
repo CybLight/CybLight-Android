@@ -25,6 +25,7 @@
     <string name="error_turnstile">Turnstile verification failed. Refresh the captcha and try again.</string>
     <string name="error_rate_limit">Too many attempts. Wait a bit and try again.</string>
     <string name="error_generic">Failed to sign in. Try again later.</string>
+    <string name="error_2fa_code">Invalid 2FA code. Check your authenticator app and try again.</string>
     <string name="error_load_friends">Failed to load friends</string>
     <string name="error_load_messages">Failed to load messages</string>
     <string name="error_send_message">Failed to send message</string>

@@ -34,6 +34,12 @@ data class UserDto(
     val role: String? = null,
 )
 
+data class TwoFactorVerifyResponse(
+    val ok: Boolean = false,
+    val user: UserDto? = null,
+    val error: String? = null,
+)
+
 data class MeResponse(
     val ok: Boolean = false,
     val user: UserDto? = null,

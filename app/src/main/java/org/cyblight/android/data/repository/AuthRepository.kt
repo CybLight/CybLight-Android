@@ -62,7 +62,7 @@ class AuthRepository(
             return AuthResult.Error(body?.error ?: "unknown_error")
         }
 
-        val user = body.data?.user ?: return AuthResult.Error("invalid_response")
+        val user = body.user ?: return AuthResult.Error("invalid_response")
         val token = extractAuthToken(response.headers().values("Set-Cookie"))
             ?: return AuthResult.Error("missing_token")
 

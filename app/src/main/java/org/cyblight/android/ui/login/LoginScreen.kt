@@ -175,6 +175,7 @@ fun TwoFactorScreen(
 @Composable
 private fun mapLoginError(code: String): String = when (code) {
     "invalid_credentials", "missing_fields" -> stringResource(R.string.error_login)
+    "invalid_code" -> stringResource(R.string.error_2fa_code)
     "turnstile_required", "turnstile_failed" -> stringResource(R.string.error_turnstile)
     "too_many_requests" -> stringResource(R.string.error_rate_limit)
     else -> stringResource(R.string.error_generic)
