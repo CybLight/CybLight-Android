@@ -32,7 +32,7 @@ class MessagesRepository(private val api: CybLightApi) {
     suspend fun loadMessages(friendId: String): Result<List<MessageDto>> {
         val response = api.messages(friendId)
         return if (response.ok) {
-            Result.success(response.messages)
+            Result.success(MessageNormalizer.normalize(response.messages))
         } else {
             Result.failure(Exception(response.error ?: "messages_load_failed"))
         }

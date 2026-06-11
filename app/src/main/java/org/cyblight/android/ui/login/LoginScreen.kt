@@ -8,13 +8,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,19 +36,18 @@ import org.cyblight.android.ui.components.AppMenu
 import org.cyblight.android.ui.components.CybLightLogo
 import org.cyblight.android.ui.components.CybAutofillType
 import org.cyblight.android.ui.components.CybOutlinedTextField
-import org.cyblight.android.ui.components.LanguageMenu
 import org.cyblight.android.ui.components.TurnstileWebView
 
 @Composable
 fun LoginScreen(
-    locale: String,
     isSubmitting: Boolean,
     errorCode: String?,
-    onLocaleSelected: (String) -> Unit,
+    onSettings: () -> Unit,
     onAbout: () -> Unit,
     onCheckUpdates: () -> Unit,
     onReportBug: () -> Unit,
     onLogin: (login: String, password: String, turnstileToken: String) -> Unit,
+    onPasskeyLogin: (login: String?) -> Unit,
 ) {
     var login by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
@@ -62,8 +66,8 @@ fun LoginScreen(
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LanguageMenu(currentLocale = locale, onLocaleSelected = onLocaleSelected)
             AppMenu(
+                onSettings = onSettings,
                 onAbout = onAbout,
                 onCheckUpdates = onCheckUpdates,
                 onReportBug = onReportBug,
@@ -141,21 +145,35 @@ fun LoginScreen(
                 Text(stringResource(R.string.sign_in))
             }
         }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedButton(
+            onClick = { onPasskeyLogin(login.ifBlank { null }) },
+            enabled = !isSubmitting,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Key, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(R.string.sign_in_passkey))
+            }
+        }
     }
 }
 
 @Composable
 fun TwoFactorScreen(
-    locale: String,
     isSubmitting: Boolean,
     errorCode: String?,
-    onLocaleSelected: (String) -> Unit,
+    onSettings: () -> Unit,
     onAbout: () -> Unit,
     onCheckUpdates: () -> Unit,
     onReportBug: () -> Unit,
-    onVerify: (code: String) -> Unit,
+    onVerify: (code: String, rememberDevice: Boolean) -> Unit,
 ) {
     var code by rememberSaveable { mutableStateOf("") }
+    var rememberDevice by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -169,8 +187,8 @@ fun TwoFactorScreen(
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LanguageMenu(currentLocale = locale, onLocaleSelected = onLocaleSelected)
             AppMenu(
+                onSettings = onSettings,
                 onAbout = onAbout,
                 onCheckUpdates = onCheckUpdates,
                 onReportBug = onReportBug,
@@ -179,6 +197,12 @@ fun TwoFactorScreen(
         CybLightLogo()
         Spacer(modifier = Modifier.height(16.dp))
         Text(stringResource(R.string.two_factor_title), style = MaterialTheme.typography.titleLarge)
+        Text(
+            text = stringResource(R.string.two_factor_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp),
+        )
         Spacer(modifier = Modifier.height(16.dp))
         CybOutlinedTextField(
             value = code,
@@ -186,13 +210,29 @@ fun TwoFactorScreen(
             label = stringResource(R.string.two_factor_code),
             modifier = Modifier.fillMaxWidth(),
         )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            androidx.compose.material3.Checkbox(
+                checked = rememberDevice,
+                onCheckedChange = { rememberDevice = it },
+            )
+            Text(
+                text = stringResource(R.string.remember_device),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+        }
         if (!errorCode.isNullOrBlank()) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(mapLoginError(errorCode), color = MaterialTheme.colorScheme.error)
         }
         Spacer(modifier = Modifier.height(16.dp))
         Button(
-            onClick = { onVerify(code) },
+            onClick = { onVerify(code, rememberDevice) },
             enabled = !isSubmitting && code.isNotBlank(),
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -207,5 +247,8 @@ private fun mapLoginError(code: String): String = when (code) {
     "invalid_code" -> stringResource(R.string.error_2fa_code)
     "turnstile_required", "turnstile_failed" -> stringResource(R.string.error_turnstile)
     "too_many_requests" -> stringResource(R.string.error_rate_limit)
+    "cancelled" -> stringResource(R.string.error_passkey_cancelled)
+    "no_passkey" -> stringResource(R.string.error_passkey_not_found)
+    "passkey_failed" -> stringResource(R.string.error_passkey_failed)
     else -> stringResource(R.string.error_generic)
 }

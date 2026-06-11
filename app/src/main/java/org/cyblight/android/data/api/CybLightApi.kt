@@ -3,6 +3,7 @@ package org.cyblight.android.data.api
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Headers
 import retrofit2.http.POST
 import retrofit2.http.Path
 
@@ -32,4 +33,11 @@ interface CybLightApi {
 
     @POST("messages/send")
     suspend fun sendMessage(@Body body: SendMessageRequest): SendMessageResponse
+
+    @POST("auth/passkey/login/options")
+    suspend fun passkeyLoginOptions(@Body body: PasskeyOptionsRequest): PasskeyOptionsResponse
+
+    @Headers("Origin: https://cyblight.org")
+    @POST("auth/passkey/login")
+    suspend fun passkeyLogin(@Body body: PasskeyLoginRequest): Response<PasskeyLoginResponse>
 }

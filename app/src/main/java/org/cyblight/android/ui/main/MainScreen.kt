@@ -28,7 +28,6 @@ import org.cyblight.android.data.api.UserDto
 import org.cyblight.android.data.repository.ConversationPreview
 import org.cyblight.android.ui.components.AppMenu
 import org.cyblight.android.ui.components.CybLightLogo
-import org.cyblight.android.ui.components.LanguageMenu
 import org.cyblight.android.ui.friends.FriendsScreen
 import org.cyblight.android.ui.messages.ChatScreen
 import org.cyblight.android.ui.messages.MessagesScreen
@@ -37,7 +36,6 @@ import org.cyblight.android.ui.messages.MessagesScreen
 @Composable
 fun MainScreen(
     user: UserDto,
-    locale: String,
     friends: List<FriendDto>,
     conversations: List<ConversationPreview>,
     friendsError: String?,
@@ -47,7 +45,7 @@ fun MainScreen(
     chatMessages: List<MessageDto>,
     isChatLoading: Boolean,
     isSending: Boolean,
-    onLocaleSelected: (String) -> Unit,
+    onSettings: () -> Unit,
     onAbout: () -> Unit,
     onCheckUpdates: () -> Unit,
     onReportBug: () -> Unit,
@@ -79,8 +77,8 @@ fun MainScreen(
                 title = { Text(stringResource(R.string.welcome_user, user.login)) },
                 navigationIcon = { CybLightLogo(size = 36.dp) },
                 actions = {
-                    LanguageMenu(currentLocale = locale, onLocaleSelected = onLocaleSelected)
                     AppMenu(
+                        onSettings = onSettings,
                         onAbout = onAbout,
                         onCheckUpdates = onCheckUpdates,
                         onReportBug = onReportBug,

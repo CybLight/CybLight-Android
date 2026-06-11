@@ -12,6 +12,7 @@ data class LoginRequest(
     val login: String,
     val password: String,
     val turnstileToken: String,
+    val deviceToken: String? = null,
 )
 
 data class TwoFactorRequest(
@@ -35,6 +36,57 @@ data class UserDto(
 )
 
 data class TwoFactorVerifyResponse(
+    val ok: Boolean = false,
+    val user: UserDto? = null,
+    val error: String? = null,
+    val deviceToken: String? = null,
+)
+
+data class PasskeyOptionsRequest(
+    val login: String? = null,
+)
+
+data class PasskeyAllowCredential(
+    val id: String,
+    val type: String = "public-key",
+    val transports: List<String>? = null,
+)
+
+data class PasskeyPublicKeyOptions(
+    val challenge: String,
+    val timeout: Long = 60_000,
+    val rpId: String,
+    val allowCredentials: List<PasskeyAllowCredential>? = null,
+    val userVerification: String = "required",
+)
+
+data class PasskeyOptionsResponse(
+    val ok: Boolean = false,
+    val challengeId: String? = null,
+    val options: PasskeyPublicKeyOptions? = null,
+    val error: String? = null,
+)
+
+data class PasskeyAssertionResponse(
+    val clientDataJSON: String,
+    val authenticatorData: String,
+    val signature: String,
+    val userHandle: String? = null,
+)
+
+data class PasskeyCredentialPayload(
+    val id: String,
+    val rawId: String,
+    val response: PasskeyAssertionResponse,
+    val type: String = "public-key",
+)
+
+data class PasskeyLoginRequest(
+    val challengeId: String,
+    val credential: PasskeyCredentialPayload,
+)
+
+data class PasskeyLoginResponse(
     val ok: Boolean = false,
     val user: UserDto? = null,
     val error: String? = null,
@@ -73,11 +125,14 @@ data class MessagesResponse(
 )
 
 data class MessageDto(
-    val id: String,
-    @SerializedName("senderId") val senderId: String,
-    val content: String,
-    @SerializedName("createdAt") val createdAt: Long,
-    @SerializedName("readAt") val readAt: Long? = null,
+    val id: String = "",
+    @SerializedName(value = "senderId", alternate = ["sender_id"])
+    val senderId: String = "",
+    val content: String = "",
+    @SerializedName(value = "createdAt", alternate = ["created_at"])
+    val createdAt: Long = 0L,
+    @SerializedName(value = "readAt", alternate = ["read_at"])
+    val readAt: Long? = null,
 )
 
 data class SendMessageRequest(

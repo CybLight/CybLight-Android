@@ -29,6 +29,7 @@ import org.cyblight.android.ui.login.LoginScreen
 import org.cyblight.android.ui.login.TwoFactorScreen
 import org.cyblight.android.ui.main.MainScreen
 import org.cyblight.android.ui.components.AboutDialog
+import org.cyblight.android.ui.settings.SettingsScreen
 import org.cyblight.android.ui.theme.CybLightTheme
 import org.cyblight.android.ui.update.UpdateCheckDialog
 import org.cyblight.android.ui.update.UpdateDialog
@@ -67,14 +68,26 @@ class MainActivity : AppCompatActivity() {
             }
 
             AppLocaleProvider(localeTag = uiState.locale) {
-            CybLightTheme {
+            CybLightTheme(themeMode = uiState.themeMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    when (uiState.screen) {
-                        AppScreen.Loading -> {
+                    when {
+                        uiState.showSettings -> {
+                            SettingsScreen(
+                                locale = uiState.locale,
+                                themeMode = uiState.themeMode,
+                                notificationsEnabled = uiState.notificationsEnabled,
+                                onBack = viewModel::closeSettings,
+                                onLocaleSelected = viewModel::setLocale,
+                                onThemeModeSelected = viewModel::setThemeMode,
+                                onNotificationsEnabledChange = viewModel::setNotificationsEnabled,
+                                onAbout = { showAbout = true },
+                            )
+                        }
+                        uiState.screen == AppScreen.Loading -> {
                             Box(
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center,
@@ -82,36 +95,36 @@ class MainActivity : AppCompatActivity() {
                                 CircularProgressIndicator()
                             }
                         }
-                        AppScreen.Login -> {
+                        uiState.screen == AppScreen.Login -> {
                             LoginScreen(
-                                locale = uiState.locale,
                                 isSubmitting = uiState.isSubmitting,
                                 errorCode = uiState.loginError,
-                                onLocaleSelected = viewModel::setLocale,
+                                onSettings = viewModel::openSettings,
                                 onAbout = { showAbout = true },
                                 onCheckUpdates = viewModel::checkForUpdatesManual,
                                 onReportBug = { BugReport.open(context) },
                                 onLogin = viewModel::login,
+                                onPasskeyLogin = { login ->
+                                    viewModel.loginWithPasskey(this@MainActivity, login)
+                                },
                             )
                         }
-                        AppScreen.TwoFactor -> {
+                        uiState.screen == AppScreen.TwoFactor -> {
                             TwoFactorScreen(
-                                locale = uiState.locale,
                                 isSubmitting = uiState.isSubmitting,
                                 errorCode = uiState.loginError,
-                                onLocaleSelected = viewModel::setLocale,
+                                onSettings = viewModel::openSettings,
                                 onAbout = { showAbout = true },
                                 onCheckUpdates = viewModel::checkForUpdatesManual,
                                 onReportBug = { BugReport.open(context) },
                                 onVerify = viewModel::verify2FA,
                             )
                         }
-                        AppScreen.Main -> {
+                        uiState.screen == AppScreen.Main -> {
                             val user = uiState.user
                             if (user != null) {
                                 MainScreen(
                                     user = user,
-                                    locale = uiState.locale,
                                     friends = uiState.friends,
                                     conversations = uiState.conversations,
                                     friendsError = uiState.friendsError,
@@ -121,7 +134,7 @@ class MainActivity : AppCompatActivity() {
                                     chatMessages = uiState.chatMessages,
                                     isChatLoading = uiState.isChatLoading,
                                     isSending = uiState.isSending,
-                                    onLocaleSelected = viewModel::setLocale,
+                                    onSettings = viewModel::openSettings,
                                     onAbout = { showAbout = true },
                                     onCheckUpdates = viewModel::checkForUpdatesManual,
                                     onReportBug = { BugReport.open(context) },

@@ -1,7 +1,5 @@
 package org.cyblight.android.ui.components
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.cyblight.android.BuildConfig
 import org.cyblight.android.R
+import org.cyblight.android.util.ExternalLinks
 
 @Composable
 fun AboutDialog(onDismiss: () -> Unit) {
@@ -51,9 +50,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                         fontWeight = FontWeight.Medium,
                     ),
                     modifier = Modifier.clickable {
-                        context.startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse(BuildConfig.WEBSITE_URL)),
-                        )
+                        ExternalLinks.openUrl(context, BuildConfig.WEBSITE_URL)
                     },
                 )
                 Text(

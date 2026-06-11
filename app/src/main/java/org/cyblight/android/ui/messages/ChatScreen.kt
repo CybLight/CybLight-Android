@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,6 +26,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -36,6 +37,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.cyblight.android.R
 import org.cyblight.android.ui.components.CybOutlinedTextField
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import org.cyblight.android.data.api.MessageDto
 import java.text.DateFormat
 import java.util.Date
@@ -55,9 +58,16 @@ fun ChatScreen(
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.lastIndex)
+    LaunchedEffect(messages) {
+        if (messages.isEmpty()) return@LaunchedEffect
+        val targetIndex = messages.lastIndex
+        try {
+            snapshotFlow { listState.layoutInfo.totalItemsCount }
+                .filter { it > targetIndex }
+                .first()
+            listState.scrollToItem(targetIndex)
+        } catch (_: Exception) {
+            // Ignore scroll failures — chat content is still usable.
         }
     }
 
@@ -108,7 +118,10 @@ fun ChatScreen(
                         state = listState,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        items(messages, key = { it.id }) { message ->
+                        itemsIndexed(
+                            items = messages,
+                            key = { index, message -> "${message.id}-$index" },
+                        ) { _, message ->
                             MessageBubble(
                                 message = message,
                                 isMine = message.senderId == currentUserId,

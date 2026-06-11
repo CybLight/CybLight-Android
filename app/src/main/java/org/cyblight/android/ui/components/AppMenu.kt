@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -20,6 +21,7 @@ import org.cyblight.android.R
 
 @Composable
 fun AppMenu(
+    onSettings: () -> Unit,
     onAbout: () -> Unit,
     onCheckUpdates: () -> Unit,
     onReportBug: () -> Unit,
@@ -34,6 +36,14 @@ fun AppMenu(
     }
 
     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.menu_settings)) },
+            leadingIcon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
+            onClick = {
+                expanded = false
+                onSettings()
+            },
+        )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.menu_about)) },
             leadingIcon = { Icon(Icons.Outlined.Info, contentDescription = null) },

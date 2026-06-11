@@ -1,5 +1,6 @@
 package org.cyblight.android.ui
 
+import android.app.Activity
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,6 +14,8 @@ import org.cyblight.android.data.ApiClient
 import org.cyblight.android.data.api.FriendDto
 import org.cyblight.android.data.api.MessageDto
 import org.cyblight.android.data.api.UserDto
+import org.cyblight.android.data.preferences.AppPreferences
+import org.cyblight.android.data.preferences.ThemeMode
 import org.cyblight.android.data.repository.AuthRepository
 import org.cyblight.android.data.repository.AuthResult
 import org.cyblight.android.data.repository.ConversationPreview
@@ -53,10 +56,14 @@ data class AppUiState(
     val isSending: Boolean = false,
     val update: UpdateUiState = UpdateUiState(),
     val manualUpdateCheck: ManualUpdateCheckState = ManualUpdateCheckState(),
+    val showSettings: Boolean = false,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val notificationsEnabled: Boolean = true,
 )
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val sessionManager = SessionManager(application)
+    private val appPreferences = AppPreferences(application)
     private val api = ApiClient.create(sessionManager)
     private val authRepository = AuthRepository(api, sessionManager)
     private val friendsRepository = FriendsRepository(api)
@@ -77,8 +84,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             val savedLocale = sessionManager.getLocale()
+            val savedTheme = appPreferences.getThemeMode()
+            val savedNotifications = appPreferences.getNotificationsEnabled()
             LocaleManager.apply(savedLocale)
-            _uiState.value = _uiState.value.copy(locale = savedLocale)
+            _uiState.value = _uiState.value.copy(
+                locale = savedLocale,
+                themeMode = savedTheme,
+                notificationsEnabled = savedNotifications,
+            )
 
             val user = authRepository.restoreSession()
             _uiState.value = if (user != null) {
@@ -225,6 +238,52 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch {
+            appPreferences.setThemeMode(mode)
+            _uiState.value = _uiState.value.copy(themeMode = mode)
+        }
+    }
+
+    fun setNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appPreferences.setNotificationsEnabled(enabled)
+            _uiState.value = _uiState.value.copy(notificationsEnabled = enabled)
+        }
+    }
+
+    fun openSettings() {
+        _uiState.value = _uiState.value.copy(showSettings = true)
+    }
+
+    fun closeSettings() {
+        _uiState.value = _uiState.value.copy(showSettings = false)
+    }
+
+    fun loginWithPasskey(activity: Activity, login: String?) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSubmitting = true, loginError = null)
+            when (val result = authRepository.loginWithPasskey(activity, login)) {
+                is AuthResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        screen = AppScreen.Main,
+                        user = result.user,
+                        isSubmitting = false,
+                        pending2FAUserId = null,
+                    )
+                    refreshSocialData()
+                }
+                is AuthResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isSubmitting = false,
+                        loginError = result.code,
+                    )
+                }
+                else -> Unit
+            }
+        }
+    }
+
     fun login(login: String, password: String, turnstileToken: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSubmitting = true, loginError = null)
@@ -255,11 +314,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun verify2FA(code: String) {
+    fun verify2FA(code: String, rememberDevice: Boolean) {
         val userId = _uiState.value.pending2FAUserId ?: return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSubmitting = true, loginError = null)
-            when (val result = authRepository.verify2FA(userId, code)) {
+            when (val result = authRepository.verify2FA(userId, code, rememberDevice)) {
                 is AuthResult.Success -> {
                     _uiState.value = _uiState.value.copy(
                         screen = AppScreen.Main,
@@ -283,7 +342,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun logout() {
         viewModelScope.launch {
             authRepository.logout()
-            _uiState.value = AppUiState(screen = AppScreen.Login, locale = _uiState.value.locale)
+            _uiState.value = AppUiState(
+                screen = AppScreen.Login,
+                locale = _uiState.value.locale,
+                themeMode = _uiState.value.themeMode,
+                notificationsEnabled = _uiState.value.notificationsEnabled,
+            )
         }
     }
 
@@ -320,12 +384,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
             messagesRepository.loadMessages(friendId)
                 .onSuccess { messages ->
+                    if (_uiState.value.chatFriendId != friendId) return@onSuccess
                     _uiState.value = _uiState.value.copy(
                         chatMessages = messages,
                         isChatLoading = false,
                     )
+                    refreshSocialData()
                 }
                 .onFailure {
+                    if (_uiState.value.chatFriendId != friendId) return@onFailure
                     _uiState.value = _uiState.value.copy(
                         isChatLoading = false,
                         messagesError = "messages_load_failed",

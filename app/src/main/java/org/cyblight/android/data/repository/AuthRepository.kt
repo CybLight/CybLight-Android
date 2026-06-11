@@ -1,7 +1,12 @@
 package org.cyblight.android.data.repository
 
+import android.app.Activity
+import org.cyblight.android.auth.PasskeyAuthException
+import org.cyblight.android.auth.PasskeyAuthHelper
 import org.cyblight.android.data.api.CybLightApi
 import org.cyblight.android.data.api.LoginRequest
+import org.cyblight.android.data.api.PasskeyLoginRequest
+import org.cyblight.android.data.api.PasskeyOptionsRequest
 import org.cyblight.android.data.api.TwoFactorRequest
 import org.cyblight.android.data.api.UserDto
 import org.cyblight.android.data.extractAuthToken
@@ -23,6 +28,7 @@ class AuthRepository(
                 login = login.trim(),
                 password = password,
                 turnstileToken = turnstileToken,
+                deviceToken = sessionManager.getDeviceToken(),
             ),
         )
 
@@ -48,9 +54,13 @@ class AuthRepository(
         return AuthResult.Success(user)
     }
 
-    suspend fun verify2FA(userId: String, code: String): AuthResult {
+    suspend fun verify2FA(userId: String, code: String, rememberDevice: Boolean): AuthResult {
         val response = api.verifyTwoFactor(
-            TwoFactorRequest(userId = userId, code = code.trim()),
+            TwoFactorRequest(
+                userId = userId,
+                code = code.trim(),
+                rememberDevice = rememberDevice,
+            ),
         )
 
         if (!response.isSuccessful) {
@@ -67,7 +77,53 @@ class AuthRepository(
             ?: return AuthResult.Error("missing_token")
 
         sessionManager.saveSession(token, user.id, user.login)
+        body.deviceToken?.takeIf { it.isNotBlank() }?.let { sessionManager.saveDeviceToken(it) }
         return AuthResult.Success(user)
+    }
+
+    suspend fun loginWithPasskey(activity: Activity, login: String? = null): AuthResult {
+        return try {
+            val optionsResponse = api.passkeyLoginOptions(
+                PasskeyOptionsRequest(login = login?.trim()?.takeIf { it.isNotEmpty() }),
+            )
+            if (!optionsResponse.ok) {
+                return AuthResult.Error(optionsResponse.error ?: "passkey_failed")
+            }
+
+            val challengeId = optionsResponse.challengeId
+            val options = optionsResponse.options
+            if (challengeId.isNullOrBlank() || options == null) {
+                return AuthResult.Error("passkey_failed")
+            }
+
+            val credential = PasskeyAuthHelper.getCredential(activity, options)
+            val response = api.passkeyLogin(
+                PasskeyLoginRequest(
+                    challengeId = challengeId,
+                    credential = credential,
+                ),
+            )
+
+            if (!response.isSuccessful) {
+                return AuthResult.Error(parseErrorBody(response.errorBody()?.string()))
+            }
+
+            val body = response.body()
+            if (body?.ok != true) {
+                return AuthResult.Error(body?.error ?: "passkey_failed")
+            }
+
+            val token = extractAuthToken(response.headers().values("Set-Cookie"))
+                ?: return AuthResult.Error("missing_token")
+
+            val user = body.user ?: api.me().user ?: return AuthResult.Error("invalid_response")
+            sessionManager.saveSession(token, user.id, user.login)
+            AuthResult.Success(user)
+        } catch (error: PasskeyAuthException) {
+            AuthResult.Error(error.code)
+        } catch (_: Exception) {
+            AuthResult.Error("passkey_failed")
+        }
     }
 
     suspend fun restoreSession(): UserDto? {

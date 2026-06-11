@@ -17,6 +17,7 @@ class SessionManager(private val context: Context) {
     private val userIdKey = stringPreferencesKey("user_id")
     private val loginKey = stringPreferencesKey("login")
     private val localeKey = stringPreferencesKey("locale")
+    private val deviceTokenKey = stringPreferencesKey("device_token")
 
     val authToken: Flow<String?> = context.dataStore.data.map { it[tokenKey] }
 
@@ -27,6 +28,20 @@ class SessionManager(private val context: Context) {
     suspend fun getToken(): String? = context.dataStore.data.first()[tokenKey]
 
     suspend fun getLocale(): String = context.dataStore.data.first()[localeKey] ?: "ru"
+
+    suspend fun getDeviceToken(): String? = context.dataStore.data.first()[deviceTokenKey]
+
+    suspend fun saveDeviceToken(token: String) {
+        context.dataStore.edit { prefs ->
+            prefs[deviceTokenKey] = token
+        }
+    }
+
+    suspend fun clearDeviceToken() {
+        context.dataStore.edit { prefs ->
+            prefs.remove(deviceTokenKey)
+        }
+    }
 
     suspend fun saveSession(token: String, userId: String, login: String) {
         context.dataStore.edit { prefs ->
@@ -47,6 +62,7 @@ class SessionManager(private val context: Context) {
             prefs.remove(tokenKey)
             prefs.remove(userIdKey)
             prefs.remove(loginKey)
+            prefs.remove(deviceTokenKey)
         }
     }
 

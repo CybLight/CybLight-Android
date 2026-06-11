@@ -1,7 +1,6 @@
 package org.cyblight.android.util
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import org.cyblight.android.BuildConfig
@@ -20,6 +19,6 @@ object BugReport {
             .appendQueryParameter("body", body)
             .build()
 
-        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+        ExternalLinks.openUrl(context, uri.toString())
     }
 }
