@@ -524,6 +524,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 .onFailure { error ->
                     val code = when (error) {
                         is PasskeyAuthException -> error.code
+                        is IllegalStateException -> error.message ?: "passkey_register_failed"
                         else -> "passkey_register_failed"
                     }
                     _uiState.value = _uiState.value.copy(
