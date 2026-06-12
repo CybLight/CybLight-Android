@@ -23,9 +23,9 @@ object ApiClient {
             }.getOrNull()
 
             val builder = chain.request().newBuilder()
-                .addHeader(MOBILE_CLIENT_HEADER, MOBILE_CLIENT_VALUE)
-                .addHeader("User-Agent", AppUserAgent.build())
-                .addHeader("Origin", org.cyblight.android.BuildConfig.WEBSITE_URL)
+                .header(MOBILE_CLIENT_HEADER, MOBILE_CLIENT_VALUE)
+                .header("User-Agent", AppUserAgent.build())
+                .header("Origin", org.cyblight.android.BuildConfig.WEBSITE_URL)
 
             val request = if (!token.isNullOrBlank()) {
                 builder.addHeader("Authorization", "Bearer $token").build()

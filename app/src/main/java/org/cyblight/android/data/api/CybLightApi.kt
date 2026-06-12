@@ -5,7 +5,6 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.HTTP
-import retrofit2.http.Headers
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
@@ -36,7 +35,6 @@ interface CybLightApi {
     @GET("auth/sessions")
     suspend fun sessions(): ApiEnvelope<SessionsData>
 
-    @Headers("Origin: https://cyblight.org")
     @POST("auth/sessions/revoke")
     suspend fun revokeSession(@Body body: RevokeSessionRequest): ApiEnvelope<RevokeSessionData>
 
@@ -102,7 +100,6 @@ interface CybLightApi {
     @POST("auth/passkey/login/options")
     suspend fun passkeyLoginOptions(@Body body: PasskeyOptionsRequest): PasskeyOptionsResponse
 
-    @Headers("Origin: https://cyblight.org")
     @POST("auth/passkey/login")
     suspend fun passkeyLogin(@Body body: PasskeyLoginRequest): Response<PasskeyLoginResponse>
 
@@ -112,22 +109,18 @@ interface CybLightApi {
     @GET("auth/passkey/list")
     suspend fun passkeyList(): PasskeyListResponse
 
-    @Headers("Origin: https://cyblight.org")
     @POST("auth/passkey/register/options")
     suspend fun passkeyRegisterOptions(): PasskeyRegisterOptionsResponse
 
-    @Headers("Origin: https://cyblight.org")
     @POST("auth/passkey/register")
     suspend fun passkeyRegister(@Body body: PasskeyRegisterRequest): ApiEnvelope<PasskeyRegisterData>
 
-    @Headers("Origin: https://cyblight.org")
     @DELETE("auth/passkey/{id}")
     suspend fun deletePasskey(@Path("id") id: String): ApiEnvelope<DeletedData>
 
     @GET("auth/trusted-devices")
     suspend fun trustedDevices(): TrustedDevicesResponse
 
-    @Headers("Origin: https://cyblight.org")
     @DELETE("auth/trusted-devices/{id}")
     suspend fun removeTrustedDevice(@Path("id") id: String): ApiEnvelope<Unit>
 
