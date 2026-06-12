@@ -18,6 +18,7 @@ import org.cyblight.android.auth.PasskeyAuthException
 import org.cyblight.android.data.ApiClient
 import android.content.Context
 import org.cyblight.android.data.api.EasterFlagsDto
+import org.cyblight.android.data.api.EasterProgress
 import org.cyblight.android.data.api.FriendDto
 import org.cyblight.android.data.api.LoginHistoryEntryDto
 import org.cyblight.android.data.api.MessageDto
@@ -153,6 +154,7 @@ data class AppUiState(
     val isLoginHistoryLoading: Boolean = false,
     val loginHistoryError: String? = null,
     val easterFlags: EasterFlagsDto? = null,
+    val easterProgress: EasterProgress = EasterProgress(),
     val isEasterLoading: Boolean = false,
     val easterError: String? = null,
     val showLightCatcherGame: Boolean = false,
@@ -741,6 +743,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshEasterFlags() {
+        refreshEasterProgressInState()
         val state = _uiState.value
         if (state.isEasterLoading) return
         if (state.easterFlags != null && state.easterError == null) return
@@ -1004,6 +1007,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     _uiState.value = _uiState.value.copy(
                         easterFlags = flags,
                         isEasterLoading = false,
+                        easterProgress = buildEasterProgress(flags),
                     )
                 }
                 .onFailure {
@@ -1346,7 +1350,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 chatReplyTarget = null,
                 chatEditTarget = null,
             )
-            archivistTracker = ArchivistTracker(friendId)
+            val saved = appPreferences.getArchivistProgress()
+            archivistTracker = if (saved != null && saved.chatId == friendId) {
+                ArchivistTracker(
+                    chatId = friendId,
+                    pinned = saved.pinned,
+                    edited = saved.edited,
+                    reacted = saved.reacted,
+                    forwarded = saved.forwarded,
+                )
+            } else {
+                ArchivistTracker(friendId)
+            }
+            refreshEasterProgressInState()
             refreshChatFriendPresence(friendId)
             chatPresenceJob = viewModelScope.launch {
                 while (isActive) {
@@ -1612,19 +1628,52 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun trackNightGuardConditions(isDarkTheme: Boolean, isMainScreen: Boolean) {
         nightGuardJob?.cancel()
         nightGuardJob = null
-        if (!isMainScreen || !isDarkTheme || _uiState.value.easterFlags?.nightGuard == true) return
+
+        if (_uiState.value.easterFlags?.nightGuard == true) {
+            viewModelScope.launch {
+                appPreferences.clearNightGuardElapsedMs()
+                refreshEasterProgressInState()
+            }
+            return
+        }
 
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        if (hour >= 6) return
+        if (hour >= 6) {
+            viewModelScope.launch {
+                appPreferences.clearNightGuardElapsedMs()
+                refreshEasterProgressInState()
+            }
+            return
+        }
+
+        if (!isMainScreen || !isDarkTheme) return
 
         nightGuardJob = viewModelScope.launch {
-            delay(30_000)
-            if (_uiState.value.easterFlags?.nightGuard == true) return@launch
-            profileRepository.unlockNightGuard()
-                .onSuccess {
-                    _uiState.value.user?.login?.let(EasterLogger::logNightGuard)
-                    refreshEasterFlagsFromServer()
+            val requiredMs = 30_000L
+            while (isActive) {
+                if (_uiState.value.easterFlags?.nightGuard == true) break
+
+                val hourNow = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                if (hourNow >= 6) {
+                    appPreferences.clearNightGuardElapsedMs()
+                    refreshEasterProgressInState()
+                    break
                 }
+
+                delay(1_000)
+                val elapsed = appPreferences.addNightGuardElapsedMs(1_000)
+                refreshEasterProgressInState()
+
+                if (elapsed >= requiredMs) {
+                    profileRepository.unlockNightGuard()
+                        .onSuccess {
+                            _uiState.value.user?.login?.let(EasterLogger::logNightGuard)
+                            appPreferences.clearNightGuardElapsedMs()
+                            refreshEasterFlagsFromServer()
+                        }
+                    break
+                }
+            }
         }
     }
 
@@ -1632,6 +1681,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (_uiState.value.easterFlags?.trustedFingerprint == true) return
         viewModelScope.launch {
             val count = appPreferences.incrementBiometricUnlockCount()
+            refreshEasterProgressInState()
             if (count >= 100) {
                 profileRepository.unlockTrustedFingerprint()
                     .onSuccess {
@@ -1660,13 +1710,44 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val tracker = archivistTracker ?: return
         if (tracker.chatId != chatId) return
         mark(tracker)
-        if (!tracker.isComplete()) return
         viewModelScope.launch {
+            appPreferences.saveArchivistProgress(
+                chatId = tracker.chatId,
+                pinned = tracker.pinned,
+                edited = tracker.edited,
+                reacted = tracker.reacted,
+                forwarded = tracker.forwarded,
+            )
+            refreshEasterProgressInState()
+            if (!tracker.isComplete()) return@launch
             profileRepository.unlockArchivist()
                 .onSuccess {
                     _uiState.value.user?.login?.let(EasterLogger::logArchivist)
                     refreshEasterFlagsFromServer()
                 }
+        }
+    }
+
+    private suspend fun buildEasterProgress(flags: EasterFlagsDto? = _uiState.value.easterFlags): EasterProgress {
+        val archivist = appPreferences.getArchivistProgress()
+        val archivistCount = if (archivist != null) {
+            listOf(archivist.pinned, archivist.edited, archivist.reacted, archivist.forwarded).count { it }
+        } else {
+            0
+        }
+        val bridgeCount = (if (flags?.bridgeWebToday == true) 1 else 0) +
+            (if (flags?.bridgeAppToday == true) 1 else 0)
+        return EasterProgress(
+            biometricUnlockCount = appPreferences.getBiometricUnlockCount().coerceIn(0, 100),
+            nightGuardSeconds = (appPreferences.getNightGuardElapsedMs() / 1_000).toInt().coerceIn(0, 30),
+            archivistStepsCompleted = archivistCount.coerceIn(0, 4),
+            bridgePlatformsToday = bridgeCount.coerceIn(0, 2),
+        )
+    }
+
+    private fun refreshEasterProgressInState() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(easterProgress = buildEasterProgress())
         }
     }
 
@@ -1682,6 +1763,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     _uiState.value = _uiState.value.copy(
                         easterFlags = flags,
                         easterError = null,
+                        easterProgress = buildEasterProgress(flags),
                     )
                 }
         }

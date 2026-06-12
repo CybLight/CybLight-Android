@@ -432,6 +432,7 @@ class MainActivity : AppCompatActivity() {
                                     onForwardChatMessage = viewModel::forwardChatMessage,
                                     onReactChatMessage = viewModel::reactToChatMessage,
                                     easterFlags = uiState.easterFlags,
+                                    easterProgress = uiState.easterProgress,
                                     isEasterLoading = uiState.isEasterLoading,
                                     easterError = uiState.easterError?.let { code ->
                                         when (code) {

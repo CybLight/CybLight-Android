@@ -26,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.cyblight.android.R
 import org.cyblight.android.data.api.EasterFlagsDto
+import org.cyblight.android.data.api.EasterProgress
 import org.cyblight.android.data.api.FriendDto
 import org.cyblight.android.data.api.MessageDto
 import org.cyblight.android.data.api.PinnedMessageDto
@@ -74,6 +75,7 @@ fun MainScreen(
     isChatLoading: Boolean,
     isSending: Boolean,
     easterFlags: EasterFlagsDto?,
+    easterProgress: EasterProgress,
     isEasterLoading: Boolean,
     easterError: String?,
     onSettings: () -> Unit,
@@ -267,6 +269,7 @@ fun MainScreen(
             )
             TAB_EASTER -> EasterEggsScreen(
                 flags = easterFlags,
+                progress = easterProgress,
                 isLoading = isEasterLoading,
                 error = easterError,
                 onBack = null,

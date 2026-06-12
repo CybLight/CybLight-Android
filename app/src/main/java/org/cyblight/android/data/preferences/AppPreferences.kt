@@ -39,6 +39,8 @@ class AppPreferences(private val context: Context) {
     private val lastSeenLoginEventIdKey = stringPreferencesKey("last_seen_login_event_id")
     private val ignoreLoginEventsUntilKey = longPreferencesKey("ignore_login_events_until")
     private val biometricUnlockCountKey = intPreferencesKey("biometric_unlock_count")
+    private val nightGuardElapsedKey = longPreferencesKey("night_guard_elapsed_ms")
+    private val archivistProgressKey = stringPreferencesKey("archivist_progress")
 
     val themeMode: Flow<ThemeMode> = context.appPreferencesStore.data.map { prefs ->
         ThemeMode.entries.firstOrNull { it.name == prefs[themeKey] } ?: ThemeMode.SYSTEM
@@ -209,6 +211,9 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    suspend fun getBiometricUnlockCount(): Int =
+        context.appPreferencesStore.data.first()[biometricUnlockCountKey] ?: 0
+
     suspend fun incrementBiometricUnlockCount(): Int {
         var next = 0
         context.appPreferencesStore.edit { prefs ->
@@ -217,4 +222,62 @@ class AppPreferences(private val context: Context) {
         }
         return next
     }
+
+    suspend fun getNightGuardElapsedMs(): Long =
+        context.appPreferencesStore.data.first()[nightGuardElapsedKey] ?: 0L
+
+    suspend fun addNightGuardElapsedMs(deltaMs: Long): Long {
+        var total = 0L
+        context.appPreferencesStore.edit { prefs ->
+            total = (prefs[nightGuardElapsedKey] ?: 0L) + deltaMs
+            prefs[nightGuardElapsedKey] = total
+        }
+        return total
+    }
+
+    suspend fun clearNightGuardElapsedMs() {
+        context.appPreferencesStore.edit { prefs ->
+            prefs.remove(nightGuardElapsedKey)
+        }
+    }
+
+    suspend fun getArchivistProgress(): ArchivistProgressSnapshot? {
+        val raw = context.appPreferencesStore.data.first()[archivistProgressKey] ?: return null
+        val parts = raw.split('\t')
+        if (parts.size != 5 || parts[0].isBlank()) return null
+        return ArchivistProgressSnapshot(
+            chatId = parts[0],
+            pinned = parts[1] == "1",
+            edited = parts[2] == "1",
+            reacted = parts[3] == "1",
+            forwarded = parts[4] == "1",
+        )
+    }
+
+    suspend fun saveArchivistProgress(
+        chatId: String,
+        pinned: Boolean,
+        edited: Boolean,
+        reacted: Boolean,
+        forwarded: Boolean,
+    ) {
+        val encoded = listOf(
+            chatId,
+            if (pinned) "1" else "0",
+            if (edited) "1" else "0",
+            if (reacted) "1" else "0",
+            if (forwarded) "1" else "0",
+        ).joinToString("\t")
+        context.appPreferencesStore.edit { prefs ->
+            prefs[archivistProgressKey] = encoded
+        }
+    }
 }
+
+data class ArchivistProgressSnapshot(
+    val chatId: String,
+    val pinned: Boolean = false,
+    val edited: Boolean = false,
+    val reacted: Boolean = false,
+    val forwarded: Boolean = false,
+)

@@ -170,8 +170,17 @@ data class EasterFlagsDto(
     @SerializedName("nightGuard") val nightGuard: Boolean = false,
     @SerializedName("trustedFingerprint") val trustedFingerprint: Boolean = false,
     val bridge: Boolean = false,
+    @SerializedName("bridgeWebToday") val bridgeWebToday: Boolean = false,
+    @SerializedName("bridgeAppToday") val bridgeAppToday: Boolean = false,
     val echo: Boolean = false,
     val archivist: Boolean = false,
+)
+
+data class EasterProgress(
+    val biometricUnlockCount: Int = 0,
+    val nightGuardSeconds: Int = 0,
+    val archivistStepsCompleted: Int = 0,
+    val bridgePlatformsToday: Int = 0,
 )
 
 data class EasterUnlockResponse(

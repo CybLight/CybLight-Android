@@ -1,13 +1,16 @@
 package org.cyblight.android.ui.easter
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -23,8 +26,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.cyblight.android.R
 import org.cyblight.android.data.api.EasterFlagsDto
+import org.cyblight.android.data.api.EasterProgress
 import org.cyblight.android.ui.components.DetailScaffold
 
 private data class EasterEggPalette(
@@ -39,7 +44,19 @@ private data class EasterEggItem(
     @StringRes val titleRes: Int,
     val unlocked: Boolean,
     val palette: EasterEggPalette,
+    @StringRes val descUnlockedRes: Int,
+    @StringRes val descLockedRes: Int,
+    @StringRes val hintUnlockedRes: Int? = null,
+    @StringRes val hintLockedRes: Int? = null,
+    val progressCurrent: Int? = null,
+    val progressTotal: Int? = null,
+    val progressIsSeconds: Boolean = false,
 )
+
+private val EasterBadgeFoundGreen = Color(0xFF22C55E)
+private val EasterBadgeFoundBackground = Color(0x2622C55E)
+private val EasterBadgeLockedRed = Color(0xFFEF4444)
+private val EasterBadgeLockedBackground = Color(0x26EF4444)
 
 private object EasterEggPalettes {
     val lightCatcher = EasterEggPalette(
@@ -107,6 +124,7 @@ private object EasterEggPalettes {
 @Composable
 fun EasterEggsScreen(
     flags: EasterFlagsDto?,
+    progress: EasterProgress,
     isLoading: Boolean,
     error: String?,
     onBack: (() -> Unit)? = null,
@@ -137,6 +155,7 @@ fun EasterEggsScreen(
             else -> {
                 EasterEggsContent(
                     flags = flags,
+                    progress = progress,
                     modifier = contentModifier,
                 )
             }
@@ -159,19 +178,79 @@ fun EasterEggsScreen(
 @Composable
 private fun EasterEggsContent(
     flags: EasterFlagsDto?,
+    progress: EasterProgress,
     modifier: Modifier = Modifier,
 ) {
-    val appEggs = remember(flags) {
+    val appEggs = remember(flags, progress) {
         listOf(
-            EasterEggItem("💡", R.string.easter_light_catcher_title, flags?.lightCatcher == true, EasterEggPalettes.lightCatcher),
-            EasterEggItem("🌙", R.string.easter_night_guard_title, flags?.nightGuard == true, EasterEggPalettes.nightGuard),
-            EasterEggItem("👆", R.string.easter_trusted_fingerprint_title, flags?.trustedFingerprint == true, EasterEggPalettes.trustedFingerprint),
-            EasterEggItem("🔔", R.string.easter_echo_title, flags?.echo == true, EasterEggPalettes.echo),
-            EasterEggItem("📚", R.string.easter_archivist_title, flags?.archivist == true, EasterEggPalettes.archivist),
+            EasterEggItem(
+                emoji = "💡",
+                titleRes = R.string.easter_light_catcher_title,
+                unlocked = flags?.lightCatcher == true,
+                palette = EasterEggPalettes.lightCatcher,
+                descUnlockedRes = R.string.easter_light_catcher_desc_unlocked,
+                descLockedRes = R.string.easter_light_catcher_desc_locked,
+                hintUnlockedRes = R.string.easter_light_catcher_hint_unlocked,
+                hintLockedRes = R.string.easter_light_catcher_hint_locked,
+            ),
+            EasterEggItem(
+                emoji = "🌙",
+                titleRes = R.string.easter_night_guard_title,
+                unlocked = flags?.nightGuard == true,
+                palette = EasterEggPalettes.nightGuard,
+                descUnlockedRes = R.string.easter_night_guard_desc_unlocked,
+                descLockedRes = R.string.easter_night_guard_desc_locked,
+                hintLockedRes = R.string.easter_night_guard_hint_locked,
+                progressCurrent = if (flags?.nightGuard != true) progress.nightGuardSeconds else null,
+                progressTotal = if (flags?.nightGuard != true) 30 else null,
+                progressIsSeconds = true,
+            ),
+            EasterEggItem(
+                emoji = "👆",
+                titleRes = R.string.easter_trusted_fingerprint_title,
+                unlocked = flags?.trustedFingerprint == true,
+                palette = EasterEggPalettes.trustedFingerprint,
+                descUnlockedRes = R.string.easter_trusted_fingerprint_desc_unlocked,
+                descLockedRes = R.string.easter_trusted_fingerprint_desc_locked,
+                hintLockedRes = R.string.easter_trusted_fingerprint_hint_locked,
+                progressCurrent = if (flags?.trustedFingerprint != true) progress.biometricUnlockCount else null,
+                progressTotal = if (flags?.trustedFingerprint != true) 100 else null,
+            ),
+            EasterEggItem(
+                emoji = "🔔",
+                titleRes = R.string.easter_echo_title,
+                unlocked = flags?.echo == true,
+                palette = EasterEggPalettes.echo,
+                descUnlockedRes = R.string.easter_echo_desc_unlocked,
+                descLockedRes = R.string.easter_echo_desc_locked,
+                hintLockedRes = R.string.easter_echo_hint_locked,
+            ),
+            EasterEggItem(
+                emoji = "📚",
+                titleRes = R.string.easter_archivist_title,
+                unlocked = flags?.archivist == true,
+                palette = EasterEggPalettes.archivist,
+                descUnlockedRes = R.string.easter_archivist_desc_unlocked,
+                descLockedRes = R.string.easter_archivist_desc_locked,
+                hintLockedRes = R.string.easter_archivist_hint_locked,
+                progressCurrent = if (flags?.archivist != true) progress.archivistStepsCompleted else null,
+                progressTotal = if (flags?.archivist != true) 4 else null,
+            ),
         )
     }
-    val bridgeEgg = remember(flags) {
-        EasterEggItem("🌉", R.string.easter_bridge_title, flags?.bridge == true, EasterEggPalettes.bridge)
+    val bridgeEgg = remember(flags, progress) {
+        EasterEggItem(
+            emoji = "🌉",
+            titleRes = R.string.easter_bridge_title,
+            unlocked = flags?.bridge == true,
+            palette = EasterEggPalettes.bridge,
+            descUnlockedRes = R.string.easter_bridge_desc_unlocked,
+            descLockedRes = R.string.easter_bridge_desc_locked,
+            hintUnlockedRes = R.string.easter_bridge_hint_unlocked,
+            hintLockedRes = R.string.easter_bridge_hint_locked,
+            progressCurrent = if (flags?.bridge != true) progress.bridgePlatformsToday else null,
+            progressTotal = if (flags?.bridge != true) 2 else null,
+        )
     }
     val websiteEggs = remember(flags) {
         listOf(
@@ -180,24 +259,40 @@ private fun EasterEggsContent(
                 titleRes = R.string.easter_strawberry_title,
                 unlocked = flags?.strawberry == true,
                 palette = EasterEggPalettes.strawberry,
+                descUnlockedRes = R.string.easter_strawberry_desc_unlocked,
+                descLockedRes = R.string.easter_strawberry_desc_locked,
+                hintUnlockedRes = R.string.easter_strawberry_hint_unlocked,
+                hintLockedRes = R.string.easter_strawberry_hint_locked,
             ),
             EasterEggItem(
                 emoji = "🪞",
                 titleRes = R.string.easter_profile_mirror_title,
                 unlocked = flags?.profileMirror == true,
                 palette = EasterEggPalettes.profileMirror,
+                descUnlockedRes = R.string.easter_profile_mirror_desc_unlocked,
+                descLockedRes = R.string.easter_profile_mirror_desc_locked,
+                hintUnlockedRes = R.string.easter_profile_mirror_hint_unlocked,
+                hintLockedRes = R.string.easter_profile_mirror_hint_locked,
             ),
             EasterEggItem(
                 emoji = "🌑",
                 titleRes = R.string.easter_dark_trigger_title,
                 unlocked = flags?.darkTrigger == true,
                 palette = EasterEggPalettes.darkTrigger,
+                descUnlockedRes = R.string.easter_dark_trigger_desc_unlocked,
+                descLockedRes = R.string.easter_dark_trigger_desc_locked,
+                hintUnlockedRes = R.string.easter_dark_trigger_hint_unlocked,
+                hintLockedRes = R.string.easter_dark_trigger_hint_locked,
             ),
             EasterEggItem(
                 emoji = "📬",
                 titleRes = R.string.easter_postmaster_title,
                 unlocked = flags?.postmaster == true,
                 palette = EasterEggPalettes.postmaster,
+                descUnlockedRes = R.string.easter_postmaster_desc_unlocked,
+                descLockedRes = R.string.easter_postmaster_desc_locked,
+                hintUnlockedRes = R.string.easter_postmaster_hint_unlocked,
+                hintLockedRes = R.string.easter_postmaster_hint_locked,
             ),
         )
     }
@@ -286,35 +381,92 @@ private fun EasterEggsSectionDivider(
 }
 
 @Composable
+private fun EasterEggStatusBadge(
+    unlocked: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val backgroundColor = if (unlocked) EasterBadgeFoundBackground else EasterBadgeLockedBackground
+    val textColor = if (unlocked) EasterBadgeFoundGreen else EasterBadgeLockedRed
+    val label = if (unlocked) {
+        stringResource(R.string.easter_badge_found)
+    } else {
+        stringResource(R.string.easter_badge_locked)
+    }
+
+    Text(
+        text = label.uppercase(),
+        modifier = modifier
+            .background(backgroundColor, RoundedCornerShape(6.dp))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        color = textColor,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.5.sp,
+    )
+}
+
+@Composable
 private fun EasterEggCard(
     item: EasterEggItem,
 ) {
     val containerColor = if (item.unlocked) item.palette.unlockedContainer else item.palette.lockedContainer
     val contentColor = if (item.unlocked) item.palette.unlockedContent else item.palette.lockedContent
+    val descriptionRes = if (item.unlocked) item.descUnlockedRes else item.descLockedRes
+    val hintRes = if (item.unlocked) item.hintUnlockedRes else item.hintLockedRes
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(text = item.emoji, style = MaterialTheme.typography.headlineMedium)
-            Text(
-                text = stringResource(item.titleRes),
-                fontWeight = FontWeight.SemiBold,
-                color = contentColor,
-            )
-            Text(
-                text = if (item.unlocked) {
-                    stringResource(R.string.easter_unlocked)
-                } else {
-                    stringResource(R.string.easter_locked)
-                },
-                color = contentColor.copy(alpha = if (item.unlocked) 0.9f else 0.75f),
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(end = 92.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(text = item.emoji, style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    text = stringResource(item.titleRes),
+                    fontWeight = FontWeight.SemiBold,
+                    color = contentColor,
+                )
+                Text(
+                    text = stringResource(descriptionRes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = contentColor.copy(alpha = 0.75f),
+                )
+                if (!item.unlocked && item.progressCurrent != null && item.progressTotal != null) {
+                    val progressText = if (item.progressIsSeconds) {
+                        stringResource(R.string.easter_progress_seconds, item.progressCurrent, item.progressTotal)
+                    } else {
+                        stringResource(R.string.easter_progress_of, item.progressCurrent, item.progressTotal)
+                    }
+                    Text(
+                        text = progressText,
+                        modifier = Modifier
+                            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = contentColor.copy(alpha = 0.9f),
+                    )
+                }
+                hintRes?.let { res ->
+                    Text(
+                        text = stringResource(res),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = contentColor.copy(alpha = 0.7f),
+                    )
+                }
+            }
+            EasterEggStatusBadge(
+                unlocked = item.unlocked,
+                modifier = Modifier.align(Alignment.TopEnd),
             )
         }
     }
