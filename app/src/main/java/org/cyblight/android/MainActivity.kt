@@ -1,11 +1,15 @@
 package org.cyblight.android
 
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import android.view.autofill.AutofillManager
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,9 +38,15 @@ import org.cyblight.android.ui.theme.CybLightTheme
 import org.cyblight.android.ui.update.UpdateCheckDialog
 import org.cyblight.android.ui.update.UpdateDialog
 import org.cyblight.android.util.BugReport
+import org.cyblight.android.util.SystemSettings
 
 class MainActivity : AppCompatActivity() {
     private val viewModel: AppViewModel by viewModels()
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshSessionOnResume()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,6 +56,15 @@ class MainActivity : AppCompatActivity() {
             val context = LocalContext.current
             var pendingAutofillCommit by remember { mutableStateOf(false) }
             var showAbout by remember { mutableStateOf(false) }
+
+            val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.RequestPermission(),
+            ) { granted ->
+                viewModel.setNotificationsEnabled(granted)
+                if (granted) {
+                    SystemSettings.openAppNotificationSettings(context)
+                }
+            }
 
             LaunchedEffect(uiState.screen) {
                 if (uiState.screen == AppScreen.Login || uiState.screen == AppScreen.TwoFactor) {
@@ -84,6 +103,13 @@ class MainActivity : AppCompatActivity() {
                                 onLocaleSelected = viewModel::setLocale,
                                 onThemeModeSelected = viewModel::setThemeMode,
                                 onNotificationsEnabledChange = viewModel::setNotificationsEnabled,
+                                onRequestNotificationPermission = {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                        notificationPermissionLauncher.launch(
+                                            Manifest.permission.POST_NOTIFICATIONS,
+                                        )
+                                    }
+                                },
                                 onAbout = { showAbout = true },
                             )
                         }

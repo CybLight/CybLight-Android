@@ -5,26 +5,55 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import org.cyblight.android.BuildConfig
 import org.cyblight.android.data.api.CybLightApi
+import org.cyblight.android.data.api.createApiGson
 import org.cyblight.android.data.session.SessionManager
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object ApiClient {
+    private const val MOBILE_CLIENT_HEADER = "X-CybLight-Client"
+    private const val MOBILE_CLIENT_VALUE = "android"
+
     fun create(sessionManager: SessionManager): CybLightApi {
         val authInterceptor = Interceptor { chain ->
             val token = runCatching {
                 kotlinx.coroutines.runBlocking { sessionManager.getToken() }
             }.getOrNull()
 
+            val builder = chain.request().newBuilder()
+                .addHeader(MOBILE_CLIENT_HEADER, MOBILE_CLIENT_VALUE)
+
             val request = if (!token.isNullOrBlank()) {
-                chain.request().newBuilder()
-                    .addHeader("Authorization", "Bearer $token")
-                    .build()
+                builder.addHeader("Authorization", "Bearer $token").build()
             } else {
-                chain.request()
+                builder.build()
             }
             chain.proceed(request)
+        }
+
+        val sessionInterceptor = Interceptor { chain ->
+            val response = chain.proceed(chain.request())
+
+            extractAuthToken(response.headers("Set-Cookie"))
+                ?.takeIf { it.isNotBlank() }
+                ?.let { newToken ->
+                    runCatching {
+                        kotlinx.coroutines.runBlocking { sessionManager.updateToken(newToken) }
+                    }
+                }
+
+            val path = chain.request().url.encodedPath
+            val isLoginAttempt = path.contains("/auth/login") ||
+                path.contains("/auth/2fa") ||
+                path.contains("/auth/passkey")
+
+            if (!isLoginAttempt && (response.code == 401 || response.code == 403)) {
+                runCatching {
+                    kotlinx.coroutines.runBlocking { sessionManager.clearAndNotifyExpired() }
+                }
+            }
+            response
         }
 
         val logging = HttpLoggingInterceptor().apply {
@@ -35,13 +64,14 @@ object ApiClient {
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .addInterceptor(authInterceptor)
+            .addInterceptor(sessionInterceptor)
             .addInterceptor(logging)
             .build()
 
         return Retrofit.Builder()
             .baseUrl(ensureTrailingSlash(BuildConfig.API_BASE_URL))
             .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(createApiGson()))
             .build()
             .create(CybLightApi::class.java)
     }

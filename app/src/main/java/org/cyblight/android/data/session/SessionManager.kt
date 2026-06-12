@@ -7,6 +7,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
@@ -18,14 +21,18 @@ class SessionManager(private val context: Context) {
     private val loginKey = stringPreferencesKey("login")
     private val localeKey = stringPreferencesKey("locale")
     private val deviceTokenKey = stringPreferencesKey("device_token")
+    private val sessionExpiredEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     val authToken: Flow<String?> = context.dataStore.data.map { it[tokenKey] }
+    val sessionExpired: SharedFlow<Unit> = sessionExpiredEvents.asSharedFlow()
 
     val isLoggedIn: Flow<Boolean> = authToken.map { !it.isNullOrBlank() }
 
     val savedLocale: Flow<String> = context.dataStore.data.map { it[localeKey] ?: "ru" }
 
     suspend fun getToken(): String? = context.dataStore.data.first()[tokenKey]
+
+    suspend fun getUserId(): String? = context.dataStore.data.first()[userIdKey]
 
     suspend fun getLocale(): String = context.dataStore.data.first()[localeKey] ?: "ru"
 
@@ -51,6 +58,13 @@ class SessionManager(private val context: Context) {
         }
     }
 
+    suspend fun updateToken(token: String) {
+        if (token.isBlank()) return
+        context.dataStore.edit { prefs ->
+            prefs[tokenKey] = token
+        }
+    }
+
     suspend fun saveLocale(locale: String) {
         context.dataStore.edit { prefs ->
             prefs[localeKey] = locale
@@ -64,6 +78,11 @@ class SessionManager(private val context: Context) {
             prefs.remove(loginKey)
             prefs.remove(deviceTokenKey)
         }
+    }
+
+    suspend fun clearAndNotifyExpired() {
+        clear()
+        sessionExpiredEvents.tryEmit(Unit)
     }
 
     suspend fun currentLogin(): String? = context.dataStore.data.first()[loginKey]

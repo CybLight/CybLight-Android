@@ -18,6 +18,7 @@ import org.cyblight.android.data.preferences.AppPreferences
 import org.cyblight.android.data.preferences.ThemeMode
 import org.cyblight.android.data.repository.AuthRepository
 import org.cyblight.android.data.repository.AuthResult
+import org.cyblight.android.data.repository.SessionRefreshResult
 import org.cyblight.android.data.repository.ConversationPreview
 import org.cyblight.android.data.repository.FriendsRepository
 import org.cyblight.android.data.repository.MessagesRepository
@@ -83,29 +84,54 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            val savedLocale = sessionManager.getLocale()
-            val savedTheme = appPreferences.getThemeMode()
-            val savedNotifications = appPreferences.getNotificationsEnabled()
-            LocaleManager.apply(savedLocale)
-            _uiState.value = _uiState.value.copy(
-                locale = savedLocale,
-                themeMode = savedTheme,
-                notificationsEnabled = savedNotifications,
-            )
-
-            val user = authRepository.restoreSession()
-            _uiState.value = if (user != null) {
-                _uiState.value.copy(screen = AppScreen.Main, user = user)
-            } else {
-                _uiState.value.copy(screen = AppScreen.Login)
+            sessionManager.sessionExpired.collect {
+                forceLogout()
             }
-
-            if (user != null) {
-                refreshSocialData()
-            }
-
-            checkForUpdate()
         }
+
+        viewModelScope.launch {
+            try {
+                val savedLocale = sessionManager.getLocale()
+                val savedTheme = appPreferences.getThemeMode()
+                val savedNotifications = appPreferences.getNotificationsEnabled()
+                LocaleManager.apply(savedLocale)
+                _uiState.value = _uiState.value.copy(
+                    locale = savedLocale,
+                    themeMode = savedTheme,
+                    notificationsEnabled = savedNotifications,
+                )
+
+                val user = authRepository.restoreSession()
+                _uiState.value = if (user != null) {
+                    _uiState.value.copy(screen = AppScreen.Main, user = user)
+                } else {
+                    _uiState.value.copy(screen = AppScreen.Login)
+                }
+
+                if (user != null) {
+                    when (authRepository.refreshSession()) {
+                        SessionRefreshResult.Expired -> {
+                            forceLogout()
+                            return@launch
+                        }
+                        else -> refreshSocialData()
+                    }
+                }
+
+                checkForUpdate()
+            } catch (_: Exception) {
+                forceLogout()
+            }
+        }
+    }
+
+    private fun forceLogout() {
+        _uiState.value = AppUiState(
+            screen = AppScreen.Login,
+            locale = _uiState.value.locale,
+            themeMode = _uiState.value.themeMode,
+            notificationsEnabled = _uiState.value.notificationsEnabled,
+        )
     }
 
     fun checkForUpdate() {
@@ -348,6 +374,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 themeMode = _uiState.value.themeMode,
                 notificationsEnabled = _uiState.value.notificationsEnabled,
             )
+        }
+    }
+
+    fun refreshSessionOnResume() {
+        if (_uiState.value.screen != AppScreen.Main || _uiState.value.user == null) return
+        viewModelScope.launch {
+            when (authRepository.refreshSession()) {
+                SessionRefreshResult.Valid -> refreshSocialData()
+                SessionRefreshResult.Expired -> forceLogout()
+                SessionRefreshResult.Offline -> Unit
+            }
         }
     }
 

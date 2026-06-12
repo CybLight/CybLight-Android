@@ -26,7 +26,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -37,8 +36,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.cyblight.android.R
 import org.cyblight.android.ui.components.CybOutlinedTextField
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
 import org.cyblight.android.data.api.MessageDto
 import java.text.DateFormat
 import java.util.Date
@@ -58,16 +56,11 @@ fun ChatScreen(
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    LaunchedEffect(messages) {
-        if (messages.isEmpty()) return@LaunchedEffect
-        val targetIndex = messages.lastIndex
-        try {
-            snapshotFlow { listState.layoutInfo.totalItemsCount }
-                .filter { it > targetIndex }
-                .first()
-            listState.scrollToItem(targetIndex)
-        } catch (_: Exception) {
-            // Ignore scroll failures — chat content is still usable.
+    LaunchedEffect(messages.size, isLoading) {
+        if (isLoading || messages.isEmpty()) return@LaunchedEffect
+        delay(50)
+        runCatching {
+            listState.animateScrollToItem(messages.lastIndex)
         }
     }
 
@@ -120,7 +113,7 @@ fun ChatScreen(
                     ) {
                         itemsIndexed(
                             items = messages,
-                            key = { index, message -> "${message.id}-$index" },
+                            key = { _, message -> message.id },
                         ) { _, message ->
                             MessageBubble(
                                 message = message,
@@ -181,7 +174,9 @@ private fun MessageBubble(message: MessageDto, isMine: Boolean) {
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val time = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(message.createdAt))
+    val timestamp = message.createdAt.takeIf { it > 0L } ?: System.currentTimeMillis()
+    val time = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(timestamp))
+    val text = message.content.ifBlank { " " }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -193,7 +188,7 @@ private fun MessageBubble(message: MessageDto, isMine: Boolean) {
                 .background(bg)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
-            Text(message.content, color = fg)
+            Text(text, color = fg)
         }
         Text(
             text = time,

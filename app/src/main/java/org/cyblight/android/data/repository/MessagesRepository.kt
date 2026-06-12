@@ -11,30 +11,38 @@ data class ConversationPreview(
 
 class MessagesRepository(private val api: CybLightApi) {
     suspend fun loadConversations(friends: List<FriendDto>): Result<List<ConversationPreview>> {
-        val unread = api.unreadSummary()
-        if (!unread.ok) {
-            return Result.failure(Exception("unread_load_failed"))
-        }
+        return try {
+            val unread = api.unreadSummary()
+            if (!unread.ok) {
+                return Result.failure(Exception("unread_load_failed"))
+            }
 
-        val previews = friends.map { friend ->
-            ConversationPreview(
-                friend = friend,
-                unreadCount = unread.unreadByUser[friend.id] ?: 0,
+            val previews = friends.map { friend ->
+                ConversationPreview(
+                    friend = friend,
+                    unreadCount = unread.unreadByUser[friend.id] ?: 0,
+                )
+            }.sortedWith(
+                compareByDescending<ConversationPreview> { it.unreadCount }
+                    .thenBy { it.friend.username.lowercase() },
             )
-        }.sortedWith(
-            compareByDescending<ConversationPreview> { it.unreadCount }
-                .thenBy { it.friend.username.lowercase() },
-        )
 
-        return Result.success(previews)
+            Result.success(previews)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     suspend fun loadMessages(friendId: String): Result<List<MessageDto>> {
-        val response = api.messages(friendId)
-        return if (response.ok) {
-            Result.success(MessageNormalizer.normalize(response.messages))
-        } else {
-            Result.failure(Exception(response.error ?: "messages_load_failed"))
+        return try {
+            val response = api.messages(friendId)
+            if (response.ok) {
+                Result.success(MessageNormalizer.normalize(response.messages))
+            } else {
+                Result.failure(Exception(response.error ?: "messages_load_failed"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 
@@ -42,17 +50,20 @@ class MessagesRepository(private val api: CybLightApi) {
         val trimmed = content.trim()
         if (trimmed.isEmpty()) return Result.failure(Exception("empty_message"))
 
-        val response = api.sendMessage(
-            org.cyblight.android.data.api.SendMessageRequest(
-                recipientId = recipientId,
-                content = trimmed,
-            ),
-        )
-
-        return if (response.ok) {
-            Result.success(Unit)
-        } else {
-            Result.failure(Exception(response.error ?: "send_failed"))
+        return try {
+            val response = api.sendMessage(
+                org.cyblight.android.data.api.SendMessageRequest(
+                    recipientId = recipientId,
+                    content = trimmed,
+                ),
+            )
+            if (response.ok) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(response.error ?: "send_failed"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 }

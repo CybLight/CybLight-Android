@@ -11,11 +11,18 @@ import org.cyblight.android.data.api.TwoFactorRequest
 import org.cyblight.android.data.api.UserDto
 import org.cyblight.android.data.extractAuthToken
 import org.cyblight.android.data.session.SessionManager
+import retrofit2.HttpException
 
 sealed class AuthResult {
     data class Success(val user: UserDto) : AuthResult()
     data class Requires2FA(val userId: String) : AuthResult()
     data class Error(val code: String) : AuthResult()
+}
+
+enum class SessionRefreshResult {
+    Valid,
+    Expired,
+    Offline,
 }
 
 class AuthRepository(
@@ -126,15 +133,61 @@ class AuthRepository(
         }
     }
 
+    suspend fun refreshSession(): SessionRefreshResult {
+        val token = sessionManager.getToken()
+        if (token.isNullOrBlank()) return SessionRefreshResult.Expired
+
+        return try {
+            val response = api.refreshSession()
+            when {
+                response.isSuccessful && response.body()?.ok == true -> SessionRefreshResult.Valid
+                response.code() == 401 || response.code() == 403 -> {
+                    sessionManager.clearAndNotifyExpired()
+                    SessionRefreshResult.Expired
+                }
+                else -> SessionRefreshResult.Offline
+            }
+        } catch (error: HttpException) {
+            if (error.code() == 401 || error.code() == 403) {
+                sessionManager.clearAndNotifyExpired()
+                SessionRefreshResult.Expired
+            } else {
+                SessionRefreshResult.Offline
+            }
+        } catch (_: Exception) {
+            SessionRefreshResult.Offline
+        }
+    }
+
     suspend fun restoreSession(): UserDto? {
         val token = sessionManager.getToken() ?: return null
         if (token.isBlank()) return null
 
-        val me = api.me()
-        return if (me.ok) me.user else {
-            sessionManager.clear()
+        return try {
+            val me = api.me()
+            when {
+                me.ok && me.user != null -> me.user
+                me.ok -> readCachedUser()
+                else -> {
+                    sessionManager.clearAndNotifyExpired()
+                    null
+                }
+            }
+        } catch (error: HttpException) {
+            if (error.code() == 401 || error.code() == 403) {
+                sessionManager.clearAndNotifyExpired()
+            }
             null
+        } catch (_: Exception) {
+            readCachedUser()
         }
+    }
+
+    private suspend fun readCachedUser(): UserDto? {
+        val userId = sessionManager.getUserId()?.trim().orEmpty()
+        val login = sessionManager.currentLogin()?.trim().orEmpty()
+        if (userId.isBlank() || login.isBlank()) return null
+        return UserDto(id = userId, login = login)
     }
 
     suspend fun logout() {

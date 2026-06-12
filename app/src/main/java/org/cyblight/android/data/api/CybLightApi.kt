@@ -17,6 +17,9 @@ interface CybLightApi {
     @GET("auth/me")
     suspend fun me(): MeResponse
 
+    @POST("auth/session/refresh")
+    suspend fun refreshSession(): Response<ApiEnvelope<Unit>>
+
     @POST("auth/logout")
     suspend fun logout(): ApiEnvelope<Map<String, Any>>
 

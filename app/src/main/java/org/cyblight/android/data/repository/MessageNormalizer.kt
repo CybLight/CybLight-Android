@@ -5,17 +5,25 @@ import org.cyblight.android.data.api.MessageDto
 object MessageNormalizer {
     fun normalize(messages: List<MessageDto>): List<MessageDto> {
         val seen = mutableSetOf<String>()
-        return messages.mapIndexed { index, message ->
-            val id = message.id.trim().ifBlank { "msg-$index-${message.createdAt}" }
-            val uniqueId = if (seen.add(id)) id else "$id-$index"
-            message.copy(
-                id = uniqueId,
-                senderId = message.senderId.trim(),
-                content = message.content.ifBlank { " " },
-                createdAt = normalizeTimestamp(message.createdAt),
-            )
+        return messages.mapIndexedNotNull { index, message ->
+            runCatching {
+                val safeId = safeString(message.id)
+                val safeSenderId = safeString(message.senderId)
+                val safeContent = safeString(message.content)
+                val id = safeId.ifBlank { "msg-$index-${message.createdAt}" }
+                val uniqueId = if (seen.add(id)) id else "$id-$index"
+                message.copy(
+                    id = uniqueId,
+                    senderId = safeSenderId,
+                    content = safeContent.ifBlank { " " },
+                    createdAt = normalizeTimestamp(message.createdAt),
+                )
+            }.getOrNull()
         }
     }
+
+    // Gson may still deliver nulls for non-null Kotlin fields at runtime.
+    private fun safeString(value: String?): String = value?.trim().orEmpty()
 
     private fun normalizeTimestamp(value: Long): Long {
         if (value <= 0L) return System.currentTimeMillis()

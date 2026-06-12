@@ -1,9 +1,6 @@
 package org.cyblight.android.ui.settings
 
-import android.Manifest
 import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -55,20 +52,12 @@ fun SettingsScreen(
     onLocaleSelected: (String) -> Unit,
     onThemeModeSelected: (ThemeMode) -> Unit,
     onNotificationsEnabledChange: (Boolean) -> Unit,
+    onRequestNotificationPermission: () -> Unit,
     onAbout: () -> Unit,
 ) {
     val context = LocalContext.current
     var languageMenuExpanded by remember { mutableStateOf(false) }
     var themeMenuExpanded by remember { mutableStateOf(false) }
-
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        onNotificationsEnabledChange(granted)
-        if (granted) {
-            SystemSettings.openAppNotificationSettings(context)
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -167,7 +156,7 @@ fun SettingsScreen(
                         checked = notificationsEnabled,
                         onCheckedChange = { enabled ->
                             if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                onRequestNotificationPermission()
                             } else {
                                 onNotificationsEnabledChange(enabled)
                                 if (enabled) {
