@@ -1621,7 +1621,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             delay(30_000)
             if (_uiState.value.easterFlags?.nightGuard == true) return@launch
             profileRepository.unlockNightGuard()
-                .onSuccess { refreshEasterFlagsFromServer() }
+                .onSuccess {
+                    _uiState.value.user?.login?.let(EasterLogger::logNightGuard)
+                    refreshEasterFlagsFromServer()
+                }
         }
     }
 
@@ -1631,7 +1634,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val count = appPreferences.incrementBiometricUnlockCount()
             if (count >= 100) {
                 profileRepository.unlockTrustedFingerprint()
-                    .onSuccess { refreshEasterFlagsFromServer() }
+                    .onSuccess {
+                        _uiState.value.user?.login?.let(EasterLogger::logTrustedFingerprint)
+                        refreshEasterFlagsFromServer()
+                    }
             }
         }
     }
@@ -1642,7 +1648,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (calendar.get(Calendar.HOUR_OF_DAY) != 23 || calendar.get(Calendar.MINUTE) != 59) return
         viewModelScope.launch {
             profileRepository.unlockEcho()
-                .onSuccess { refreshEasterFlagsFromServer() }
+                .onSuccess {
+                    _uiState.value.user?.login?.let(EasterLogger::logEcho)
+                    refreshEasterFlagsFromServer()
+                }
         }
     }
 
@@ -1654,14 +1663,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (!tracker.isComplete()) return
         viewModelScope.launch {
             profileRepository.unlockArchivist()
-                .onSuccess { refreshEasterFlagsFromServer() }
+                .onSuccess {
+                    _uiState.value.user?.login?.let(EasterLogger::logArchivist)
+                    refreshEasterFlagsFromServer()
+                }
         }
     }
 
     private fun refreshEasterFlagsFromServer() {
         viewModelScope.launch {
+            val previous = _uiState.value.easterFlags
+            val hadBridge = previous?.bridge == true
             profileRepository.loadEasterFlags()
                 .onSuccess { flags ->
+                    if (previous != null && !hadBridge && flags.bridge) {
+                        _uiState.value.user?.login?.let(EasterLogger::logBridge)
+                    }
                     _uiState.value = _uiState.value.copy(
                         easterFlags = flags,
                         easterError = null,
