@@ -4,7 +4,9 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.HTTP
 import retrofit2.http.Headers
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -75,6 +77,27 @@ interface CybLightApi {
 
     @POST("messages/send")
     suspend fun sendMessage(@Body body: SendMessageRequest): SendMessageResponse
+
+    @PATCH("messages/{messageId}")
+    suspend fun editMessage(
+        @Path("messageId") messageId: String,
+        @Body body: EditMessageRequest,
+    ): MessageActionResponse
+
+    @DELETE("messages/{messageId}")
+    suspend fun deleteMessage(@Path("messageId") messageId: String): MessageActionResponse
+
+    @POST("messages/{messageId}/pin")
+    suspend fun pinMessage(
+        @Path("messageId") messageId: String,
+        @Body body: PinMessageRequest,
+    ): MessageActionResponse
+
+    @HTTP(method = "DELETE", path = "messages/{messageId}/pin", hasBody = true)
+    suspend fun unpinMessage(
+        @Path("messageId") messageId: String,
+        @Body body: UnpinMessageRequest,
+    ): MessageActionResponse
 
     @POST("auth/passkey/login/options")
     suspend fun passkeyLoginOptions(@Body body: PasskeyOptionsRequest): PasskeyOptionsResponse

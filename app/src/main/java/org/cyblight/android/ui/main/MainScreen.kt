@@ -28,6 +28,7 @@ import org.cyblight.android.R
 import org.cyblight.android.data.api.EasterFlagsDto
 import org.cyblight.android.data.api.FriendDto
 import org.cyblight.android.data.api.MessageDto
+import org.cyblight.android.data.api.PinnedMessageDto
 import org.cyblight.android.data.api.UserDto
 import org.cyblight.android.data.repository.ConversationPreview
 import org.cyblight.android.data.repository.SecurityOverview
@@ -35,6 +36,8 @@ import org.cyblight.android.ui.components.AppMenu
 import org.cyblight.android.ui.components.CybLightLogo
 import org.cyblight.android.ui.easter.EasterEggsScreen
 import org.cyblight.android.ui.friends.FriendsScreen
+import org.cyblight.android.ui.messages.ChatEditTarget
+import org.cyblight.android.ui.messages.ChatReplyTarget
 import org.cyblight.android.ui.messages.ChatScreen
 import org.cyblight.android.ui.messages.MessagesScreen
 import org.cyblight.android.ui.security.SecurityScreen
@@ -65,6 +68,9 @@ fun MainScreen(
     chatFriendIsOnline: Boolean,
     chatFriendLastSeenAt: Long?,
     chatMessages: List<MessageDto>,
+    chatPinnedMessage: PinnedMessageDto?,
+    chatReplyTarget: ChatReplyTarget?,
+    chatEditTarget: ChatEditTarget?,
     isChatLoading: Boolean,
     isSending: Boolean,
     easterFlags: EasterFlagsDto?,
@@ -91,6 +97,15 @@ fun MainScreen(
     onOpenChat: (friendId: String, username: String) -> Unit,
     onCloseChat: () -> Unit,
     onSendMessage: (String) -> Unit,
+    onClearChatReply: () -> Unit,
+    onClearChatEdit: () -> Unit,
+    onStartChatReply: (MessageDto) -> Unit,
+    onStartChatEdit: (MessageDto) -> Unit,
+    onPinChatMessage: (MessageDto) -> Unit,
+    onUnpinChatMessage: (MessageDto) -> Unit,
+    onDeleteChatMessage: (String) -> Unit,
+    onDeleteChatMessages: (List<String>) -> Unit,
+    onForwardChatMessage: (String, String) -> Unit,
     securityOverview: SecurityOverview?,
     isSecurityLoading: Boolean,
     isSecurityRefreshing: Boolean,
@@ -110,13 +125,26 @@ fun MainScreen(
             friendIsOnline = chatFriendIsOnline,
             friendLastSeenAt = chatFriendLastSeenAt,
             messages = chatMessages,
+            pinnedMessage = chatPinnedMessage,
+            friends = friends,
             currentUserId = user.id,
             isLoading = isChatLoading,
             isSending = isSending,
             error = messagesError,
+            replyTarget = chatReplyTarget,
+            editTarget = chatEditTarget,
             onBack = onCloseChat,
             onOpenProfile = onOpenFriendProfile,
             onSend = onSendMessage,
+            onClearReply = onClearChatReply,
+            onClearEdit = onClearChatEdit,
+            onStartReply = onStartChatReply,
+            onStartEdit = onStartChatEdit,
+            onPinMessage = onPinChatMessage,
+            onUnpinMessage = onUnpinChatMessage,
+            onDeleteMessage = onDeleteChatMessage,
+            onDeleteMessages = onDeleteChatMessages,
+            onForwardMessage = onForwardChatMessage,
         )
         return
     }

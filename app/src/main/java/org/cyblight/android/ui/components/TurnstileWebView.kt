@@ -1,6 +1,7 @@
 package org.cyblight.android.ui.components
 
 import android.annotation.SuppressLint
+import android.graphics.Color
 import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
@@ -30,6 +31,8 @@ fun TurnstileWebView(
         factory = { context ->
             WebView(context).apply {
                 importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
+                setBackgroundColor(Color.TRANSPARENT)
+                background = null
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 webViewClient = WebViewClient()
@@ -51,7 +54,7 @@ fun TurnstileWebView(
                       <meta name="viewport" content="width=device-width, initial-scale=1.0">
                       <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"></script>
                       <style>
-                        body { margin: 0; background: transparent; display: flex; justify-content: center; }
+                        html, body { margin: 0; background: transparent !important; display: flex; justify-content: center; }
                       </style>
                     </head>
                     <body>
@@ -59,6 +62,7 @@ fun TurnstileWebView(
                       <script>
                         turnstile.render('#turnstile', {
                           sitekey: '${BuildConfig.TURNSTILE_SITEKEY}',
+                          theme: 'dark',
                           callback: function(token) {
                             CybLightTurnstile.onToken(token);
                           }

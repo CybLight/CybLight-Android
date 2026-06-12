@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 
 data class LinkPreviewData(
     val url: String,
@@ -34,10 +35,16 @@ private data class MicrolinkImage(
     val url: String? = null,
 )
 
-class LinkPreviewRepository {
-    private val client = OkHttpClient()
+object LinkPreviewRepository {
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(12, TimeUnit.SECONDS)
+        .writeTimeout(8, TimeUnit.SECONDS)
+        .callTimeout(15, TimeUnit.SECONDS)
+        .build()
     private val gson = Gson()
     private val cache = ConcurrentHashMap<String, LinkPreviewData?>()
+
     suspend fun fetch(url: String): LinkPreviewData? = withContext(Dispatchers.IO) {
         cache[url]?.let { return@withContext it }
 

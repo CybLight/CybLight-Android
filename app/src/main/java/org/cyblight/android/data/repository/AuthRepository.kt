@@ -124,7 +124,9 @@ class AuthRepository(
             val token = extractAuthToken(response.headers().values("Set-Cookie"))
                 ?: return AuthResult.Error("missing_token")
 
-            val user = resolveUser(body.user, api.me().user)
+            sessionManager.updateToken(token)
+            val meUser = runCatching { api.me().user }.getOrNull()
+            val user = resolveUser(body.user, meUser)
                 ?: return AuthResult.Error("invalid_response")
             sessionManager.saveSession(token, user.id, user.login)
             AuthResult.Success(user)
@@ -206,6 +208,13 @@ class AuthRepository(
         }
         if (partial != null && partial.id.isNotBlank() && partial.login.isNotBlank()) {
             return partial
+        }
+        val login = partial?.login?.takeIf { it.isNotBlank() }
+            ?: meUser?.login?.takeIf { it.isNotBlank() }
+        val id = partial?.id?.takeIf { it.isNotBlank() }
+            ?: meUser?.id?.takeIf { it.isNotBlank() }
+        if (!login.isNullOrBlank() && !id.isNullOrBlank()) {
+            return UserDto(id = id, login = login)
         }
         return null
     }

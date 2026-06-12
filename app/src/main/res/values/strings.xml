@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">CybLight</string>
-    <string name="app_tagline">Управление устройствами</string>
+    <string name="app_tagline">Вход в аккаунт CybLight</string>
     <string name="sign_in">Войти</string>
     <string name="signing_in">Вхожу…</string>
     <string name="username">Логин</string>
@@ -55,6 +55,34 @@
     <string name="message_placeholder">Сообщение…</string>
     <string name="chat_emoji">Смайлики</string>
     <string name="chat_link_preview_loading">Загрузка превью…</string>
+    <string name="chat_pinned_label">Закреплённое сообщение</string>
+    <string name="chat_pinned_fallback">Сообщение</string>
+    <string name="chat_action_reply">Ответить</string>
+    <string name="chat_action_copy">Копировать</string>
+    <string name="chat_action_copy_link">Копировать ссылку</string>
+    <string name="chat_action_forward">Переслать</string>
+    <string name="chat_action_pin">Закрепить</string>
+    <string name="chat_action_unpin">Открепить</string>
+    <string name="chat_action_edit">Изменить</string>
+    <string name="chat_action_delete">Удалить</string>
+    <string name="chat_action_select">Выделить</string>
+    <string name="chat_selected_count">Выбрано %1$d</string>
+    <string name="chat_copied">Скопировано</string>
+    <string name="chat_link_copied">Ссылка скопирована</string>
+    <string name="chat_forward_title">Переслать сообщение</string>
+    <string name="chat_forward_no_friends">Нет друзей для пересылки</string>
+    <string name="chat_forwarded">Сообщение переслано</string>
+    <string name="chat_delete_title">Удалить сообщение</string>
+    <string name="chat_delete_one">Удалить это сообщение?</string>
+    <string name="chat_delete_many">Удалить %1$d выбранных сообщений?</string>
+    <string name="chat_delete_foreign">Нельзя удалять чужие сообщения</string>
+    <string name="chat_unpin_confirm">Убрать закреп из этого чата?</string>
+    <string name="chat_reply_to">Ответ %1$s</string>
+    <string name="chat_reply_you">Вы</string>
+    <string name="chat_reply_peer">Собеседник</string>
+    <string name="chat_editing_message">Редактирование</string>
+    <string name="chat_edit_placeholder">Изменить сообщение…</string>
+    <string name="chat_edited">изменено</string>
     <string name="chat_compose_preview_title">Предпросмотр ссылки</string>
     <string name="chat_insert_link">Вставить ссылку</string>
     <string name="chat_insert_link_url">URL</string>

@@ -86,7 +86,11 @@ object ApiClient {
 fun extractAuthToken(setCookieHeaders: List<String>): String? {
     for (header in setCookieHeaders) {
         val part = header.split(";").firstOrNull { it.trim().startsWith("cyb_auth=") } ?: continue
-        return part.substringAfter("cyb_auth=").trim()
+        val raw = part.substringAfter("cyb_auth=").trim()
+        if (raw.isBlank()) continue
+        return runCatching {
+            java.net.URLDecoder.decode(raw, Charsets.UTF_8.name())
+        }.getOrDefault(raw)
     }
     return null
 }

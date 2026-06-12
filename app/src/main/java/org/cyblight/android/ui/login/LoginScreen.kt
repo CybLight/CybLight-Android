@@ -257,6 +257,9 @@ private fun mapLoginError(code: String): String = when (code) {
     "too_many_requests" -> stringResource(R.string.error_rate_limit)
     "cancelled" -> stringResource(R.string.error_passkey_cancelled)
     "no_passkey" -> stringResource(R.string.error_passkey_not_found)
-    "passkey_failed" -> stringResource(R.string.error_passkey_failed)
+    "asset_links_failed" -> stringResource(R.string.error_passkey_asset_links_failed)
+    "passkey_failed", "missing_token", "invalid_response",
+    "origin_mismatch", "invalid_challenge", "challenge_mismatch",
+    -> stringResource(R.string.error_passkey_failed)
     else -> stringResource(R.string.error_generic)
 }

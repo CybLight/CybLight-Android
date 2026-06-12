@@ -42,16 +42,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 import org.cyblight.android.BuildConfig
 import org.cyblight.android.R
 import org.cyblight.android.util.ExternalLinks
@@ -88,6 +90,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
     var languageMenuExpanded by remember { mutableStateOf(false) }
     var themeMenuExpanded by remember { mutableStateOf(false) }
     var appLockTimeoutMenuExpanded by remember { mutableStateOf(false) }
@@ -456,7 +459,10 @@ fun SettingsScreen(
                         versionTapCount++
                         if (versionTapCount >= 7) {
                             versionTapCount = 0
-                            onOpenLightCatcherGame()
+                            scope.launch {
+                                delay(200)
+                                onOpenLightCatcherGame()
+                            }
                         }
                     },
             )

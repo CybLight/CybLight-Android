@@ -32,6 +32,8 @@ import coil.request.ImageRequest
 import org.cyblight.android.R
 import org.cyblight.android.data.repository.LinkPreviewData
 import org.cyblight.android.data.repository.LinkPreviewRepository
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import org.cyblight.android.util.ExternalLinks
 
 @Composable
@@ -41,12 +43,12 @@ fun ChatMessageContent(
     linkColor: androidx.compose.ui.graphics.Color,
     messageId: String,
     modifier: Modifier = Modifier,
+    enableLinkPreview: Boolean = true,
 ) {
     val parsed = remember(rawContent, linkColor) {
         ChatMessageParser.parseWithSpoilers(rawContent, linkColor)
     }
     val revealedSpoilers = remember { mutableStateMapOf<String, Boolean>() }
-    val previewRepository = remember { LinkPreviewRepository() }
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         parsed.parts.forEach { part ->
@@ -98,12 +100,13 @@ fun ChatMessageContent(
             }
         }
 
-        parsed.previewUrl?.let { url ->
-            LinkPreviewCard(
-                url = url,
-                repository = previewRepository,
-                textColor = textColor,
-            )
+        if (enableLinkPreview) {
+            parsed.previewUrl?.let { url ->
+                LinkPreviewCard(
+                    url = url,
+                    textColor = textColor,
+                )
+            }
         }
     }
 }
@@ -111,16 +114,21 @@ fun ChatMessageContent(
 @Composable
 private fun LinkPreviewCard(
     url: String,
-    repository: LinkPreviewRepository,
     textColor: androidx.compose.ui.graphics.Color,
 ) {
     val context = LocalContext.current
     var preview by remember(url) { mutableStateOf<LinkPreviewData?>(null) }
     var loading by remember(url) { mutableStateOf(true) }
+    var failed by remember(url) { mutableStateOf(false) }
 
     LaunchedEffect(url) {
         loading = true
-        preview = repository.fetch(url)
+        failed = false
+        preview = null
+        val result = LinkPreviewRepository.fetch(url)
+        if (!currentCoroutineContext().isActive) return@LaunchedEffect
+        preview = result
+        failed = result == null
         loading = false
     }
 
@@ -135,38 +143,55 @@ private fun LinkPreviewCard(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            if (loading) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
-                    Text(
-                        stringResource(R.string.chat_link_preview_loading),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = textColor.copy(alpha = 0.8f),
-                        modifier = Modifier.padding(start = 8.dp),
-                    )
+            when {
+                loading -> {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                        Text(
+                            stringResource(R.string.chat_link_preview_loading),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = textColor.copy(alpha = 0.8f),
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
                 }
-            } else {
-                val title = preview?.title?.ifBlank { preview?.siteName }?.ifBlank { url }
-                Text(
-                    title.orEmpty(),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = textColor,
-                    maxLines = 2,
-                )
-                preview?.description?.takeIf { it.isNotBlank() }?.let { description ->
+                failed -> {
                     Text(
-                        description,
+                        runCatching { java.net.URI(url).host }.getOrDefault(url),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = textColor,
+                        maxLines = 2,
+                    )
+                    Text(
+                        url,
                         style = MaterialTheme.typography.bodySmall,
-                        color = textColor.copy(alpha = 0.8f),
+                        color = textColor.copy(alpha = 0.75f),
                         maxLines = 2,
                     )
                 }
-                Text(
-                    runCatching { java.net.URI(url).host }.getOrDefault(url),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = textColor.copy(alpha = 0.65f),
-                    maxLines = 1,
-                )
+                else -> {
+                    val title = preview?.title?.ifBlank { preview?.siteName }?.ifBlank { url }
+                    Text(
+                        title.orEmpty(),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = textColor,
+                        maxLines = 2,
+                    )
+                    preview?.description?.takeIf { it.isNotBlank() }?.let { description ->
+                        Text(
+                            description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = textColor.copy(alpha = 0.8f),
+                            maxLines = 2,
+                        )
+                    }
+                    Text(
+                        runCatching { java.net.URI(url).host }.getOrDefault(url),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = textColor.copy(alpha = 0.65f),
+                        maxLines = 1,
+                    )
+                }
             }
         }
         if (!loading && !preview?.imageUrl.isNullOrBlank()) {

@@ -42,7 +42,8 @@ object PasskeyAuthHelper {
         } catch (error: NoCredentialException) {
             throw PasskeyAuthException("no_passkey")
         } catch (error: GetCredentialException) {
-            throw PasskeyAuthException("passkey_failed")
+            Log.e(TAG, "getCredential failed: type=${error.type}, message=${error.message}", error)
+            throw PasskeyAuthException(mapGetCredentialError(error))
         }
 
         val publicKeyCredential = result.credential as? PublicKeyCredential
@@ -72,6 +73,19 @@ object PasskeyAuthHelper {
             ?: throw PasskeyAuthException("invalid_response")
 
         return parseRegistrationResponse(publicKeyCredential.registrationResponseJson)
+    }
+
+    private fun mapGetCredentialError(error: GetCredentialException): String {
+        val type = error.type.lowercase()
+        val message = error.message?.lowercase().orEmpty()
+        if (type.contains("dom") ||
+            message.contains("asset link") ||
+            message.contains("digital asset") ||
+            message.contains("assetlinks")
+        ) {
+            return "asset_links_failed"
+        }
+        return "passkey_failed"
     }
 
     private fun mapCreateCredentialError(error: CreateCredentialException): String {

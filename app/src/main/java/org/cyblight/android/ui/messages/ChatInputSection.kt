@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
@@ -49,6 +50,10 @@ fun ChatInputSection(
     onDraftChange: (TextFieldValue) -> Unit,
     suppressedPreviewUrl: String?,
     onSuppressPreview: () -> Unit,
+    replyTarget: ChatReplyTarget? = null,
+    editTarget: ChatEditTarget? = null,
+    onClearReply: () -> Unit = {},
+    onClearEdit: () -> Unit = {},
     isSending: Boolean,
     onSend: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -82,6 +87,21 @@ fun ChatInputSection(
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
+        replyTarget?.let { reply ->
+            ChatComposeBanner(
+                title = stringResource(R.string.chat_reply_to, reply.author),
+                subtitle = reply.preview,
+                onDismiss = onClearReply,
+            )
+        }
+        editTarget?.let {
+            ChatComposeBanner(
+                title = stringResource(R.string.chat_editing_message),
+                subtitle = null,
+                onDismiss = onClearEdit,
+            )
+        }
+
         ChatFormattingToolbar(
             onBold = { wrapSelection(draft, onDraftChange, "**", "**") },
             onItalic = { wrapSelection(draft, onDraftChange, "_", "_") },
@@ -115,7 +135,15 @@ fun ChatInputSection(
             OutlinedTextField(
                 value = draft,
                 onValueChange = onDraftChange,
-                placeholder = { Text(stringResource(R.string.message_placeholder)) },
+                placeholder = {
+                    Text(
+                        if (editTarget != null) {
+                            stringResource(R.string.chat_edit_placeholder)
+                        } else {
+                            stringResource(R.string.message_placeholder)
+                        },
+                    )
+                },
                 modifier = Modifier.weight(1f),
                 maxLines = 4,
             )
@@ -135,6 +163,35 @@ fun ChatInputSection(
             ) {
                 Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = stringResource(R.string.send))
             }
+        }
+    }
+}
+
+@Composable
+private fun ChatComposeBanner(
+    title: String,
+    subtitle: String?,
+    onDismiss: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            subtitle?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                )
+            }
+        }
+        IconButton(onClick = onDismiss) {
+            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.cancel))
         }
     }
 }

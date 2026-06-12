@@ -48,6 +48,7 @@ private class MessageDtoDeserializer : JsonDeserializer<MessageDto> {
             content = obj.readString("content"),
             createdAt = obj.readLong("createdAt", "created_at"),
             readAt = obj.readNullableLong("readAt", "read_at"),
+            editedAt = obj.readNullableLong("editedAt", "edited_at"),
         )
     }
 }

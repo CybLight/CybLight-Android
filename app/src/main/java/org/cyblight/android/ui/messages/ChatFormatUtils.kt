@@ -3,10 +3,18 @@ package org.cyblight.android.ui.messages
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
+data class ReplyMeta(
+    val messageId: String,
+    val author: String,
+    val text: String,
+)
+
 object ChatFormatUtils {
     private val urlRegex = Regex("""https?://[^\s<]+""", RegexOption.IGNORE_CASE)
     private val noPreviewRegex = Regex("""\[\[CYBLIGHT_NO_PREVIEW:([^\]]+)]]""")
     private val replyRegex = Regex("""\n?\[\[CYBLIGHT_REPLY:[^\]]+]]""")
+    private val replyMetaRegex = Regex("""\[\[CYBLIGHT_REPLY:([^:\]]+):([^:\]]*):([^\]]*)]]""")
+    private val replyMetaLegacyRegex = Regex("""\[\[CYBLIGHT_REPLY:([^:\]]+):([^\]]*)]]""")
 
     fun stripMetadataTokens(text: String): String {
         return text
@@ -37,6 +45,46 @@ object ChatFormatUtils {
     fun appendNoPreviewToken(content: String, url: String): String {
         val encoded = URLEncoder.encode(url, StandardCharsets.UTF_8.name())
         return "$content\n[[CYBLIGHT_NO_PREVIEW:$encoded]]"
+    }
+
+    fun extractReplyMeta(text: String): ReplyMeta? {
+        replyMetaRegex.find(text)?.let { match ->
+            val messageId = match.groupValues[1].trim()
+            if (messageId.isNotEmpty()) {
+                return ReplyMeta(
+                    messageId = messageId,
+                    author = decodeToken(match.groupValues[2]).ifBlank { "Собеседник" },
+                    text = decodeToken(match.groupValues[3]),
+                )
+            }
+        }
+        replyMetaLegacyRegex.find(text)?.let { match ->
+            val messageId = match.groupValues[1].trim()
+            if (messageId.isNotEmpty()) {
+                return ReplyMeta(
+                    messageId = messageId,
+                    author = "Собеседник",
+                    text = decodeToken(match.groupValues[2]),
+                )
+            }
+        }
+        return null
+    }
+
+    fun appendReplyToken(content: String, messageId: String, author: String, preview: String): String {
+        val safeAuthor = URLEncoder.encode(author, StandardCharsets.UTF_8.name())
+        val safePreview = URLEncoder.encode(
+            preview.replace(Regex("""\s+"""), " ").trim().take(220),
+            StandardCharsets.UTF_8.name(),
+        )
+        return "$content\n[[CYBLIGHT_REPLY:$messageId:$safeAuthor:$safePreview]]"
+    }
+
+    private fun decodeToken(value: String): String {
+        if (value.isBlank()) return ""
+        return runCatching {
+            java.net.URLDecoder.decode(value, StandardCharsets.UTF_8.name())
+        }.getOrDefault(value)
     }
 
     private fun normalizeUrl(value: String): String {

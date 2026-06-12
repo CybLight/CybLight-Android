@@ -175,6 +175,8 @@ data class LightCatcherResponse(
 data class MeUserDto(
     val id: String = "",
     val login: String = "",
+    @SerializedName("createdAt") val createdAt: Long = 0L,
+    val role: String? = null,
     val email: String? = null,
     @SerializedName("emailVerified") val emailVerified: Boolean = false,
     @SerializedName("pendingEmail") val pendingEmail: String? = null,
@@ -351,9 +353,18 @@ data class UnreadSummaryResponse(
     @SerializedName("unreadByUser") val unreadByUser: Map<String, Int> = emptyMap(),
 )
 
+data class PinnedMessageDto(
+    @SerializedName("messageId") val messageId: String = "",
+    val content: String = "",
+    @SerializedName("senderId") val senderId: String = "",
+    @SerializedName("pinnedByUserId") val pinnedByUserId: String = "",
+    @SerializedName("updatedAt") val updatedAt: Long = 0L,
+)
+
 data class MessagesResponse(
     val ok: Boolean = false,
     val messages: List<MessageDto> = emptyList(),
+    val pinned: PinnedMessageDto? = null,
     val error: String? = null,
 )
 
@@ -366,6 +377,25 @@ data class MessageDto(
     val createdAt: Long = 0L,
     @SerializedName(value = "readAt", alternate = ["read_at"])
     val readAt: Long? = null,
+    @SerializedName(value = "editedAt", alternate = ["edited_at"])
+    val editedAt: Long? = null,
+)
+
+data class EditMessageRequest(
+    val content: String,
+)
+
+data class PinMessageRequest(
+    @SerializedName("forBoth") val forBoth: Boolean = false,
+)
+
+data class UnpinMessageRequest(
+    @SerializedName("forBoth") val forBoth: Boolean = false,
+)
+
+data class MessageActionResponse(
+    val ok: Boolean = false,
+    val error: String? = null,
 )
 
 data class SendMessageRequest(

@@ -119,7 +119,8 @@ fun LightCatcherGameDialog(
 
     AlertDialog(
         onDismissRequest = {
-            if (!isUnlocking) onDismiss()
+            if (isUnlocking || phase == GamePhase.Playing) return@AlertDialog
+            onDismiss()
         },
         title = {
             Text(

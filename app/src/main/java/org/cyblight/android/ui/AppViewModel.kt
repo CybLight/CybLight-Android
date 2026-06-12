@@ -21,6 +21,7 @@ import org.cyblight.android.data.api.EasterFlagsDto
 import org.cyblight.android.data.api.FriendDto
 import org.cyblight.android.data.api.LoginHistoryEntryDto
 import org.cyblight.android.data.api.MessageDto
+import org.cyblight.android.data.api.PinnedMessageDto
 import org.cyblight.android.data.api.PasskeyDto
 import org.cyblight.android.data.api.ProfileDto
 import org.cyblight.android.data.api.SessionDto
@@ -52,6 +53,9 @@ import org.cyblight.android.update.UpdateUiState
 import org.cyblight.android.notifications.LoginNotificationMonitor
 import org.cyblight.android.workers.LoginNotificationWorker
 import org.cyblight.android.util.SystemSettings
+import org.cyblight.android.ui.messages.ChatEditTarget
+import org.cyblight.android.ui.messages.ChatFormatUtils
+import org.cyblight.android.ui.messages.ChatReplyTarget
 import java.io.File
 
 enum class AppScreen {
@@ -94,6 +98,9 @@ data class AppUiState(
     val friendsError: String? = null,
     val messagesError: String? = null,
     val chatMessages: List<MessageDto> = emptyList(),
+    val chatPinnedMessage: PinnedMessageDto? = null,
+    val chatReplyTarget: ChatReplyTarget? = null,
+    val chatEditTarget: ChatEditTarget? = null,
     val chatFriendId: String? = null,
     val chatFriendName: String? = null,
     val chatFriendIsOnline: Boolean = false,
@@ -1245,6 +1252,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 isChatLoading = true,
                 messagesError = null,
                 chatMessages = emptyList(),
+                chatPinnedMessage = null,
+                chatReplyTarget = null,
+                chatEditTarget = null,
             )
             refreshChatFriendPresence(friendId)
             chatPresenceJob = viewModelScope.launch {
@@ -1255,10 +1265,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             messagesRepository.loadMessages(friendId)
-                .onSuccess { messages ->
+                .onSuccess { thread ->
                     if (_uiState.value.chatFriendId != friendId) return@onSuccess
                     _uiState.value = _uiState.value.copy(
-                        chatMessages = messages,
+                        chatMessages = thread.messages,
+                        chatPinnedMessage = thread.pinned,
                         isChatLoading = false,
                     )
                     refreshSocialData()
@@ -1282,9 +1293,113 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             chatFriendIsOnline = false,
             chatFriendLastSeenAt = null,
             chatMessages = emptyList(),
+            chatPinnedMessage = null,
+            chatReplyTarget = null,
+            chatEditTarget = null,
             messagesError = null,
         )
         refreshSocialData()
+    }
+
+    fun clearChatReply() {
+        _uiState.value = _uiState.value.copy(chatReplyTarget = null)
+    }
+
+    fun clearChatEdit() {
+        _uiState.value = _uiState.value.copy(chatEditTarget = null)
+    }
+
+    fun startChatReply(message: MessageDto) {
+        val friendName = _uiState.value.chatFriendName.orEmpty()
+        val isMine = message.senderId == _uiState.value.user?.id
+        val author = if (isMine) {
+            getApplication<Application>().getString(org.cyblight.android.R.string.chat_reply_you)
+        } else {
+            friendName.ifBlank { getApplication<Application>().getString(org.cyblight.android.R.string.chat_reply_peer) }
+        }
+        val preview = ChatFormatUtils.stripMetadataTokens(message.content)
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+            .take(220)
+        _uiState.value = _uiState.value.copy(
+            chatReplyTarget = ChatReplyTarget(message.id, author, preview),
+            chatEditTarget = null,
+        )
+    }
+
+    fun startChatEdit(message: MessageDto) {
+        _uiState.value = _uiState.value.copy(
+            chatEditTarget = ChatEditTarget(message.id, message.content),
+            chatReplyTarget = null,
+        )
+    }
+
+    fun pinChatMessage(message: MessageDto) {
+        val friendId = _uiState.value.chatFriendId ?: return
+        viewModelScope.launch {
+            messagesRepository.pinMessage(message.id)
+                .onSuccess { reloadChat(friendId) }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(messagesError = "pin_failed")
+                }
+        }
+    }
+
+    fun unpinChatMessage(message: MessageDto) {
+        val friendId = _uiState.value.chatFriendId ?: return
+        viewModelScope.launch {
+            messagesRepository.unpinMessage(message.id)
+                .onSuccess { reloadChat(friendId) }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(messagesError = "unpin_failed")
+                }
+        }
+    }
+
+    fun deleteChatMessage(messageId: String) {
+        val friendId = _uiState.value.chatFriendId ?: return
+        viewModelScope.launch {
+            messagesRepository.deleteMessage(messageId)
+                .onSuccess { reloadChat(friendId) }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(messagesError = "delete_failed")
+                }
+        }
+    }
+
+    fun deleteChatMessages(messageIds: List<String>) {
+        val friendId = _uiState.value.chatFriendId ?: return
+        viewModelScope.launch {
+            messagesRepository.deleteMessages(messageIds)
+                .onSuccess { reloadChat(friendId) }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(messagesError = "delete_failed")
+                }
+        }
+    }
+
+    fun forwardChatMessage(targetFriendId: String, content: String) {
+        val text = ChatFormatUtils.stripMetadataTokens(content).trim()
+        if (text.isEmpty()) return
+        viewModelScope.launch {
+            messagesRepository.sendMessage(targetFriendId, text)
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(messagesError = "send_failed")
+                }
+        }
+    }
+
+    private suspend fun reloadChat(friendId: String) {
+        messagesRepository.loadMessages(friendId)
+            .onSuccess { thread ->
+                if (_uiState.value.chatFriendId != friendId) return
+                _uiState.value = _uiState.value.copy(
+                    chatMessages = thread.messages,
+                    chatPinnedMessage = thread.pinned,
+                    messagesError = null,
+                )
+                refreshSocialData()
+            }
     }
 
     private fun refreshChatFriendPresence(friendId: String) {
@@ -1302,22 +1417,39 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun sendMessage(content: String) {
         val friendId = _uiState.value.chatFriendId ?: return
+        val editTarget = _uiState.value.chatEditTarget
+        val replyTarget = _uiState.value.chatReplyTarget
+        var finalContent = content.trim()
+        if (finalContent.isEmpty()) return
+        if (editTarget == null && replyTarget != null) {
+            finalContent = ChatFormatUtils.appendReplyToken(
+                finalContent,
+                replyTarget.messageId,
+                replyTarget.author,
+                replyTarget.preview,
+            )
+        }
+
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSending = true, messagesError = null)
-            messagesRepository.sendMessage(friendId, content)
+            val action = if (editTarget != null) {
+                messagesRepository.editMessage(editTarget.messageId, finalContent)
+            } else {
+                messagesRepository.sendMessage(friendId, finalContent)
+            }
+            action
                 .onSuccess {
-                    messagesRepository.loadMessages(friendId)
-                        .onSuccess { messages ->
-                            _uiState.value = _uiState.value.copy(
-                                chatMessages = messages,
-                                isSending = false,
-                            )
-                        }
+                    reloadChat(friendId)
+                    _uiState.value = _uiState.value.copy(
+                        isSending = false,
+                        chatReplyTarget = null,
+                        chatEditTarget = null,
+                    )
                 }
                 .onFailure {
                     _uiState.value = _uiState.value.copy(
                         isSending = false,
-                        messagesError = "send_failed",
+                        messagesError = if (editTarget != null) "edit_failed" else "send_failed",
                     )
                 }
         }
