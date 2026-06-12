@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "727617287957",
+    "project_id": "cyblight-android",
+    "storage_bucket": "cyblight-android.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:727617287957:android:5b597a682f83920a9b5b1c",
+        "android_client_info": {
+          "package_name": "org.cyblight.android"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBkH4U5kU9ASds0s6hydg5yY-uJyqW5E4o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

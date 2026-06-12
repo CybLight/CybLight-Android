@@ -4,7 +4,6 @@ import android.app.Application
 import kotlinx.coroutines.runBlocking
 import org.cyblight.android.data.session.SessionManager
 import org.cyblight.android.i18n.LocaleManager
-
 import org.cyblight.android.notifications.NotificationHelper
 
 class CybLightApplication : Application() {

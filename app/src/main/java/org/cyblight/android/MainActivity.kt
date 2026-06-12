@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,6 +39,7 @@ import org.cyblight.android.ui.security.SessionsScreen
 import org.cyblight.android.ui.security.TrustedDevicesScreen
 import org.cyblight.android.update.ApkInstaller
 import org.cyblight.android.i18n.AppLocaleProvider
+import org.cyblight.android.notifications.NotificationHelper
 import org.cyblight.android.ui.AppViewModel
 import org.cyblight.android.ui.login.LoginScreen
 import org.cyblight.android.ui.login.TwoFactorScreen
@@ -55,6 +57,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.launch
+import org.cyblight.android.data.preferences.ThemeMode
 import org.cyblight.android.security.BiometricHelper
 import org.cyblight.android.ui.applock.AppLockScreen
 import org.cyblight.android.util.BugReport
@@ -82,11 +85,37 @@ class MainActivity : AppCompatActivity() {
             val lifecycleOwner = LocalLifecycleOwner.current
             val coroutineScope = rememberCoroutineScope()
             val biometricAvailable = remember { BiometricHelper.isAvailable(this@MainActivity) }
+            val isDarkTheme = when (uiState.themeMode) {
+                ThemeMode.DARK -> true
+                ThemeMode.LIGHT -> false
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            }
+
+            LaunchedEffect(isDarkTheme, uiState.screen, uiState.easterFlags?.nightGuard) {
+                viewModel.trackNightGuardConditions(
+                    isDarkTheme = isDarkTheme,
+                    isMainScreen = uiState.screen == AppScreen.Main,
+                )
+            }
+
+            LaunchedEffect(uiState.screen) {
+                if (uiState.screen != AppScreen.Main) return@LaunchedEffect
+                val friendId = intent?.getStringExtra(NotificationHelper.EXTRA_CHAT_FRIEND_ID)?.trim().orEmpty()
+                if (friendId.isEmpty()) return@LaunchedEffect
+                val friendName = intent?.getStringExtra(NotificationHelper.EXTRA_CHAT_FRIEND_NAME)?.trim()
+                    .orEmpty()
+                viewModel.openChatFromNotification(friendId, friendName)
+                intent?.removeExtra(NotificationHelper.EXTRA_CHAT_FRIEND_ID)
+                intent?.removeExtra(NotificationHelper.EXTRA_CHAT_FRIEND_NAME)
+            }
 
             DisposableEffect(lifecycleOwner, uiState.appLockEnabled, uiState.screen) {
                 val observer = LifecycleEventObserver { _, event ->
                     when (event) {
                         Lifecycle.Event.ON_STOP -> {
+                            if (uiState.screen == AppScreen.Main) {
+                                viewModel.onMainScreenBackgrounded()
+                            }
                             if (uiState.screen == AppScreen.Main && uiState.appLockEnabled) {
                                 viewModel.onAppBackgrounded()
                             }
@@ -160,6 +189,7 @@ class MainActivity : AppCompatActivity() {
                                 themeMode = uiState.themeMode,
                                 notificationsEnabled = uiState.notificationsEnabled,
                                 loginAlertsEnabled = uiState.loginAlertsEnabled,
+                                messageAlertsEnabled = uiState.messageAlertsEnabled,
                                 appLockEnabled = uiState.appLockEnabled,
                                 appLockBiometric = uiState.appLockBiometric,
                                 appLockPinConfigured = uiState.appLockPinConfigured,
@@ -170,6 +200,7 @@ class MainActivity : AppCompatActivity() {
                                 onThemeModeSelected = viewModel::setThemeMode,
                                 onNotificationsEnabledChange = viewModel::setNotificationsEnabled,
                                 onLoginAlertsEnabledChange = viewModel::setLoginAlertsEnabled,
+                                onMessageAlertsEnabledChange = viewModel::setMessageAlertsEnabled,
                                 onAppLockEnabledChange = viewModel::setAppLockEnabled,
                                 onAppLockBiometricChange = viewModel::setAppLockBiometric,
                                 onSetupAppLockPin = viewModel::setupAppLockPin,
@@ -476,6 +507,7 @@ class MainActivity : AppCompatActivity() {
                                         isAppLocked = false
                                         appLockError = null
                                         viewModel.onAppUnlocked()
+                                        viewModel.onBiometricUnlockSuccess()
                                         onSuccess()
                                     },
                                     onFailed = onFailed,

@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.BatteryChargingFull
 import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Fingerprint
@@ -70,6 +71,7 @@ fun SettingsScreen(
     themeMode: ThemeMode,
     notificationsEnabled: Boolean,
     loginAlertsEnabled: Boolean,
+    messageAlertsEnabled: Boolean,
     appLockEnabled: Boolean,
     appLockBiometric: Boolean,
     appLockPinConfigured: Boolean,
@@ -80,6 +82,7 @@ fun SettingsScreen(
     onThemeModeSelected: (ThemeMode) -> Unit,
     onNotificationsEnabledChange: (Boolean) -> Unit,
     onLoginAlertsEnabledChange: (Boolean) -> Unit,
+    onMessageAlertsEnabledChange: (Boolean) -> Unit,
     onAppLockEnabledChange: (Boolean) -> Unit,
     onAppLockBiometricChange: (Boolean) -> Unit,
     onSetupAppLockPin: (String, Boolean) -> Unit,
@@ -293,6 +296,29 @@ fun SettingsScreen(
                                 }
                             } else {
                                 onLoginAlertsEnabledChange(enabled)
+                            }
+                        },
+                        enabled = systemNotificationsEnabled,
+                    )
+                },
+            )
+
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_message_alerts)) },
+                supportingContent = { Text(stringResource(R.string.settings_message_alerts_hint)) },
+                leadingContent = { Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = null) },
+                trailingContent = {
+                    Switch(
+                        checked = messageAlertsEnabled && systemNotificationsEnabled,
+                        onCheckedChange = { enabled ->
+                            if (enabled && !systemNotificationsEnabled) {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    onRequestNotificationPermission()
+                                } else {
+                                    SystemSettings.openAppNotificationSettings(context)
+                                }
+                            } else {
+                                onMessageAlertsEnabledChange(enabled)
                             }
                         },
                         enabled = systemNotificationsEnabled,

@@ -117,6 +117,18 @@ interface CybLightApi {
     @POST("auth/easter/light-catcher")
     suspend fun unlockLightCatcher(): LightCatcherResponse
 
+    @POST("auth/easter/night-guard")
+    suspend fun unlockNightGuard(): EasterUnlockResponse
+
+    @POST("auth/easter/trusted-fingerprint")
+    suspend fun unlockTrustedFingerprint(): EasterUnlockResponse
+
+    @POST("auth/easter/echo")
+    suspend fun unlockEcho(): EasterUnlockResponse
+
+    @POST("auth/easter/archivist")
+    suspend fun unlockArchivist(): EasterUnlockResponse
+
     @GET("auth/passkey/list")
     suspend fun passkeyList(): PasskeyListResponse
 
@@ -140,4 +152,10 @@ interface CybLightApi {
         @Query("limit") limit: Int = 50,
         @Query("offset") offset: Int = 0,
     ): LoginHistoryResponse
+
+    @POST("push/register")
+    suspend fun registerPushToken(@Body body: PushRegisterRequest): PushActionResponse
+
+    @HTTP(method = "DELETE", path = "push/unregister", hasBody = true)
+    suspend fun unregisterPushToken(@Body body: PushUnregisterRequest): PushActionResponse
 }

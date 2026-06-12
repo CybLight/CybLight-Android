@@ -40,6 +40,8 @@ captures/
 !.env.example
 secrets.properties
 keystore.properties
+FCM_SERVICE_ACCOUNT_JSON.json
+*firebase*adminsdk*.json
 
 # Log files
 *.log

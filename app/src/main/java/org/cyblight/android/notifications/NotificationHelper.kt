@@ -13,19 +13,35 @@ import org.cyblight.android.R
 
 object NotificationHelper {
     const val CHANNEL_SECURITY = "cyblight_security"
+    const val CHANNEL_MESSAGES = "cyblight_messages"
     const val NOTIFICATION_LOGIN = 1001
+    const val NOTIFICATION_MESSAGE_BASE = 2000
+
+    const val EXTRA_CHAT_FRIEND_ID = "extra_chat_friend_id"
+    const val EXTRA_CHAT_FRIEND_NAME = "extra_chat_friend_name"
 
     fun ensureChannels(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
-        val channel = NotificationChannel(
+
+        val securityChannel = NotificationChannel(
             CHANNEL_SECURITY,
             context.getString(R.string.notification_channel_security),
             NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
             description = context.getString(R.string.notification_channel_security_desc)
         }
-        manager.createNotificationChannel(channel)
+
+        val messagesChannel = NotificationChannel(
+            CHANNEL_MESSAGES,
+            context.getString(R.string.notification_channel_messages),
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = context.getString(R.string.notification_channel_messages_desc)
+        }
+
+        manager.createNotificationChannel(securityChannel)
+        manager.createNotificationChannel(messagesChannel)
     }
 
     fun showNewLoginAlert(
@@ -64,4 +80,52 @@ object NotificationHelper {
 
         NotificationManagerCompat.from(context).notify(NOTIFICATION_LOGIN, notification)
     }
+
+    fun showNewMessageAlert(
+        context: Context,
+        friendId: String,
+        friendName: String,
+        preview: String,
+        unreadCount: Int = 1,
+    ) {
+        ensureChannels(context)
+        val launchIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_CHAT_FRIEND_ID, friendId)
+            putExtra(EXTRA_CHAT_FRIEND_NAME, friendName)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            friendId.hashCode(),
+            launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        val title = friendName.ifBlank { context.getString(R.string.notification_message_title_fallback) }
+        val body = if (unreadCount > 1) {
+            context.getString(R.string.notification_message_body_many, unreadCount, preview)
+        } else {
+            preview.ifBlank { context.getString(R.string.notification_message_body_fallback) }
+        }
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_MESSAGES)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .build()
+
+        NotificationManagerCompat.from(context).notify(notificationIdForFriend(friendId), notification)
+    }
+
+    fun cancelMessageNotification(context: Context, friendId: String) {
+        NotificationManagerCompat.from(context).cancel(notificationIdForFriend(friendId))
+    }
+
+    fun notificationIdForFriend(friendId: String): Int =
+        NOTIFICATION_MESSAGE_BASE + (friendId.hashCode() and 0x7FFF)
 }

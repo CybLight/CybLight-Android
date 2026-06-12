@@ -49,7 +49,22 @@ private class MessageDtoDeserializer : JsonDeserializer<MessageDto> {
             createdAt = obj.readLong("createdAt", "created_at"),
             readAt = obj.readNullableLong("readAt", "read_at"),
             editedAt = obj.readNullableLong("editedAt", "edited_at"),
+            reactions = obj.readReactions("reactions"),
         )
+    }
+}
+
+private fun JsonObject.readReactions(key: String): List<MessageReactionDto> {
+    val element = get(key) ?: return emptyList()
+    if (!element.isJsonArray) return emptyList()
+
+    return element.asJsonArray.mapNotNull { item ->
+        if (!item.isJsonObject) return@mapNotNull null
+        val reaction = item.asJsonObject
+        val emoji = reaction.readString("emoji").trim()
+        if (emoji.isEmpty()) return@mapNotNull null
+        val count = reaction.readInt("count").coerceAtLeast(1)
+        MessageReactionDto(emoji = emoji, count = count)
     }
 }
 
@@ -102,4 +117,21 @@ private fun JsonObject.readNullableLong(vararg keys: String): Long? {
         }
     }
     return null
+}
+
+private fun JsonObject.readInt(vararg keys: String): Int {
+    for (key in keys) {
+        val element = get(key) ?: continue
+        if (element.isJsonNull) continue
+        if (element.isJsonPrimitive) {
+            val primitive = element.asJsonPrimitive
+            val parsed = when {
+                primitive.isNumber -> primitive.asInt
+                primitive.isString -> primitive.asString.trim().toIntOrNull()
+                else -> null
+            }
+            if (parsed != null) return parsed
+        }
+    }
+    return 0
 }

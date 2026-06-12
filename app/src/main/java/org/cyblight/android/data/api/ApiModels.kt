@@ -166,6 +166,17 @@ data class EasterFlagsDto(
     @SerializedName("profileMirror") val profileMirror: Boolean = false,
     @SerializedName("lightCatcher") val lightCatcher: Boolean = false,
     val postmaster: Boolean = false,
+    @SerializedName("developerMode") val developerMode: Boolean = false,
+    @SerializedName("nightGuard") val nightGuard: Boolean = false,
+    @SerializedName("trustedFingerprint") val trustedFingerprint: Boolean = false,
+    val bridge: Boolean = false,
+    val echo: Boolean = false,
+    val archivist: Boolean = false,
+)
+
+data class EasterUnlockResponse(
+    val ok: Boolean = false,
+    val error: String? = null,
 )
 
 data class LightCatcherResponse(
@@ -349,10 +360,33 @@ data class FriendPresenceResponse(
     val error: String? = null,
 )
 
+data class UnreadDetailDto(
+    @SerializedName("senderId") val senderId: String = "",
+    @SerializedName("senderLogin") val senderLogin: String = "",
+    @SerializedName("unreadCount") val unreadCount: Int = 0,
+    val preview: String = "",
+    @SerializedName("latestAt") val latestAt: Long = 0L,
+)
+
 data class UnreadSummaryResponse(
     val ok: Boolean = false,
     @SerializedName("totalUnread") val totalUnread: Int = 0,
     @SerializedName("unreadByUser") val unreadByUser: Map<String, Int> = emptyMap(),
+    @SerializedName("unreadDetails") val unreadDetails: List<UnreadDetailDto> = emptyList(),
+)
+
+data class PushRegisterRequest(
+    val token: String,
+    val platform: String = "android",
+)
+
+data class PushUnregisterRequest(
+    val token: String? = null,
+)
+
+data class PushActionResponse(
+    val ok: Boolean = false,
+    val error: String? = null,
 )
 
 data class PinnedMessageDto(

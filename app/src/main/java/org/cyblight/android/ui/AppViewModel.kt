@@ -21,6 +21,7 @@ import org.cyblight.android.data.api.EasterFlagsDto
 import org.cyblight.android.data.api.FriendDto
 import org.cyblight.android.data.api.LoginHistoryEntryDto
 import org.cyblight.android.data.api.MessageDto
+import org.cyblight.android.data.api.MessageReactionDto
 import org.cyblight.android.data.api.PinnedMessageDto
 import org.cyblight.android.data.api.PasskeyDto
 import org.cyblight.android.data.api.ProfileDto
@@ -51,12 +52,26 @@ import org.cyblight.android.update.UpdateRepository
 import org.cyblight.android.update.UpdateStatus
 import org.cyblight.android.update.UpdateUiState
 import org.cyblight.android.notifications.LoginNotificationMonitor
+import org.cyblight.android.notifications.MessageNotificationMonitor
+import org.cyblight.android.notifications.PushTokenRegistrar
 import org.cyblight.android.workers.LoginNotificationWorker
+import org.cyblight.android.workers.MessageNotificationWorker
 import org.cyblight.android.util.SystemSettings
 import org.cyblight.android.ui.messages.ChatEditTarget
 import org.cyblight.android.ui.messages.ChatFormatUtils
 import org.cyblight.android.ui.messages.ChatReplyTarget
 import java.io.File
+import java.util.Calendar
+
+private data class ArchivistTracker(
+    val chatId: String,
+    var pinned: Boolean = false,
+    var edited: Boolean = false,
+    var reacted: Boolean = false,
+    var forwarded: Boolean = false,
+) {
+    fun isComplete(): Boolean = pinned && edited && reacted && forwarded
+}
 
 enum class AppScreen {
     Loading,
@@ -145,6 +160,7 @@ data class AppUiState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val notificationsEnabled: Boolean = true,
     val loginAlertsEnabled: Boolean = true,
+    val messageAlertsEnabled: Boolean = true,
     val appLockEnabled: Boolean = false,
     val appLockBiometric: Boolean = true,
     val appLockPinConfigured: Boolean = false,
@@ -165,8 +181,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val updatePreferences = UpdatePreferences(application)
     private var pendingUpdate: AppUpdateInfo? = null
     private val loginNotificationMonitor = LoginNotificationMonitor(application)
+    private val messageNotificationMonitor = MessageNotificationMonitor(application)
     private var chatPresenceJob: Job? = null
     private var chatRefreshJob: Job? = null
+    private var nightGuardJob: Job? = null
+    private var archivistTracker: ArchivistTracker? = null
     private var appLockBackgroundedAtMs: Long? = null
     private var skipAppLockOnce = false
 
@@ -192,6 +211,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val savedTheme = appPreferences.getThemeMode()
                 val notifications = resolveNotificationsEnabled()
                 val loginAlerts = appPreferences.getLoginAlertsEnabled()
+                val messageAlerts = appPreferences.getMessageAlertsEnabled()
                 val appLockEnabled = appPreferences.getAppLockEnabled()
                 val appLockBiometric = appPreferences.getAppLockBiometric()
                 val appLockPinConfigured = appPreferences.hasAppLockPin()
@@ -202,6 +222,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     themeMode = savedTheme,
                     notificationsEnabled = notifications,
                     loginAlertsEnabled = loginAlerts,
+                    messageAlertsEnabled = messageAlerts,
                     appLockEnabled = appLockEnabled && appLockPinConfigured,
                     appLockBiometric = appLockBiometric,
                     appLockPinConfigured = appLockPinConfigured,
@@ -221,6 +242,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         else -> {
                             refreshSocialData()
                             LoginNotificationWorker.schedule(getApplication())
+                            MessageNotificationWorker.schedule(getApplication())
+                            PushTokenRegistrar.registerCurrentToken(getApplication())
                         }
                     }
                 }
@@ -234,12 +257,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun forceLogout() {
         LoginNotificationWorker.cancel(getApplication())
+        MessageNotificationWorker.cancel(getApplication())
+        PushTokenRegistrar.unregisterCurrentToken(getApplication())
+        viewModelScope.launch {
+            appPreferences.setActiveChatFriendId(null)
+        }
         _uiState.value = AppUiState(
             screen = AppScreen.Login,
             locale = _uiState.value.locale,
             themeMode = _uiState.value.themeMode,
             notificationsEnabled = _uiState.value.notificationsEnabled,
             loginAlertsEnabled = _uiState.value.loginAlertsEnabled,
+            messageAlertsEnabled = _uiState.value.messageAlertsEnabled,
             appLockEnabled = _uiState.value.appLockEnabled,
             appLockBiometric = _uiState.value.appLockBiometric,
             appLockPinConfigured = _uiState.value.appLockPinConfigured,
@@ -392,6 +421,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val resolved = enabled && SystemSettings.areNotificationsEnabled(getApplication())
             appPreferences.setNotificationsEnabled(resolved)
             _uiState.value = _uiState.value.copy(notificationsEnabled = resolved)
+            if (resolved && _uiState.value.user != null) {
+                if (_uiState.value.loginAlertsEnabled) {
+                    LoginNotificationWorker.schedule(getApplication())
+                }
+                if (_uiState.value.messageAlertsEnabled) {
+                    MessageNotificationWorker.schedule(getApplication())
+                    PushTokenRegistrar.registerCurrentToken(getApplication())
+                }
+            } else if (!resolved) {
+                LoginNotificationWorker.cancel(getApplication())
+                MessageNotificationWorker.cancel(getApplication())
+            }
         }
     }
 
@@ -430,10 +471,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             appPreferences.setLoginAlertsEnabled(enabled)
             _uiState.value = _uiState.value.copy(loginAlertsEnabled = enabled)
-            if (enabled && _uiState.value.user != null) {
+            if (enabled && _uiState.value.user != null && _uiState.value.notificationsEnabled) {
                 LoginNotificationWorker.schedule(getApplication())
             } else if (!enabled) {
                 LoginNotificationWorker.cancel(getApplication())
+            }
+        }
+    }
+
+    fun setMessageAlertsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appPreferences.setMessageAlertsEnabled(enabled)
+            _uiState.value = _uiState.value.copy(messageAlertsEnabled = enabled)
+            if (enabled && _uiState.value.user != null && _uiState.value.notificationsEnabled) {
+                MessageNotificationWorker.schedule(getApplication())
+                PushTokenRegistrar.registerCurrentToken(getApplication())
+            } else if (!enabled) {
+                MessageNotificationWorker.cancel(getApplication())
+                PushTokenRegistrar.unregisterCurrentToken(getApplication())
             }
         }
     }
@@ -477,8 +532,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onAppBackgrounded() {
-        if (!_uiState.value.appLockEnabled) return
-        appLockBackgroundedAtMs = System.currentTimeMillis()
+        if (_uiState.value.appLockEnabled) {
+            appLockBackgroundedAtMs = System.currentTimeMillis()
+        }
+    }
+
+    fun onMainScreenBackgrounded() {
+        if (_uiState.value.screen != AppScreen.Main || _uiState.value.user == null) return
+        viewModelScope.launch {
+            appPreferences.setActiveChatFriendId(null)
+        }
+        MessageNotificationWorker.scheduleImmediate(getApplication())
     }
 
     fun onAppUnlocked() {
@@ -510,11 +574,26 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun checkMessageNotifications() {
+        if (_uiState.value.screen != AppScreen.Main || _uiState.value.user == null) return
+        viewModelScope.launch {
+            messageNotificationMonitor.checkForNewMessages()
+        }
+    }
+
+    fun openChatFromNotification(friendId: String, friendName: String) {
+        if (friendId.isBlank()) return
+        openChat(friendId, friendName.ifBlank { friendId })
+    }
+
     private fun onAuthenticated() {
         skipAppLockOnce = true
         viewModelScope.launch {
             loginNotificationMonitor.markOwnLoginGracePeriod()
+            messageNotificationMonitor.syncBaselineFromServer()
             LoginNotificationWorker.schedule(getApplication())
+            MessageNotificationWorker.schedule(getApplication())
+            PushTokenRegistrar.registerCurrentToken(getApplication())
         }
         checkForUpdate(force = true)
     }
@@ -954,14 +1033,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(lightCatcherUnlocking = true)
             profileRepository.unlockLightCatcher()
                 .onSuccess {
-                    val current = _uiState.value.easterFlags
                     _uiState.value.user?.login?.let(EasterLogger::logLightCatcher)
                     _uiState.value = _uiState.value.copy(
                         showLightCatcherGame = false,
                         lightCatcherUnlocking = false,
-                        easterFlags = current?.copy(lightCatcher = true)
-                            ?: EasterFlagsDto(lightCatcher = true),
                     )
+                    refreshEasterFlagsFromServer()
                 }
                 .onFailure {
                     _uiState.value = _uiState.value.copy(lightCatcherUnlocking = false)
@@ -1060,6 +1137,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 themeMode = _uiState.value.themeMode,
                 notificationsEnabled = _uiState.value.notificationsEnabled,
                 loginAlertsEnabled = _uiState.value.loginAlertsEnabled,
+                messageAlertsEnabled = _uiState.value.messageAlertsEnabled,
                 appLockEnabled = _uiState.value.appLockEnabled,
                 appLockBiometric = _uiState.value.appLockBiometric,
                 appLockPinConfigured = _uiState.value.appLockPinConfigured,
@@ -1068,13 +1146,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             appLockBackgroundedAtMs = null
             skipAppLockOnce = false
             LoginNotificationWorker.cancel(getApplication())
+            MessageNotificationWorker.cancel(getApplication())
+            PushTokenRegistrar.unregisterCurrentToken(getApplication())
         }
     }
 
     fun onAppResumed() {
         checkForUpdate()
         if (_uiState.value.screen != AppScreen.Main || _uiState.value.user == null) return
+        viewModelScope.launch {
+            _uiState.value.chatFriendId?.let { appPreferences.setActiveChatFriendId(it) }
+        }
         checkLoginNotifications()
+        checkMessageNotifications()
         viewModelScope.launch {
             when (authRepository.refreshSession()) {
                 SessionRefreshResult.Valid -> refreshSocialData()
@@ -1248,6 +1332,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         chatRefreshJob?.cancel()
         val cachedFriend = _uiState.value.friends.find { it.id == friendId }
         viewModelScope.launch {
+            appPreferences.setActiveChatFriendId(friendId)
+            messageNotificationMonitor.clearFriendNotification(friendId)
             _uiState.value = _uiState.value.copy(
                 chatFriendId = friendId,
                 chatFriendName = friendName,
@@ -1260,6 +1346,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 chatReplyTarget = null,
                 chatEditTarget = null,
             )
+            archivistTracker = ArchivistTracker(friendId)
             refreshChatFriendPresence(friendId)
             chatPresenceJob = viewModelScope.launch {
                 while (isActive) {
@@ -1299,6 +1386,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         chatPresenceJob = null
         chatRefreshJob?.cancel()
         chatRefreshJob = null
+        nightGuardJob?.cancel()
+        nightGuardJob = null
+        archivistTracker = null
+        viewModelScope.launch {
+            appPreferences.setActiveChatFriendId(null)
+        }
         _uiState.value = _uiState.value.copy(
             chatFriendId = null,
             chatFriendName = null,
@@ -1348,9 +1441,36 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun reactToChatMessage(messageId: String, emoji: String) {
         val friendId = _uiState.value.chatFriendId ?: return
+        val trimmed = emoji.trim()
+        if (trimmed.isEmpty()) return
+
+        val optimisticMessages = _uiState.value.chatMessages.map { message ->
+            if (message.id != messageId) return@map message
+            val existing = message.reactions.find { it.emoji == trimmed }
+            val updatedReactions = if (existing != null) {
+                if (existing.count <= 1) {
+                    message.reactions.filter { it.emoji != trimmed }
+                } else {
+                    message.reactions.map { reaction ->
+                        if (reaction.emoji == trimmed) reaction.copy(count = reaction.count - 1) else reaction
+                    }
+                }
+            } else {
+                message.reactions + MessageReactionDto(emoji = trimmed, count = 1)
+            }
+            message.copy(reactions = updatedReactions)
+        }
+        _uiState.value = _uiState.value.copy(chatMessages = optimisticMessages)
+
         viewModelScope.launch {
-            messagesRepository.reactToMessage(messageId, emoji)
-                .onSuccess { reloadChat(friendId) }
+            messagesRepository.reactToMessage(messageId, trimmed)
+                .onSuccess {
+                    reloadChat(friendId)
+                    markArchivistAction(friendId) { it.reacted = true }
+                }
+                .onFailure {
+                    reloadChat(friendId)
+                }
         }
     }
 
@@ -1358,7 +1478,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val friendId = _uiState.value.chatFriendId ?: return
         viewModelScope.launch {
             messagesRepository.pinMessage(message.id)
-                .onSuccess { reloadChat(friendId) }
+                .onSuccess {
+                    reloadChat(friendId)
+                    markArchivistAction(friendId) { it.pinned = true }
+                }
                 .onFailure {
                     _uiState.value = _uiState.value.copy(messagesError = "pin_failed")
                 }
@@ -1401,8 +1524,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun forwardChatMessage(targetFriendId: String, content: String) {
         val text = ChatFormatUtils.stripMetadataTokens(content).trim()
         if (text.isEmpty()) return
+        val sourceChatId = _uiState.value.chatFriendId
         viewModelScope.launch {
             messagesRepository.sendMessage(targetFriendId, text)
+                .onSuccess {
+                    sourceChatId?.let { chatId ->
+                        markArchivistAction(chatId) { it.forwarded = true }
+                    }
+                }
                 .onFailure {
                     _uiState.value = _uiState.value.copy(messagesError = "send_failed")
                 }
@@ -1460,6 +1589,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             action
                 .onSuccess {
                     reloadChat(friendId)
+                    if (editTarget != null) {
+                        markArchivistAction(friendId) { it.edited = true }
+                    } else {
+                        maybeUnlockEchoEaster()
+                    }
                     _uiState.value = _uiState.value.copy(
                         isSending = false,
                         chatReplyTarget = null,
@@ -1470,6 +1604,67 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     _uiState.value = _uiState.value.copy(
                         isSending = false,
                         messagesError = if (editTarget != null) "edit_failed" else "send_failed",
+                    )
+                }
+        }
+    }
+
+    fun trackNightGuardConditions(isDarkTheme: Boolean, isMainScreen: Boolean) {
+        nightGuardJob?.cancel()
+        nightGuardJob = null
+        if (!isMainScreen || !isDarkTheme || _uiState.value.easterFlags?.nightGuard == true) return
+
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        if (hour >= 6) return
+
+        nightGuardJob = viewModelScope.launch {
+            delay(30_000)
+            if (_uiState.value.easterFlags?.nightGuard == true) return@launch
+            profileRepository.unlockNightGuard()
+                .onSuccess { refreshEasterFlagsFromServer() }
+        }
+    }
+
+    fun onBiometricUnlockSuccess() {
+        if (_uiState.value.easterFlags?.trustedFingerprint == true) return
+        viewModelScope.launch {
+            val count = appPreferences.incrementBiometricUnlockCount()
+            if (count >= 100) {
+                profileRepository.unlockTrustedFingerprint()
+                    .onSuccess { refreshEasterFlagsFromServer() }
+            }
+        }
+    }
+
+    private fun maybeUnlockEchoEaster() {
+        if (_uiState.value.easterFlags?.echo == true) return
+        val calendar = Calendar.getInstance()
+        if (calendar.get(Calendar.HOUR_OF_DAY) != 23 || calendar.get(Calendar.MINUTE) != 59) return
+        viewModelScope.launch {
+            profileRepository.unlockEcho()
+                .onSuccess { refreshEasterFlagsFromServer() }
+        }
+    }
+
+    private fun markArchivistAction(chatId: String, mark: (ArchivistTracker) -> Unit) {
+        if (_uiState.value.easterFlags?.archivist == true) return
+        val tracker = archivistTracker ?: return
+        if (tracker.chatId != chatId) return
+        mark(tracker)
+        if (!tracker.isComplete()) return
+        viewModelScope.launch {
+            profileRepository.unlockArchivist()
+                .onSuccess { refreshEasterFlagsFromServer() }
+        }
+    }
+
+    private fun refreshEasterFlagsFromServer() {
+        viewModelScope.launch {
+            profileRepository.loadEasterFlags()
+                .onSuccess { flags ->
+                    _uiState.value = _uiState.value.copy(
+                        easterFlags = flags,
+                        easterError = null,
                     )
                 }
         }

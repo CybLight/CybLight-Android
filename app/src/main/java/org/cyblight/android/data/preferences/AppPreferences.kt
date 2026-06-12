@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -27,6 +28,9 @@ class AppPreferences(private val context: Context) {
     private val themeKey = stringPreferencesKey("theme_mode")
     private val notificationsKey = booleanPreferencesKey("notifications_enabled")
     private val loginAlertsKey = booleanPreferencesKey("login_alerts_enabled")
+    private val messageAlertsKey = booleanPreferencesKey("message_alerts_enabled")
+    private val activeChatFriendIdKey = stringPreferencesKey("active_chat_friend_id")
+    private val lastNotifiedUnreadCountsKey = stringPreferencesKey("last_notified_unread_counts")
     private val appLockEnabledKey = booleanPreferencesKey("app_lock_enabled")
     private val appLockBiometricKey = booleanPreferencesKey("app_lock_biometric")
     private val appLockPinSaltKey = stringPreferencesKey("app_lock_pin_salt")
@@ -34,6 +38,7 @@ class AppPreferences(private val context: Context) {
     private val appLockTimeoutKey = longPreferencesKey("app_lock_timeout_ms")
     private val lastSeenLoginEventIdKey = stringPreferencesKey("last_seen_login_event_id")
     private val ignoreLoginEventsUntilKey = longPreferencesKey("ignore_login_events_until")
+    private val biometricUnlockCountKey = intPreferencesKey("biometric_unlock_count")
 
     val themeMode: Flow<ThemeMode> = context.appPreferencesStore.data.map { prefs ->
         ThemeMode.entries.firstOrNull { it.name == prefs[themeKey] } ?: ThemeMode.SYSTEM
@@ -45,6 +50,10 @@ class AppPreferences(private val context: Context) {
 
     val loginAlertsEnabled: Flow<Boolean> = context.appPreferencesStore.data.map { prefs ->
         prefs[loginAlertsKey] ?: true
+    }
+
+    val messageAlertsEnabled: Flow<Boolean> = context.appPreferencesStore.data.map { prefs ->
+        prefs[messageAlertsKey] ?: true
     }
 
     val appLockEnabled: Flow<Boolean> = context.appPreferencesStore.data.map { prefs ->
@@ -63,6 +72,9 @@ class AppPreferences(private val context: Context) {
 
     suspend fun getLoginAlertsEnabled(): Boolean =
         loginAlertsEnabled.first()
+
+    suspend fun getMessageAlertsEnabled(): Boolean =
+        messageAlertsEnabled.first()
 
     suspend fun getAppLockEnabled(): Boolean =
         appLockEnabled.first()
@@ -102,6 +114,44 @@ class AppPreferences(private val context: Context) {
     suspend fun setLoginAlertsEnabled(enabled: Boolean) {
         context.appPreferencesStore.edit { prefs ->
             prefs[loginAlertsKey] = enabled
+        }
+    }
+
+    suspend fun setMessageAlertsEnabled(enabled: Boolean) {
+        context.appPreferencesStore.edit { prefs ->
+            prefs[messageAlertsKey] = enabled
+        }
+    }
+
+    suspend fun getActiveChatFriendId(): String? =
+        context.appPreferencesStore.data.first()[activeChatFriendIdKey]
+
+    suspend fun setActiveChatFriendId(friendId: String?) {
+        context.appPreferencesStore.edit { prefs ->
+            if (friendId.isNullOrBlank()) {
+                prefs.remove(activeChatFriendIdKey)
+            } else {
+                prefs[activeChatFriendIdKey] = friendId
+            }
+        }
+    }
+
+    suspend fun getLastNotifiedUnreadCounts(): Map<String, Int> {
+        val raw = context.appPreferencesStore.data.first()[lastNotifiedUnreadCountsKey] ?: return emptyMap()
+        return raw.split('\n')
+            .mapNotNull { line ->
+                val parts = line.split('=', limit = 2)
+                if (parts.size != 2) return@mapNotNull null
+                val count = parts[1].toIntOrNull() ?: return@mapNotNull null
+                parts[0] to count
+            }
+            .toMap()
+    }
+
+    suspend fun setLastNotifiedUnreadCounts(counts: Map<String, Int>) {
+        val encoded = counts.entries.joinToString("\n") { "${it.key}=${it.value}" }
+        context.appPreferencesStore.edit { prefs ->
+            prefs[lastNotifiedUnreadCountsKey] = encoded
         }
     }
 
@@ -157,5 +207,14 @@ class AppPreferences(private val context: Context) {
         context.appPreferencesStore.edit { prefs ->
             prefs[ignoreLoginEventsUntilKey] = timestampMs
         }
+    }
+
+    suspend fun incrementBiometricUnlockCount(): Int {
+        var next = 0
+        context.appPreferencesStore.edit { prefs ->
+            next = (prefs[biometricUnlockCountKey] ?: 0) + 1
+            prefs[biometricUnlockCountKey] = next
+        }
+        return next
     }
 }

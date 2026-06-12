@@ -356,7 +356,7 @@ fun ChatScreen(
                         ) {
                             itemsIndexed(
                                 items = messages,
-                                key = { _, message -> message.id },
+                                key = { index, message -> "${message.id}-$index" },
                             ) { _, message ->
                                 val isMine = message.senderId == currentUserId
                                 val isSelected = selectedIds.contains(message.id)

@@ -32,14 +32,19 @@ class ProfileRepository(private val api: CybLightApi) {
         }
     }
 
-    suspend fun unlockLightCatcher(): Result<Unit> {
+    suspend fun unlockLightCatcher(): Result<Unit> = unlockEaster { api.unlockLightCatcher().ok }
+
+    suspend fun unlockNightGuard(): Result<Unit> = unlockEaster { api.unlockNightGuard().ok }
+
+    suspend fun unlockTrustedFingerprint(): Result<Unit> = unlockEaster { api.unlockTrustedFingerprint().ok }
+
+    suspend fun unlockEcho(): Result<Unit> = unlockEaster { api.unlockEcho().ok }
+
+    suspend fun unlockArchivist(): Result<Unit> = unlockEaster { api.unlockArchivist().ok }
+
+    private suspend fun unlockEaster(call: suspend () -> Boolean): Result<Unit> {
         return try {
-            val response = api.unlockLightCatcher()
-            if (response.ok && response.lightCatcher) {
-                Result.success(Unit)
-            } else {
-                Result.failure(Exception(response.error ?: "easter_unlock_failed"))
-            }
+            if (call()) Result.success(Unit) else Result.failure(Exception("easter_unlock_failed"))
         } catch (e: Exception) {
             Result.failure(e)
         }
