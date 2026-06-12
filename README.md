@@ -118,6 +118,10 @@ APK: `app\build\outputs\apk\release\app-release.apk`
 2. Соберите подписанный release APK: `gradlew.bat assembleRelease` (см. раздел «Release-сборка»)
 3. Создайте GitHub Release с тегом `v0.3.0` (версия в теге должна быть выше текущей)
 4. Прикрепите APK к релизу (файл с расширением `.apk`, например `cyblight-android-v0.3.0.apk`)
+5. В описании релиза используйте шаблон из `release-notes-v0.4.9.md`:
+   - блок **Что нового** — только для пользователей, без технических инструкций
+   - блок **Установка** со ссылкой: `https://cyblight.org/ru/downloads/`
+   - обновление на GitHub: `gh release edit vX.Y.Z --notes-file release-notes-vX.Y.Z.md`
 
 Пользователь, нажавший «Позже», не увидит то же уведомление снова, пока не выйдет более новая версия.
 
