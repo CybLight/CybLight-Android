@@ -2,10 +2,12 @@ package org.cyblight.android.data.api
 
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface CybLightApi {
     @POST("auth/login")
@@ -59,4 +61,32 @@ interface CybLightApi {
 
     @POST("auth/easter/light-catcher")
     suspend fun unlockLightCatcher(): LightCatcherResponse
+
+    @GET("auth/passkey/list")
+    suspend fun passkeyList(): PasskeyListResponse
+
+    @Headers("Origin: https://cyblight.org")
+    @POST("auth/passkey/register/options")
+    suspend fun passkeyRegisterOptions(): PasskeyRegisterOptionsResponse
+
+    @Headers("Origin: https://cyblight.org")
+    @POST("auth/passkey/register")
+    suspend fun passkeyRegister(@Body body: PasskeyRegisterRequest): ApiEnvelope<PasskeyRegisterData>
+
+    @Headers("Origin: https://cyblight.org")
+    @DELETE("auth/passkey/{id}")
+    suspend fun deletePasskey(@Path("id") id: String): ApiEnvelope<Unit>
+
+    @GET("auth/trusted-devices")
+    suspend fun trustedDevices(): TrustedDevicesResponse
+
+    @Headers("Origin: https://cyblight.org")
+    @DELETE("auth/trusted-devices/{id}")
+    suspend fun removeTrustedDevice(@Path("id") id: String): ApiEnvelope<Unit>
+
+    @GET("auth/login-history")
+    suspend fun loginHistory(
+        @Query("limit") limit: Int = 50,
+        @Query("offset") offset: Int = 0,
+    ): LoginHistoryResponse
 }

@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -24,18 +26,14 @@ fun EasterEggsScreen(
     flags: EasterFlagsDto?,
     isLoading: Boolean,
     error: String?,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
 ) {
-    DetailScaffold(
-        title = stringResource(R.string.easter_eggs_title),
-        onBack = onBack,
-    ) { padding ->
+    val body: @Composable (Modifier) -> Unit = { modifier ->
         when {
             isLoading && flags == null -> {
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
+                    modifier = modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -44,9 +42,8 @@ fun EasterEggsScreen(
             }
             !error.isNullOrBlank() && flags == null -> {
                 Column(
-                    modifier = Modifier
+                    modifier = modifier
                         .fillMaxSize()
-                        .padding(padding)
                         .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
@@ -56,9 +53,9 @@ fun EasterEggsScreen(
             }
             else -> {
                 Column(
-                    modifier = Modifier
+                    modifier = modifier
                         .fillMaxSize()
-                        .padding(padding)
+                        .verticalScroll(rememberScrollState())
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -90,6 +87,18 @@ fun EasterEggsScreen(
                 }
             }
         }
+    }
+
+    if (onBack != null) {
+        DetailScaffold(
+            title = stringResource(R.string.easter_eggs_title),
+            onBack = onBack,
+            modifier = modifier,
+        ) { padding ->
+            body(Modifier.padding(padding))
+        }
+    } else {
+        body(modifier)
     }
 }
 

@@ -47,6 +47,8 @@ fun HelpScreen(onBack: () -> Unit) {
                     stringResource(R.string.help_item_tabs),
                     stringResource(R.string.help_item_friends),
                     stringResource(R.string.help_item_messages),
+                    stringResource(R.string.help_item_security),
+                    stringResource(R.string.help_item_easter),
                 ),
             )
 
@@ -57,7 +59,6 @@ fun HelpScreen(onBack: () -> Unit) {
                     stringResource(R.string.help_item_appearance),
                     stringResource(R.string.help_item_notifications),
                     stringResource(R.string.help_item_background),
-                    stringResource(R.string.help_item_account),
                     stringResource(R.string.help_item_about),
                 ),
             )

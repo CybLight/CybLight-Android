@@ -92,6 +92,69 @@ data class PasskeyLoginResponse(
     val error: String? = null,
 )
 
+data class PasskeyRp(
+    val name: String = "",
+    val id: String = "",
+)
+
+data class PasskeyUserInfo(
+    val id: String = "",
+    val name: String = "",
+    @SerializedName("displayName") val displayName: String = "",
+)
+
+data class PasskeyCredParam(
+    val type: String = "public-key",
+    val alg: Int = -7,
+)
+
+data class PasskeyAuthenticatorSelection(
+    @SerializedName("authenticatorAttachment") val authenticatorAttachment: String? = null,
+    @SerializedName("requireResidentKey") val requireResidentKey: Boolean? = null,
+    @SerializedName("residentKey") val residentKey: String? = null,
+    @SerializedName("userVerification") val userVerification: String? = null,
+)
+
+data class PasskeyCreationOptions(
+    val challenge: String = "",
+    val rp: PasskeyRp = PasskeyRp(),
+    val user: PasskeyUserInfo = PasskeyUserInfo(),
+    @SerializedName("pubKeyCredParams") val pubKeyCredParams: List<PasskeyCredParam> = emptyList(),
+    val timeout: Long = 60_000,
+    @SerializedName("excludeCredentials") val excludeCredentials: List<PasskeyAllowCredential>? = null,
+    @SerializedName("authenticatorSelection") val authenticatorSelection: PasskeyAuthenticatorSelection? = null,
+    val attestation: String = "none",
+)
+
+data class PasskeyRegisterOptionsResponse(
+    val ok: Boolean = false,
+    val options: PasskeyCreationOptions? = null,
+    val error: String? = null,
+)
+
+data class PasskeyAttestationResponse(
+    val clientDataJSON: String,
+    val attestationObject: String,
+)
+
+data class PasskeyRegistrationPayload(
+    val id: String,
+    val rawId: String,
+    val response: PasskeyAttestationResponse,
+    val type: String = "public-key",
+)
+
+data class PasskeyRegisterRequest(
+    val credential: PasskeyRegistrationPayload,
+    val name: String? = null,
+    val transports: List<String>? = null,
+)
+
+data class PasskeyRegisterData(
+    val id: String = "",
+    val name: String? = null,
+)
+
 data class EasterFlagsDto(
     val strawberry: Boolean = false,
     @SerializedName("darkTrigger") val darkTrigger: Boolean = false,
@@ -108,6 +171,12 @@ data class LightCatcherResponse(
 data class MeUserDto(
     val id: String = "",
     val login: String = "",
+    val email: String? = null,
+    @SerializedName("emailVerified") val emailVerified: Boolean = false,
+    @SerializedName("pendingEmail") val pendingEmail: String? = null,
+    @SerializedName("pendingEmailVerifiedAt") val pendingEmailVerifiedAt: Long? = null,
+    @SerializedName("passChangedAt") val passChangedAt: Long? = null,
+    @SerializedName("totpEnabled") val totpEnabled: Boolean = false,
     val easter: EasterFlagsDto? = null,
 )
 
@@ -165,6 +234,57 @@ data class RevokeSessionRequest(
 data class RevokeSessionData(
     val removed: Int = 0,
     @SerializedName("loggedOut") val loggedOut: Boolean = false,
+)
+
+data class PasskeyDto(
+    val id: String = "",
+    val name: String? = null,
+    @SerializedName("createdAt") val createdAt: Long = 0L,
+    @SerializedName("lastUsedAt") val lastUsedAt: Long? = null,
+)
+
+data class PasskeyListResponse(
+    val ok: Boolean = false,
+    val passkeys: List<PasskeyDto> = emptyList(),
+    val error: String? = null,
+)
+
+data class TrustedDeviceDto(
+    val id: String = "",
+    @SerializedName("deviceFingerprint") val deviceFingerprint: String? = null,
+    @SerializedName("userAgent") val userAgent: String? = null,
+    @SerializedName("ipAddress") val ipAddress: String? = null,
+    @SerializedName("createdAt") val createdAt: Long = 0L,
+    @SerializedName("lastUsedAt") val lastUsedAt: Long? = null,
+    @SerializedName("expiresAt") val expiresAt: Long = 0L,
+)
+
+data class TrustedDevicesResponse(
+    val ok: Boolean = false,
+    val devices: List<TrustedDeviceDto> = emptyList(),
+    val error: String? = null,
+)
+
+data class LoginHistoryEntryDto(
+    val id: String = "",
+    val action: String = "",
+    val ip: String? = null,
+    @SerializedName("userAgent") val userAgent: String? = null,
+    @SerializedName("createdAt") val createdAt: Long = 0L,
+)
+
+data class LoginHistoryPagination(
+    val limit: Int = 0,
+    val offset: Int = 0,
+    val total: Int = 0,
+    @SerializedName("hasMore") val hasMore: Boolean = false,
+)
+
+data class LoginHistoryResponse(
+    val ok: Boolean = false,
+    val history: List<LoginHistoryEntryDto> = emptyList(),
+    val pagination: LoginHistoryPagination? = null,
+    val error: String? = null,
 )
 
 data class FriendsListResponse(

@@ -13,12 +13,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.BatteryChargingFull
-import androidx.compose.material.icons.outlined.Celebration
 import androidx.compose.material.icons.outlined.HelpOutline
+import androidx.compose.material.icons.outlined.Fingerprint
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
-import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.SettingsApplications
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -53,6 +54,7 @@ import org.cyblight.android.R
 import org.cyblight.android.util.ExternalLinks
 import org.cyblight.android.data.preferences.ThemeMode
 import org.cyblight.android.i18n.LocaleManager
+import org.cyblight.android.ui.applock.PinSetupDialog
 import org.cyblight.android.util.SystemSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,14 +63,21 @@ fun SettingsScreen(
     locale: String,
     themeMode: ThemeMode,
     notificationsEnabled: Boolean,
+    loginAlertsEnabled: Boolean,
+    appLockEnabled: Boolean,
+    appLockBiometric: Boolean,
+    appLockPinConfigured: Boolean,
+    biometricAvailable: Boolean,
     onBack: () -> Unit,
     onLocaleSelected: (String) -> Unit,
     onThemeModeSelected: (ThemeMode) -> Unit,
     onNotificationsEnabledChange: (Boolean) -> Unit,
+    onLoginAlertsEnabledChange: (Boolean) -> Unit,
+    onAppLockEnabledChange: (Boolean) -> Unit,
+    onAppLockBiometricChange: (Boolean) -> Unit,
+    onSetupAppLockPin: (String, Boolean) -> Unit,
     onRequestNotificationPermission: () -> Unit,
     onHelp: () -> Unit,
-    onSecurity: () -> Unit,
-    onEasterEggs: () -> Unit,
     onOpenLightCatcherGame: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -79,6 +88,26 @@ fun SettingsScreen(
         mutableStateOf(SystemSettings.areNotificationsEnabled(context))
     }
     var versionTapCount by remember { mutableStateOf(0) }
+    var showPinSetup by remember { mutableStateOf(false) }
+    var enableLockAfterPinSetup by remember { mutableStateOf(false) }
+
+    if (showPinSetup) {
+        PinSetupDialog(
+            title = stringResource(
+                if (appLockPinConfigured) {
+                    R.string.app_lock_change_pin
+                } else {
+                    R.string.app_lock_setup_pin
+                },
+            ),
+            onDismiss = { showPinSetup = false },
+            onConfirm = { pin ->
+                onSetupAppLockPin(pin, enableLockAfterPinSetup)
+                showPinSetup = false
+                enableLockAfterPinSetup = false
+            },
+        )
+    }
 
     LaunchedEffect(versionTapCount) {
         if (versionTapCount in 1..6) {
@@ -228,6 +257,85 @@ fun SettingsScreen(
                     .clickable { SystemSettings.openAppNotificationSettings(context) },
             )
 
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_login_alerts)) },
+                supportingContent = { Text(stringResource(R.string.settings_login_alerts_hint)) },
+                leadingContent = { Icon(Icons.Outlined.Notifications, contentDescription = null) },
+                trailingContent = {
+                    Switch(
+                        checked = loginAlertsEnabled && systemNotificationsEnabled,
+                        onCheckedChange = { enabled ->
+                            if (enabled && !systemNotificationsEnabled) {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    onRequestNotificationPermission()
+                                } else {
+                                    SystemSettings.openAppNotificationSettings(context)
+                                }
+                            } else {
+                                onLoginAlertsEnabledChange(enabled)
+                            }
+                        },
+                        enabled = systemNotificationsEnabled,
+                    )
+                },
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            Text(
+                text = stringResource(R.string.settings_section_security),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_app_lock)) },
+                supportingContent = { Text(stringResource(R.string.settings_app_lock_hint)) },
+                leadingContent = { Icon(Icons.Outlined.Lock, contentDescription = null) },
+                trailingContent = {
+                    Switch(
+                        checked = appLockEnabled,
+                        onCheckedChange = { enabled ->
+                            if (enabled) {
+                                if (appLockPinConfigured) {
+                                    onAppLockEnabledChange(true)
+                                } else {
+                                    enableLockAfterPinSetup = true
+                                    showPinSetup = true
+                                }
+                            } else {
+                                onAppLockEnabledChange(false)
+                            }
+                        },
+                    )
+                },
+            )
+
+            if (biometricAvailable) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_app_lock_biometric)) },
+                    leadingContent = { Icon(Icons.Outlined.Fingerprint, contentDescription = null) },
+                    trailingContent = {
+                        Switch(
+                            checked = appLockBiometric,
+                            onCheckedChange = onAppLockBiometricChange,
+                            enabled = appLockPinConfigured,
+                        )
+                    },
+                )
+            }
+
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.app_lock_change_pin)) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        enableLockAfterPinSetup = false
+                        showPinSetup = true
+                    },
+            )
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             Text(
@@ -266,33 +374,6 @@ fun SettingsScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             Text(
-                text = stringResource(R.string.settings_section_account),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.security_title)) },
-                supportingContent = { Text(stringResource(R.string.security_hint)) },
-                leadingContent = { Icon(Icons.Outlined.Security, contentDescription = null) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onSecurity),
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.easter_eggs_title)) },
-                supportingContent = { Text(stringResource(R.string.easter_eggs_menu_hint)) },
-                leadingContent = { Icon(Icons.Outlined.Celebration, contentDescription = null) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onEasterEggs),
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-            Text(
                 text = stringResource(R.string.settings_section_about),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
@@ -326,21 +407,22 @@ fun SettingsScreen(
                         ExternalLinks.openUrl(context, BuildConfig.WEBSITE_URL)
                     },
                 )
-                Text(
-                    text = stringResource(R.string.about_version, BuildConfig.VERSION_NAME),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .padding(top = 4.dp)
-                        .clickable {
-                            versionTapCount++
-                            if (versionTapCount >= 7) {
-                                versionTapCount = 0
-                                onOpenLightCatcherGame()
-                            }
-                        },
-                )
             }
+
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_version)) },
+                supportingContent = { Text(BuildConfig.VERSION_NAME) },
+                leadingContent = { Icon(Icons.Outlined.Info, contentDescription = null) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        versionTapCount++
+                        if (versionTapCount >= 7) {
+                            versionTapCount = 0
+                            onOpenLightCatcherGame()
+                        }
+                    },
+            )
         }
     }
 }

@@ -28,11 +28,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import org.cyblight.android.ui.AppScreen
 import org.cyblight.android.ui.DetailScreen
-import org.cyblight.android.ui.easter.EasterEggsScreen
 import org.cyblight.android.ui.easter.LightCatcherGameDialog
 import org.cyblight.android.ui.profile.ProfileScreen
-import org.cyblight.android.ui.security.SecurityScreen
+import org.cyblight.android.ui.security.LoginHistoryScreen
+import org.cyblight.android.ui.security.PasskeysScreen
+import org.cyblight.android.ui.security.SecurityCheckScreen
 import org.cyblight.android.ui.security.SessionsScreen
+import org.cyblight.android.ui.security.TrustedDevicesScreen
 import org.cyblight.android.update.ApkInstaller
 import org.cyblight.android.i18n.AppLocaleProvider
 import org.cyblight.android.ui.AppViewModel
@@ -45,8 +47,16 @@ import org.cyblight.android.ui.settings.SettingsScreen
 import org.cyblight.android.ui.theme.CybLightTheme
 import org.cyblight.android.ui.update.UpdateCheckDialog
 import org.cyblight.android.ui.update.UpdateDialog
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import kotlinx.coroutines.launch
+import org.cyblight.android.security.BiometricHelper
+import org.cyblight.android.ui.applock.AppLockScreen
 import org.cyblight.android.util.BugReport
-import org.cyblight.android.util.SystemSettings
 
 class MainActivity : AppCompatActivity() {
     private val viewModel: AppViewModel by viewModels()
@@ -64,6 +74,35 @@ class MainActivity : AppCompatActivity() {
             val context = LocalContext.current
             var pendingAutofillCommit by remember { mutableStateOf(false) }
             var showAbout by remember { mutableStateOf(false) }
+            var isAppLocked by rememberSaveable { mutableStateOf(false) }
+            var shouldLockOnResume by remember { mutableStateOf(false) }
+            var appLockError by remember { mutableStateOf<String?>(null) }
+            val lifecycleOwner = LocalLifecycleOwner.current
+            val coroutineScope = rememberCoroutineScope()
+            val biometricAvailable = remember { BiometricHelper.isAvailable(this@MainActivity) }
+
+            DisposableEffect(lifecycleOwner, uiState.appLockEnabled, uiState.screen) {
+                val observer = LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_STOP -> {
+                            if (uiState.screen == AppScreen.Main && uiState.appLockEnabled) {
+                                shouldLockOnResume = true
+                            }
+                        }
+                        Lifecycle.Event.ON_START -> {
+                            if (shouldLockOnResume &&
+                                uiState.screen == AppScreen.Main &&
+                                uiState.appLockEnabled
+                            ) {
+                                isAppLocked = true
+                            }
+                        }
+                        else -> Unit
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+            }
 
             val notificationPermissionLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.RequestPermission(),
@@ -104,10 +143,19 @@ class MainActivity : AppCompatActivity() {
                                 locale = uiState.locale,
                                 themeMode = uiState.themeMode,
                                 notificationsEnabled = uiState.notificationsEnabled,
+                                loginAlertsEnabled = uiState.loginAlertsEnabled,
+                                appLockEnabled = uiState.appLockEnabled,
+                                appLockBiometric = uiState.appLockBiometric,
+                                appLockPinConfigured = uiState.appLockPinConfigured,
+                                biometricAvailable = biometricAvailable,
                                 onBack = viewModel::navigateBack,
                                 onLocaleSelected = viewModel::setLocale,
                                 onThemeModeSelected = viewModel::setThemeMode,
                                 onNotificationsEnabledChange = viewModel::setNotificationsEnabled,
+                                onLoginAlertsEnabledChange = viewModel::setLoginAlertsEnabled,
+                                onAppLockEnabledChange = viewModel::setAppLockEnabled,
+                                onAppLockBiometricChange = viewModel::setAppLockBiometric,
+                                onSetupAppLockPin = viewModel::setupAppLockPin,
                                 onRequestNotificationPermission = {
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                         notificationPermissionLauncher.launch(
@@ -116,18 +164,78 @@ class MainActivity : AppCompatActivity() {
                                     }
                                 },
                                 onHelp = viewModel::openHelp,
-                                onSecurity = viewModel::openSecurity,
-                                onEasterEggs = viewModel::openEasterEggs,
                                 onOpenLightCatcherGame = viewModel::openLightCatcherGame,
                             )
                         }
                         DetailScreen.Help -> {
                             HelpScreen(onBack = viewModel::navigateBack)
                         }
-                        DetailScreen.Security -> {
-                            SecurityScreen(
+                        DetailScreen.SecurityCheck -> {
+                            SecurityCheckScreen(
+                                overview = uiState.securityOverview,
                                 onBack = viewModel::navigateBack,
-                                onOpenSessions = viewModel::openSessions,
+                                onOpenEmail = { viewModel.openAccountSecurity(context) },
+                                onOpenTwoFactor = { viewModel.openAccountSecurity(context) },
+                                onOpenPasskeys = viewModel::openPasskeys,
+                            )
+                        }
+                        DetailScreen.LoginHistory -> {
+                            LoginHistoryScreen(
+                                history = uiState.loginHistory,
+                                isLoading = uiState.isLoginHistoryLoading,
+                                error = uiState.loginHistoryError?.let { code ->
+                                    when (code) {
+                                        "login_history_load_failed" ->
+                                            stringResource(R.string.error_load_login_history)
+                                        else -> code
+                                    }
+                                },
+                                onBack = viewModel::navigateBack,
+                                onRefresh = viewModel::refreshLoginHistory,
+                            )
+                        }
+                        DetailScreen.TrustedDevices -> {
+                            TrustedDevicesScreen(
+                                devices = uiState.trustedDevices,
+                                isLoading = uiState.isTrustedDevicesLoading,
+                                error = uiState.trustedDevicesError?.let { code ->
+                                    when (code) {
+                                        "trusted_devices_load_failed" ->
+                                            stringResource(R.string.error_load_trusted_devices)
+                                        "trusted_device_remove_failed" ->
+                                            stringResource(R.string.error_remove_trusted_device)
+                                        else -> code
+                                    }
+                                },
+                                isRemoving = uiState.isTrustedDeviceRemoving,
+                                onBack = viewModel::navigateBack,
+                                onRefresh = viewModel::refreshTrustedDevices,
+                                onRemove = viewModel::removeTrustedDevice,
+                            )
+                        }
+                        DetailScreen.Passkeys -> {
+                            PasskeysScreen(
+                                passkeys = uiState.passkeys,
+                                isLoading = uiState.isPasskeysLoading,
+                                error = uiState.passkeysError?.let { code ->
+                                    when (code) {
+                                        "passkeys_load_failed" ->
+                                            stringResource(R.string.error_load_passkeys)
+                                        else -> code
+                                    }
+                                },
+                                isRegistering = uiState.isPasskeyRegistering,
+                                registerError = uiState.passkeyRegisterError,
+                                isDeleting = uiState.isPasskeyDeleting,
+                                deleteError = uiState.passkeyDeleteError,
+                                onBack = viewModel::navigateBack,
+                                onRefresh = viewModel::refreshPasskeys,
+                                onAddPasskey = { name ->
+                                    viewModel.registerPasskey(this@MainActivity, name)
+                                },
+                                onDeletePasskey = viewModel::deletePasskey,
+                                onDismissRegisterError = viewModel::clearPasskeyRegisterError,
+                                onDismissDeleteError = viewModel::clearPasskeyDeleteError,
                             )
                         }
                         DetailScreen.Sessions -> {
@@ -146,19 +254,6 @@ class MainActivity : AppCompatActivity() {
                                 onBack = viewModel::navigateBack,
                                 onRevoke = viewModel::revokeSession,
                                 onRefresh = viewModel::refreshSessions,
-                            )
-                        }
-                        DetailScreen.EasterEggs -> {
-                            EasterEggsScreen(
-                                flags = uiState.easterFlags,
-                                isLoading = uiState.isEasterLoading,
-                                error = uiState.easterError?.let { code ->
-                                    when (code) {
-                                        "easter_load_failed" -> stringResource(R.string.error_load_easter)
-                                        else -> code
-                                    }
-                                },
-                                onBack = viewModel::navigateBack,
                             )
                         }
                         DetailScreen.OwnProfile -> {
@@ -256,6 +351,27 @@ class MainActivity : AppCompatActivity() {
                                     onOpenChat = viewModel::openChat,
                                     onCloseChat = viewModel::closeChat,
                                     onSendMessage = viewModel::sendMessage,
+                                    easterFlags = uiState.easterFlags,
+                                    isEasterLoading = uiState.isEasterLoading,
+                                    easterError = uiState.easterError?.let { code ->
+                                        when (code) {
+                                            "easter_load_failed" -> stringResource(R.string.error_load_easter)
+                                            else -> code
+                                        }
+                                    },
+                                    securityOverview = uiState.securityOverview,
+                                    isSecurityLoading = uiState.isSecurityLoading,
+                                    isSecurityRefreshing = uiState.isSecurityLoading &&
+                                        uiState.securityOverview != null,
+                                    onSecurityTabSelected = viewModel::refreshSecurityOverview,
+                                    onRefreshSecurity = viewModel::forceRefreshSecurityOverview,
+                                    onOpenSecurityCheck = viewModel::openSecurityCheck,
+                                    onOpenAccountSecurity = { viewModel.openAccountSecurity(context) },
+                                    onOpenPasskeys = viewModel::openPasskeys,
+                                    onOpenTrustedDevices = viewModel::openTrustedDevices,
+                                    onOpenLoginHistory = viewModel::openLoginHistory,
+                                    onOpenSessions = viewModel::openSessions,
+                                    onEasterTabSelected = viewModel::refreshEasterFlags,
                                 )
                             }
                         }
@@ -285,6 +401,34 @@ class MainActivity : AppCompatActivity() {
                         onInstall = ::installUpdate,
                         onDismiss = viewModel::dismissUpdate,
                     )
+
+                    if (isAppLocked && uiState.screen == AppScreen.Main && uiState.appLockEnabled) {
+                        AppLockScreen(
+                            biometricAvailable = biometricAvailable,
+                            biometricEnabled = uiState.appLockBiometric,
+                            errorMessage = appLockError,
+                            onUnlockPin = { pin ->
+                                coroutineScope.launch {
+                                    val ok = viewModel.verifyAppLockPin(pin)
+                                    if (ok) {
+                                        isAppLocked = false
+                                        appLockError = null
+                                    } else {
+                                        appLockError = context.getString(R.string.app_lock_wrong_pin)
+                                    }
+                                }
+                            },
+                            onUnlockBiometric = {
+                                BiometricHelper.showUnlockPrompt(
+                                    activity = this@MainActivity,
+                                    onSuccess = {
+                                        isAppLocked = false
+                                        appLockError = null
+                                    },
+                                )
+                            },
+                        )
+                    }
                 }
                 }
             }

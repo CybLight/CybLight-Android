@@ -10,13 +10,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.cyblight.android.auth.PasskeyAuthException
 import org.cyblight.android.data.ApiClient
 import android.content.Context
 import org.cyblight.android.data.api.EasterFlagsDto
 import org.cyblight.android.data.api.FriendDto
+import org.cyblight.android.data.api.LoginHistoryEntryDto
 import org.cyblight.android.data.api.MessageDto
+import org.cyblight.android.data.api.PasskeyDto
 import org.cyblight.android.data.api.ProfileDto
 import org.cyblight.android.data.api.SessionDto
+import org.cyblight.android.data.api.TrustedDeviceDto
 import org.cyblight.android.data.api.UserDto
 import org.cyblight.android.data.preferences.AppPreferences
 import org.cyblight.android.data.preferences.ThemeMode
@@ -27,8 +31,11 @@ import org.cyblight.android.data.repository.ConversationPreview
 import org.cyblight.android.data.repository.FriendsRepository
 import org.cyblight.android.data.repository.MessagesRepository
 import org.cyblight.android.data.repository.ProfileRepository
+import org.cyblight.android.data.repository.SecurityOverview
+import org.cyblight.android.data.repository.SecurityRepository
 import org.cyblight.android.data.repository.SessionsRepository
 import org.cyblight.android.data.session.SessionManager
+import org.cyblight.android.util.EasterLogger
 import org.cyblight.android.util.ExternalLinks
 import org.cyblight.android.i18n.LocaleManager
 import org.cyblight.android.update.AppUpdateInfo
@@ -37,6 +44,8 @@ import org.cyblight.android.update.UpdatePreferences
 import org.cyblight.android.update.UpdateRepository
 import org.cyblight.android.update.UpdateStatus
 import org.cyblight.android.update.UpdateUiState
+import org.cyblight.android.notifications.LoginNotificationMonitor
+import org.cyblight.android.workers.LoginNotificationWorker
 import org.cyblight.android.util.SystemSettings
 import java.io.File
 
@@ -51,9 +60,11 @@ enum class DetailScreen {
     None,
     Settings,
     Help,
-    Security,
+    SecurityCheck,
+    LoginHistory,
+    TrustedDevices,
+    Passkeys,
     Sessions,
-    EasterEggs,
     OwnProfile,
     FriendProfile,
 }
@@ -87,6 +98,23 @@ data class AppUiState(
     val isSessionsLoading: Boolean = false,
     val sessionsError: String? = null,
     val isSessionRevoking: Boolean = false,
+    val securityOverview: SecurityOverview? = null,
+    val isSecurityLoading: Boolean = false,
+    val securityError: String? = null,
+    val passkeys: List<PasskeyDto> = emptyList(),
+    val isPasskeysLoading: Boolean = false,
+    val passkeysError: String? = null,
+    val isPasskeyRegistering: Boolean = false,
+    val passkeyRegisterError: String? = null,
+    val isPasskeyDeleting: Boolean = false,
+    val passkeyDeleteError: String? = null,
+    val trustedDevices: List<TrustedDeviceDto> = emptyList(),
+    val isTrustedDevicesLoading: Boolean = false,
+    val trustedDevicesError: String? = null,
+    val isTrustedDeviceRemoving: Boolean = false,
+    val loginHistory: List<LoginHistoryEntryDto> = emptyList(),
+    val isLoginHistoryLoading: Boolean = false,
+    val loginHistoryError: String? = null,
     val easterFlags: EasterFlagsDto? = null,
     val isEasterLoading: Boolean = false,
     val easterError: String? = null,
@@ -94,6 +122,10 @@ data class AppUiState(
     val lightCatcherUnlocking: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val notificationsEnabled: Boolean = true,
+    val loginAlertsEnabled: Boolean = true,
+    val appLockEnabled: Boolean = false,
+    val appLockBiometric: Boolean = true,
+    val appLockPinConfigured: Boolean = false,
 )
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -105,9 +137,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val messagesRepository = MessagesRepository(api)
     private val profileRepository = ProfileRepository(api)
     private val sessionsRepository = SessionsRepository(api)
+    private val securityRepository = SecurityRepository(api)
     private val updateRepository = UpdateRepository(application)
     private val updatePreferences = UpdatePreferences(application)
     private var pendingUpdate: AppUpdateInfo? = null
+    private val loginNotificationMonitor = LoginNotificationMonitor(application)
 
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
@@ -130,11 +164,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val savedLocale = sessionManager.getLocale()
                 val savedTheme = appPreferences.getThemeMode()
                 val notifications = resolveNotificationsEnabled()
+                val loginAlerts = appPreferences.getLoginAlertsEnabled()
+                val appLockEnabled = appPreferences.getAppLockEnabled()
+                val appLockBiometric = appPreferences.getAppLockBiometric()
+                val appLockPinConfigured = appPreferences.hasAppLockPin()
                 LocaleManager.apply(savedLocale)
                 _uiState.value = _uiState.value.copy(
                     locale = savedLocale,
                     themeMode = savedTheme,
                     notificationsEnabled = notifications,
+                    loginAlertsEnabled = loginAlerts,
+                    appLockEnabled = appLockEnabled && appLockPinConfigured,
+                    appLockBiometric = appLockBiometric,
+                    appLockPinConfigured = appLockPinConfigured,
                 )
 
                 val user = authRepository.restoreSession()
@@ -150,7 +192,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             forceLogout()
                             return@launch
                         }
-                        else -> refreshSocialData()
+                        else -> {
+                            refreshSocialData()
+                            LoginNotificationWorker.schedule(getApplication())
+                        }
                     }
                 }
 
@@ -162,11 +207,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun forceLogout() {
+        LoginNotificationWorker.cancel(getApplication())
         _uiState.value = AppUiState(
             screen = AppScreen.Login,
             locale = _uiState.value.locale,
             themeMode = _uiState.value.themeMode,
             notificationsEnabled = _uiState.value.notificationsEnabled,
+            loginAlertsEnabled = _uiState.value.loginAlertsEnabled,
+            appLockEnabled = _uiState.value.appLockEnabled,
+            appLockBiometric = _uiState.value.appLockBiometric,
+            appLockPinConfigured = _uiState.value.appLockPinConfigured,
         )
     }
 
@@ -337,8 +387,106 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    fun openSecurity() {
-        _uiState.value = _uiState.value.copy(detailScreen = DetailScreen.Security)
+    fun refreshSecurityOverview() {
+        if (_uiState.value.isSecurityLoading) return
+        loadSecurityOverview()
+    }
+
+    fun forceRefreshSecurityOverview() {
+        loadSecurityOverview()
+    }
+
+    fun setLoginAlertsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appPreferences.setLoginAlertsEnabled(enabled)
+            _uiState.value = _uiState.value.copy(loginAlertsEnabled = enabled)
+            if (enabled && _uiState.value.user != null) {
+                LoginNotificationWorker.schedule(getApplication())
+            } else if (!enabled) {
+                LoginNotificationWorker.cancel(getApplication())
+            }
+        }
+    }
+
+    fun setAppLockBiometric(enabled: Boolean) {
+        viewModelScope.launch {
+            appPreferences.setAppLockBiometric(enabled)
+            _uiState.value = _uiState.value.copy(appLockBiometric = enabled)
+        }
+    }
+
+    fun setupAppLockPin(pin: String, enableLock: Boolean) {
+        viewModelScope.launch {
+            appPreferences.setAppLockPin(pin)
+            if (enableLock) {
+                appPreferences.setAppLockEnabled(true)
+            }
+            _uiState.value = _uiState.value.copy(
+                appLockPinConfigured = true,
+                appLockEnabled = enableLock || _uiState.value.appLockEnabled,
+            )
+        }
+    }
+
+    fun setAppLockEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            if (enabled && !appPreferences.hasAppLockPin()) return@launch
+            appPreferences.setAppLockEnabled(enabled)
+            _uiState.value = _uiState.value.copy(appLockEnabled = enabled)
+        }
+    }
+
+    suspend fun verifyAppLockPin(pin: String): Boolean =
+        appPreferences.verifyAppLockPin(pin)
+
+    fun checkLoginNotifications() {
+        if (_uiState.value.screen != AppScreen.Main || _uiState.value.user == null) return
+        viewModelScope.launch {
+            loginNotificationMonitor.checkForNewLogin()
+        }
+    }
+
+    private fun onAuthenticated() {
+        viewModelScope.launch {
+            loginNotificationMonitor.markOwnLoginGracePeriod()
+            LoginNotificationWorker.schedule(getApplication())
+        }
+    }
+
+    fun openSecurityCheck() {
+        _uiState.value = _uiState.value.copy(detailScreen = DetailScreen.SecurityCheck)
+    }
+
+    fun openAccountSecurity(context: Context) {
+        val locale = _uiState.value.locale
+        ExternalLinks.openUrl(context, "https://cyblight.org/$locale/account-security/")
+    }
+
+    fun openPasskeys() {
+        _uiState.value = _uiState.value.copy(
+            detailScreen = DetailScreen.Passkeys,
+            passkeysError = null,
+            isPasskeysLoading = true,
+        )
+        loadPasskeys()
+    }
+
+    fun openTrustedDevices() {
+        _uiState.value = _uiState.value.copy(
+            detailScreen = DetailScreen.TrustedDevices,
+            trustedDevicesError = null,
+            isTrustedDevicesLoading = true,
+        )
+        loadTrustedDevices()
+    }
+
+    fun openLoginHistory() {
+        _uiState.value = _uiState.value.copy(
+            detailScreen = DetailScreen.LoginHistory,
+            loginHistoryError = null,
+            isLoginHistoryLoading = true,
+        )
+        loadLoginHistory()
     }
 
     fun openSessions() {
@@ -350,12 +498,105 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         loadSessions()
     }
 
-    fun openEasterEggs() {
-        _uiState.value = _uiState.value.copy(
-            detailScreen = DetailScreen.EasterEggs,
-            easterError = null,
-            isEasterLoading = true,
-        )
+    fun refreshPasskeys() {
+        loadPasskeys()
+    }
+
+    fun registerPasskey(activity: Activity, name: String) {
+        val resolvedName = name.ifBlank {
+            getApplication<Application>().getString(org.cyblight.android.R.string.security_passkeys_default_name)
+        }
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isPasskeyRegistering = true,
+                passkeyRegisterError = null,
+            )
+            securityRepository.registerPasskey(activity, resolvedName)
+                .onSuccess {
+                    loadPasskeys()
+                    loadSecurityOverview()
+                    _uiState.value = _uiState.value.copy(
+                        isPasskeyRegistering = false,
+                        passkeyRegisterError = null,
+                    )
+                }
+                .onFailure { error ->
+                    val code = when (error) {
+                        is PasskeyAuthException -> error.code
+                        else -> "passkey_register_failed"
+                    }
+                    _uiState.value = _uiState.value.copy(
+                        isPasskeyRegistering = false,
+                        passkeyRegisterError = code,
+                    )
+                }
+        }
+    }
+
+    fun clearPasskeyRegisterError() {
+        _uiState.value = _uiState.value.copy(passkeyRegisterError = null)
+    }
+
+    fun deletePasskey(passkeyId: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isPasskeyDeleting = true,
+                passkeyDeleteError = null,
+            )
+            securityRepository.deletePasskey(passkeyId)
+                .onSuccess {
+                    loadPasskeys()
+                    loadSecurityOverview()
+                    _uiState.value = _uiState.value.copy(
+                        isPasskeyDeleting = false,
+                        passkeyDeleteError = null,
+                    )
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(
+                        isPasskeyDeleting = false,
+                        passkeyDeleteError = "passkey_remove_failed",
+                    )
+                }
+        }
+    }
+
+    fun clearPasskeyDeleteError() {
+        _uiState.value = _uiState.value.copy(passkeyDeleteError = null)
+    }
+
+    fun refreshTrustedDevices() {
+        loadTrustedDevices()
+    }
+
+    fun refreshLoginHistory() {
+        loadLoginHistory()
+    }
+
+    fun removeTrustedDevice(deviceId: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isTrustedDeviceRemoving = true,
+                trustedDevicesError = null,
+            )
+            securityRepository.removeTrustedDevice(deviceId)
+                .onSuccess {
+                    loadTrustedDevices()
+                    _uiState.value = _uiState.value.copy(isTrustedDeviceRemoving = false)
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(
+                        isTrustedDeviceRemoving = false,
+                        trustedDevicesError = "trusted_device_remove_failed",
+                    )
+                }
+        }
+    }
+
+    fun refreshEasterFlags() {
+        val state = _uiState.value
+        if (state.isEasterLoading) return
+        if (state.easterFlags != null && state.easterError == null) return
         loadEasterFlags()
     }
 
@@ -383,7 +624,26 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun navigateBack() {
         when (_uiState.value.detailScreen) {
-            DetailScreen.Sessions -> _uiState.value = _uiState.value.copy(detailScreen = DetailScreen.Security)
+            DetailScreen.Sessions -> {
+                _uiState.value = _uiState.value.copy(
+                    detailScreen = DetailScreen.None,
+                    sessionsError = null,
+                )
+            }
+            DetailScreen.SecurityCheck,
+            DetailScreen.LoginHistory,
+            DetailScreen.TrustedDevices,
+            DetailScreen.Passkeys,
+            -> {
+                _uiState.value = _uiState.value.copy(
+                    detailScreen = DetailScreen.None,
+                    passkeysError = null,
+                    passkeyRegisterError = null,
+                    passkeyDeleteError = null,
+                    trustedDevicesError = null,
+                    loginHistoryError = null,
+                )
+            }
             DetailScreen.Help -> {
                 _uiState.value = if (_uiState.value.helpReturnToSettings) {
                     _uiState.value.copy(
@@ -396,9 +656,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         helpReturnToSettings = false,
                     )
                 }
-            }
-            DetailScreen.Security, DetailScreen.EasterEggs -> {
-                _uiState.value = _uiState.value.copy(detailScreen = DetailScreen.Settings)
             }
             else -> {
                 _uiState.value = _uiState.value.copy(
@@ -481,6 +738,88 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun loadSecurityOverview() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSecurityLoading = true, securityError = null)
+            securityRepository.loadOverview()
+                .onSuccess { overview ->
+                    _uiState.value = _uiState.value.copy(
+                        securityOverview = overview,
+                        isSecurityLoading = false,
+                    )
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(
+                        isSecurityLoading = false,
+                        securityError = "security_load_failed",
+                    )
+                }
+        }
+    }
+
+    private fun loadPasskeys() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isPasskeysLoading = true, passkeysError = null)
+            securityRepository.loadPasskeys()
+                .onSuccess { passkeys ->
+                    _uiState.value = _uiState.value.copy(
+                        passkeys = passkeys,
+                        isPasskeysLoading = false,
+                    )
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(
+                        isPasskeysLoading = false,
+                        passkeysError = "passkeys_load_failed",
+                    )
+                }
+        }
+    }
+
+    private fun loadTrustedDevices() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isTrustedDevicesLoading = true,
+                trustedDevicesError = null,
+            )
+            securityRepository.loadTrustedDevices()
+                .onSuccess { devices ->
+                    _uiState.value = _uiState.value.copy(
+                        trustedDevices = devices,
+                        isTrustedDevicesLoading = false,
+                    )
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(
+                        isTrustedDevicesLoading = false,
+                        trustedDevicesError = "trusted_devices_load_failed",
+                    )
+                }
+        }
+    }
+
+    private fun loadLoginHistory() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isLoginHistoryLoading = true,
+                loginHistoryError = null,
+            )
+            securityRepository.loadLoginHistory()
+                .onSuccess { history ->
+                    _uiState.value = _uiState.value.copy(
+                        loginHistory = history,
+                        isLoginHistoryLoading = false,
+                    )
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(
+                        isLoginHistoryLoading = false,
+                        loginHistoryError = "login_history_load_failed",
+                    )
+                }
+        }
+    }
+
     private fun loadSessions() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSessionsLoading = true, sessionsError = null)
@@ -539,6 +878,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             profileRepository.unlockLightCatcher()
                 .onSuccess {
                     val current = _uiState.value.easterFlags
+                    _uiState.value.user?.login?.let(EasterLogger::logLightCatcher)
                     _uiState.value = _uiState.value.copy(
                         showLightCatcherGame = false,
                         lightCatcherUnlocking = false,
@@ -564,6 +904,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         pending2FAUserId = null,
                     )
                     refreshSocialData()
+                    onAuthenticated()
                 }
                 is AuthResult.Error -> {
                     _uiState.value = _uiState.value.copy(
@@ -588,6 +929,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         pending2FAUserId = null,
                     )
                     refreshSocialData()
+                    onAuthenticated()
                 }
                 is AuthResult.Requires2FA -> {
                     _uiState.value = _uiState.value.copy(
@@ -619,6 +961,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         pending2FAUserId = null,
                     )
                     refreshSocialData()
+                    onAuthenticated()
                 }
                 is AuthResult.Error -> {
                     _uiState.value = _uiState.value.copy(
@@ -639,12 +982,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 locale = _uiState.value.locale,
                 themeMode = _uiState.value.themeMode,
                 notificationsEnabled = _uiState.value.notificationsEnabled,
+                loginAlertsEnabled = _uiState.value.loginAlertsEnabled,
+                appLockEnabled = _uiState.value.appLockEnabled,
+                appLockBiometric = _uiState.value.appLockBiometric,
+                appLockPinConfigured = _uiState.value.appLockPinConfigured,
             )
+            LoginNotificationWorker.cancel(getApplication())
         }
     }
 
     fun refreshSessionOnResume() {
         if (_uiState.value.screen != AppScreen.Main || _uiState.value.user == null) return
+        checkLoginNotifications()
         viewModelScope.launch {
             when (authRepository.refreshSession()) {
                 SessionRefreshResult.Valid -> refreshSocialData()
