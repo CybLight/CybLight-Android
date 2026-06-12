@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import org.cyblight.android.R
 import org.cyblight.android.update.UpdateStatus
 import org.cyblight.android.update.UpdateUiState
+import org.cyblight.android.update.buildReleaseNotesAnnotatedString
 
 @Composable
 fun UpdateDialog(
@@ -50,7 +51,10 @@ fun UpdateDialog(
 
                 if (state.releaseNotes.isNotBlank()) {
                     Text(
-                        text = state.releaseNotes,
+                        text = buildReleaseNotesAnnotatedString(
+                            raw = state.releaseNotes,
+                            linkColor = MaterialTheme.colorScheme.primary,
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

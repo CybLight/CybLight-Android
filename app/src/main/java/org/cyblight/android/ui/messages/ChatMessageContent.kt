@@ -125,11 +125,15 @@ private fun LinkPreviewCard(
         loading = true
         failed = false
         preview = null
-        val result = LinkPreviewRepository.fetch(url)
-        if (!currentCoroutineContext().isActive) return@LaunchedEffect
-        preview = result
-        failed = result == null
-        loading = false
+        try {
+            val result = LinkPreviewRepository.fetch(url)
+            if (currentCoroutineContext().isActive) {
+                preview = result
+                failed = result == null
+            }
+        } finally {
+            loading = false
+        }
     }
 
     Row(

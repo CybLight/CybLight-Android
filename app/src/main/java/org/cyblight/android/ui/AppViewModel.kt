@@ -216,20 +216,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
                 if (user != null) {
                     when (authRepository.refreshSession()) {
-                        SessionRefreshResult.Expired -> {
-                            forceLogout()
-                            return@launch
-                        }
+                        SessionRefreshResult.Expired -> forceLogout()
                         else -> {
                             refreshSocialData()
                             LoginNotificationWorker.schedule(getApplication())
                         }
                     }
                 }
-
-                checkForUpdate()
             } catch (_: Exception) {
                 forceLogout()
+            } finally {
+                checkForUpdate(force = true)
             }
         }
     }
@@ -249,10 +246,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    fun checkForUpdate() {
+    fun checkForUpdate(force: Boolean = false) {
         viewModelScope.launch {
+            if (!force && !updatePreferences.shouldAutoCheckNow()) return@launch
+
             updateRepository.checkForUpdate()
                 .onSuccess { info ->
+                    updatePreferences.markAutoChecked()
                     if (info == null) return@onSuccess
 
                     val dismissed = updatePreferences.getDismissedVersion()
@@ -515,6 +515,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             loginNotificationMonitor.markOwnLoginGracePeriod()
             LoginNotificationWorker.schedule(getApplication())
         }
+        checkForUpdate(force = true)
     }
 
     fun openSecurityCheck() {
@@ -1069,7 +1070,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun refreshSessionOnResume() {
+    fun onAppResumed() {
+        checkForUpdate()
         if (_uiState.value.screen != AppScreen.Main || _uiState.value.user == null) return
         checkLoginNotifications()
         viewModelScope.launch {

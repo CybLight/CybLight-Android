@@ -63,7 +63,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        viewModel.refreshSessionOnResume()
+        viewModel.onAppResumed()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
