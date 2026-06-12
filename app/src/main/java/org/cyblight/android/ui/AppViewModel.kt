@@ -166,6 +166,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var pendingUpdate: AppUpdateInfo? = null
     private val loginNotificationMonitor = LoginNotificationMonitor(application)
     private var chatPresenceJob: Job? = null
+    private var chatRefreshJob: Job? = null
     private var appLockBackgroundedAtMs: Long? = null
     private var skipAppLockOnce = false
 
@@ -1244,6 +1245,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openChat(friendId: String, friendName: String) {
         chatPresenceJob?.cancel()
+        chatRefreshJob?.cancel()
         val cachedFriend = _uiState.value.friends.find { it.id == friendId }
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
@@ -1263,6 +1265,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 while (isActive) {
                     delay(5_000)
                     refreshChatFriendPresence(friendId)
+                }
+            }
+            chatRefreshJob = viewModelScope.launch {
+                while (isActive) {
+                    delay(8_000)
+                    reloadChat(friendId)
                 }
             }
 
@@ -1289,6 +1297,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun closeChat() {
         chatPresenceJob?.cancel()
         chatPresenceJob = null
+        chatRefreshJob?.cancel()
+        chatRefreshJob = null
         _uiState.value = _uiState.value.copy(
             chatFriendId = null,
             chatFriendName = null,
@@ -1334,6 +1344,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             chatEditTarget = ChatEditTarget(message.id, message.content),
             chatReplyTarget = null,
         )
+    }
+
+    fun reactToChatMessage(messageId: String, emoji: String) {
+        val friendId = _uiState.value.chatFriendId ?: return
+        viewModelScope.launch {
+            messagesRepository.reactToMessage(messageId, emoji)
+                .onSuccess { reloadChat(friendId) }
+        }
     }
 
     fun pinChatMessage(message: MessageDto) {

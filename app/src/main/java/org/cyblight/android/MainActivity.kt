@@ -19,6 +19,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -77,6 +78,7 @@ class MainActivity : AppCompatActivity() {
             var isAppLocked by rememberSaveable { mutableStateOf(false) }
             var isColdStart by rememberSaveable { mutableStateOf(true) }
             var appLockError by remember { mutableStateOf<String?>(null) }
+            var appLockSession by remember { mutableIntStateOf(0) }
             val lifecycleOwner = LocalLifecycleOwner.current
             val coroutineScope = rememberCoroutineScope()
             val biometricAvailable = remember { BiometricHelper.isAvailable(this@MainActivity) }
@@ -95,6 +97,7 @@ class MainActivity : AppCompatActivity() {
                                 viewModel.shouldShowAppLock(isColdStart = false)
                             ) {
                                 isAppLocked = true
+                                appLockSession++
                             }
                         }
                         else -> Unit
@@ -108,6 +111,7 @@ class MainActivity : AppCompatActivity() {
                 if (uiState.screen == AppScreen.Main && uiState.appLockEnabled) {
                     if (viewModel.shouldShowAppLock(isColdStart = isColdStart)) {
                         isAppLocked = true
+                        appLockSession++
                     }
                     isColdStart = false
                 }
@@ -395,6 +399,7 @@ class MainActivity : AppCompatActivity() {
                                     onDeleteChatMessage = viewModel::deleteChatMessage,
                                     onDeleteChatMessages = viewModel::deleteChatMessages,
                                     onForwardChatMessage = viewModel::forwardChatMessage,
+                                    onReactChatMessage = viewModel::reactToChatMessage,
                                     easterFlags = uiState.easterFlags,
                                     isEasterLoading = uiState.isEasterLoading,
                                     easterError = uiState.easterError?.let { code ->
@@ -448,6 +453,7 @@ class MainActivity : AppCompatActivity() {
 
                     if (isAppLocked && uiState.screen == AppScreen.Main && uiState.appLockEnabled) {
                         AppLockScreen(
+                            sessionId = appLockSession,
                             biometricAvailable = biometricAvailable,
                             biometricEnabled = uiState.appLockBiometric,
                             errorMessage = appLockError,
@@ -463,14 +469,17 @@ class MainActivity : AppCompatActivity() {
                                     }
                                 }
                             },
-                            onUnlockBiometric = {
+                            onUnlockBiometric = { onSuccess, onFailed, onError ->
                                 BiometricHelper.showUnlockPrompt(
                                     activity = this@MainActivity,
                                     onSuccess = {
                                         isAppLocked = false
                                         appLockError = null
                                         viewModel.onAppUnlocked()
+                                        onSuccess()
                                     },
+                                    onFailed = onFailed,
+                                    onError = onError,
                                 )
                             },
                         )

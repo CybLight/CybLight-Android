@@ -165,6 +165,7 @@ data class EasterFlagsDto(
     @SerializedName("darkTrigger") val darkTrigger: Boolean = false,
     @SerializedName("profileMirror") val profileMirror: Boolean = false,
     @SerializedName("lightCatcher") val lightCatcher: Boolean = false,
+    val postmaster: Boolean = false,
 )
 
 data class LightCatcherResponse(
@@ -362,6 +363,25 @@ data class PinnedMessageDto(
     @SerializedName("updatedAt") val updatedAt: Long = 0L,
 )
 
+data class MessageReactionDto(
+    val emoji: String = "",
+    val count: Int = 0,
+)
+
+data class ReactMessageRequest(
+    val emoji: String,
+)
+
+data class ReactMessageResponse(
+    val ok: Boolean = false,
+    val error: String? = null,
+)
+
+data class MarkReadResponse(
+    val ok: Boolean = false,
+    val error: String? = null,
+)
+
 data class MessagesResponse(
     val ok: Boolean = false,
     val messages: List<MessageDto> = emptyList(),
@@ -380,6 +400,7 @@ data class MessageDto(
     val readAt: Long? = null,
     @SerializedName(value = "editedAt", alternate = ["edited_at"])
     val editedAt: Long? = null,
+    val reactions: List<MessageReactionDto> = emptyList(),
 )
 
 data class EditMessageRequest(

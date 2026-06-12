@@ -53,6 +53,8 @@
     <string name="chat_editing_message">Редагування</string>
     <string name="chat_edit_placeholder">Змінити повідомлення…</string>
     <string name="chat_edited">змінено</string>
+    <string name="chat_status_sent">Надіслано</string>
+    <string name="chat_status_read">Прочитано</string>
     <string name="chat_compose_preview_title">Попередній перегляд посилання</string>
     <string name="chat_insert_link">Вставити посилання</string>
     <string name="chat_insert_link_url">URL</string>
@@ -137,6 +139,9 @@
     <string name="app_lock_biometric">Біометрія</string>
     <string name="app_lock_biometric_title">Розблокувати CybLight</string>
     <string name="app_lock_biometric_subtitle">Підтвердіть відбиток або Face ID</string>
+    <string name="app_lock_biometric_waiting">Підтвердіть біометрію для розблокування</string>
+    <string name="app_lock_biometric_retry">Сканувати знову</string>
+    <string name="app_lock_biometric_failures">Невдалих спроб: %1$d з %2$d</string>
     <string name="app_lock_setup_pin">Задайте PIN</string>
     <string name="app_lock_change_pin">Змінити PIN</string>
     <string name="app_lock_wrong_pin">Невірний PIN</string>
@@ -262,6 +267,7 @@
     <string name="easter_dark_trigger_title">Темний тригер</string>
     <string name="easter_profile_mirror_title">Дзеркало профілю</string>
     <string name="easter_light_catcher_title">Ловець світла</string>
+    <string name="easter_postmaster_title">Postmaster</string>
     <string name="light_catcher_title">Ловець світла</string>
     <string name="light_catcher_rules">Лови спалахи світла, поки вони не згаснуть. Потрібно зловити 7 за відведений час.</string>
     <string name="light_catcher_progress">Зловлено: %1$d / %2$d · Залишилось %3$d с</string>

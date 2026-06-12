@@ -6,6 +6,7 @@ import org.cyblight.android.data.api.EditMessageRequest
 import org.cyblight.android.data.api.MessageDto
 import org.cyblight.android.data.api.PinnedMessageDto
 import org.cyblight.android.data.api.PinMessageRequest
+import org.cyblight.android.data.api.ReactMessageRequest
 import org.cyblight.android.data.api.UnpinMessageRequest
 
 data class ConversationPreview(
@@ -102,6 +103,27 @@ class MessagesRepository(private val api: CybLightApi) {
         return try {
             val response = api.unpinMessage(messageId, UnpinMessageRequest(forBoth))
             if (response.ok) Result.success(Unit) else Result.failure(Exception(response.error ?: "unpin_failed"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun reactToMessage(messageId: String, emoji: String): Result<Unit> {
+        val trimmed = emoji.trim()
+        if (trimmed.isEmpty()) return Result.failure(Exception("empty_reaction"))
+
+        return try {
+            val response = api.reactToMessage(messageId, ReactMessageRequest(trimmed))
+            if (response.ok) Result.success(Unit) else Result.failure(Exception(response.error ?: "reaction_failed"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun markMessagesAsRead(friendId: String): Result<Unit> {
+        return try {
+            val response = api.markMessagesAsRead(friendId)
+            if (response.ok) Result.success(Unit) else Result.failure(Exception(response.error ?: "mark_read_failed"))
         } catch (e: Exception) {
             Result.failure(e)
         }

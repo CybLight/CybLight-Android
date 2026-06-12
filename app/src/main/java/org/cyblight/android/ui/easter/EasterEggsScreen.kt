@@ -84,6 +84,12 @@ fun EasterEggsScreen(
                         title = stringResource(R.string.easter_light_catcher_title),
                         unlocked = flags?.lightCatcher == true,
                     )
+                    EasterEggCard(
+                        emoji = "📬",
+                        title = stringResource(R.string.easter_postmaster_title),
+                        unlocked = flags?.postmaster == true,
+                        highlightUnlocked = true,
+                    )
                 }
             }
         }
@@ -107,8 +113,18 @@ private fun EasterEggCard(
     emoji: String,
     title: String,
     unlocked: Boolean,
+    highlightUnlocked: Boolean = false,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = if (highlightUnlocked && unlocked) {
+            androidx.compose.material3.CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            )
+        } else {
+            androidx.compose.material3.CardDefaults.cardColors()
+        },
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

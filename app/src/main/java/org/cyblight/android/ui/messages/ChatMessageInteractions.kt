@@ -63,12 +63,19 @@ fun MessageContextMenuSheet(
     state: MessageMenuState,
     onDismiss: () -> Unit,
     onAction: (MessageMenuAction) -> Unit,
+    onReact: (String) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {
+        QuickReactionsRow(
+            onReact = { emoji ->
+                onReact(emoji)
+                onDismiss()
+            },
+        )
         Column(modifier = Modifier.padding(bottom = 24.dp)) {
             MenuRow(Icons.AutoMirrored.Outlined.Reply, stringResource(R.string.chat_action_reply)) {
                 onAction(MessageMenuAction.Reply)

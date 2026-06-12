@@ -16,7 +16,8 @@ object BiometricHelper {
     fun showUnlockPrompt(
         activity: FragmentActivity,
         onSuccess: () -> Unit,
-        onError: () -> Unit = {},
+        onFailed: () -> Unit = {},
+        onError: (errorCode: Int) -> Unit = {},
     ) {
         val executor = ContextCompat.getMainExecutor(activity)
         val prompt = BiometricPrompt(
@@ -28,10 +29,12 @@ object BiometricHelper {
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    onError()
+                    onError(errorCode)
                 }
 
-                override fun onAuthenticationFailed() = Unit
+                override fun onAuthenticationFailed() {
+                    onFailed()
+                }
             },
         )
         val info = BiometricPrompt.PromptInfo.Builder()

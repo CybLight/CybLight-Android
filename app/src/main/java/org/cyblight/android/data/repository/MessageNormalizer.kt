@@ -17,6 +17,13 @@ object MessageNormalizer {
                     senderId = safeSenderId,
                     content = safeContent.ifBlank { " " },
                     createdAt = normalizeTimestamp(message.createdAt),
+                    readAt = message.readAt?.let { normalizeTimestamp(it) },
+                    editedAt = message.editedAt?.let { normalizeTimestamp(it) },
+                    reactions = message.reactions
+                        .mapNotNull { reaction ->
+                            val emoji = reaction.emoji.trim()
+                            if (emoji.isEmpty()) null else reaction.copy(emoji = emoji, count = reaction.count.coerceAtLeast(1))
+                        },
                 )
             }.getOrNull()
         }

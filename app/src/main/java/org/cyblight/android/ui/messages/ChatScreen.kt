@@ -21,6 +21,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Forward
 import androidx.compose.material.icons.automirrored.outlined.Reply
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PushPin
@@ -94,6 +96,7 @@ fun ChatScreen(
     onDeleteMessage: (String) -> Unit,
     onDeleteMessages: (List<String>) -> Unit,
     onForwardMessage: (String, String) -> Unit,
+    onReactMessage: (String, String) -> Unit,
 ) {
     var draft by remember { mutableStateOf(TextFieldValue()) }
     var suppressedPreviewUrl by remember { mutableStateOf<String?>(null) }
@@ -168,6 +171,7 @@ fun ChatScreen(
             state = state,
             onDismiss = { menuState = null },
             onAction = { handleMenuAction(it, state) },
+            onReact = { emoji -> onReactMessage(state.message.id, emoji) },
         )
     }
 
@@ -361,6 +365,7 @@ fun ChatScreen(
                                     isMine = isMine,
                                     isSelectionMode = selectionMode,
                                     isSelected = isSelected,
+                                    onReact = { emoji -> onReactMessage(message.id, emoji) },
                                     onTap = {
                                         if (selectionMode) {
                                             selectedIds = if (isSelected) {
@@ -542,6 +547,7 @@ private fun MessageBubble(
     isMine: Boolean,
     isSelectionMode: Boolean,
     isSelected: Boolean,
+    onReact: (String) -> Unit,
     onTap: () -> Unit,
     onLongPress: () -> Unit,
 ) {
@@ -602,9 +608,13 @@ private fun MessageBubble(
                     messageId = message.id,
                 )
             }
+            MessageReactionsRow(
+                reactions = message.reactions,
+                onReactionClick = onReact,
+            )
             Row(
                 modifier = Modifier.padding(top = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -619,7 +629,31 @@ private fun MessageBubble(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                if (isMine) {
+                    MessageReadStatus(
+                        readAt = message.readAt,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        readTint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun MessageReadStatus(
+    readAt: Long?,
+    tint: androidx.compose.ui.graphics.Color,
+    readTint: androidx.compose.ui.graphics.Color,
+) {
+    val isRead = readAt != null && readAt > 0L
+    Icon(
+        imageVector = if (isRead) Icons.Filled.DoneAll else Icons.Filled.Done,
+        contentDescription = stringResource(
+            if (isRead) R.string.chat_status_read else R.string.chat_status_sent,
+        ),
+        modifier = Modifier.size(14.dp),
+        tint = if (isRead) readTint else tint,
+    )
 }

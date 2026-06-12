@@ -68,6 +68,17 @@ interface CybLightApi {
     @GET("messages/unread-summary")
     suspend fun unreadSummary(): UnreadSummaryResponse
 
+    @POST("messages/{messageId}/react")
+    suspend fun reactToMessage(
+        @Path("messageId") messageId: String,
+        @Body body: ReactMessageRequest,
+    ): ReactMessageResponse
+
+    @POST("messages/{friendId}/mark-read")
+    suspend fun markMessagesAsRead(
+        @Path("friendId") friendId: String,
+    ): MarkReadResponse
+
     @GET("messages/{friendId}")
     suspend fun messages(
         @Path("friendId") friendId: String,

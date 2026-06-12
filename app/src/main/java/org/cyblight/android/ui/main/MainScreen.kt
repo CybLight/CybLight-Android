@@ -106,6 +106,7 @@ fun MainScreen(
     onDeleteChatMessage: (String) -> Unit,
     onDeleteChatMessages: (List<String>) -> Unit,
     onForwardChatMessage: (String, String) -> Unit,
+    onReactChatMessage: (String, String) -> Unit,
     securityOverview: SecurityOverview?,
     isSecurityLoading: Boolean,
     isSecurityRefreshing: Boolean,
@@ -145,6 +146,7 @@ fun MainScreen(
             onDeleteMessage = onDeleteChatMessage,
             onDeleteMessages = onDeleteChatMessages,
             onForwardMessage = onForwardChatMessage,
+            onReactMessage = onReactChatMessage,
         )
         return
     }
