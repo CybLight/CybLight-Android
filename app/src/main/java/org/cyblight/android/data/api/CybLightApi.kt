@@ -75,7 +75,7 @@ interface CybLightApi {
 
     @Headers("Origin: https://cyblight.org")
     @DELETE("auth/passkey/{id}")
-    suspend fun deletePasskey(@Path("id") id: String): ApiEnvelope<Unit>
+    suspend fun deletePasskey(@Path("id") id: String): ApiEnvelope<DeletedData>
 
     @GET("auth/trusted-devices")
     suspend fun trustedDevices(): TrustedDevicesResponse

@@ -155,6 +155,10 @@ data class PasskeyRegisterData(
     val name: String? = null,
 )
 
+data class DeletedData(
+    val deleted: Boolean = false,
+)
+
 data class EasterFlagsDto(
     val strawberry: Boolean = false,
     @SerializedName("darkTrigger") val darkTrigger: Boolean = false,

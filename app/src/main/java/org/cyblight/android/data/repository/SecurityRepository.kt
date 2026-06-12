@@ -91,6 +91,7 @@ class SecurityRepository(private val api: CybLightApi) {
         if (!response.ok) {
             throw IllegalStateException(response.error ?: "passkey_remove_failed")
         }
+        Unit
     }
 
     suspend fun loadTrustedDevices(): Result<List<TrustedDeviceDto>> = runCatching {

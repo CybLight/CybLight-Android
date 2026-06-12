@@ -1,6 +1,5 @@
 package org.cyblight.android.util
 
-import android.os.Build
 import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -11,6 +10,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.cyblight.android.BuildConfig
+import org.cyblight.android.util.AppUserAgent
 import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
@@ -33,7 +33,7 @@ object EasterLogger {
             "route" to "android/settings",
             "page" to "cyblight-android://settings/light-catcher",
             "timezone" to TimeZone.getDefault().id,
-            "ua" to buildUserAgent(),
+            "ua" to AppUserAgent.build(),
             "referrer" to null,
         )
 
@@ -45,13 +45,10 @@ object EasterLogger {
                     .url(logUrl)
                     .post(body)
                     .header("Origin", BuildConfig.WEBSITE_URL)
-                    .header("User-Agent", buildUserAgent())
+                    .header("User-Agent", AppUserAgent.build())
                     .build()
                 client.newCall(request).execute().close()
             }
         }
     }
-
-    private fun buildUserAgent(): String =
-        "CybLight-Android/${BuildConfig.VERSION_NAME} (Android ${Build.VERSION.RELEASE}; ${Build.MANUFACTURER} ${Build.MODEL})"
 }

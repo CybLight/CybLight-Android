@@ -7,6 +7,7 @@ import org.cyblight.android.BuildConfig
 import org.cyblight.android.data.api.CybLightApi
 import org.cyblight.android.data.api.createApiGson
 import org.cyblight.android.data.session.SessionManager
+import org.cyblight.android.util.AppUserAgent
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
@@ -23,6 +24,7 @@ object ApiClient {
 
             val builder = chain.request().newBuilder()
                 .addHeader(MOBILE_CLIENT_HEADER, MOBILE_CLIENT_VALUE)
+                .addHeader("User-Agent", AppUserAgent.build())
                 .addHeader("Origin", org.cyblight.android.BuildConfig.WEBSITE_URL)
 
             val request = if (!token.isNullOrBlank()) {

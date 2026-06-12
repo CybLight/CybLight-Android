@@ -455,6 +455,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openSecurityCheck() {
         _uiState.value = _uiState.value.copy(detailScreen = DetailScreen.SecurityCheck)
+        forceRefreshSecurityOverview()
     }
 
     fun openAccountSecurity(context: Context) {
@@ -757,6 +758,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun syncOverviewPasskeyCount(count: Int) {
+        val overview = _uiState.value.securityOverview ?: return
+        if (overview.passkeyCount == count) return
+        _uiState.value = _uiState.value.copy(
+            securityOverview = overview.copy(passkeyCount = count),
+        )
+    }
+
     private fun loadPasskeys() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isPasskeysLoading = true, passkeysError = null)
@@ -766,6 +775,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         passkeys = passkeys,
                         isPasskeysLoading = false,
                     )
+                    syncOverviewPasskeyCount(passkeys.size)
                 }
                 .onFailure {
                     _uiState.value = _uiState.value.copy(
