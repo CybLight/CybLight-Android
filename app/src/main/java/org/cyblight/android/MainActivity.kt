@@ -25,7 +25,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import org.cyblight.android.ui.AppScreen
+import org.cyblight.android.ui.DetailScreen
+import org.cyblight.android.ui.easter.EasterEggsScreen
+import org.cyblight.android.ui.easter.LightCatcherGameDialog
+import org.cyblight.android.ui.profile.ProfileScreen
+import org.cyblight.android.ui.security.SecurityScreen
+import org.cyblight.android.ui.security.SessionsScreen
 import org.cyblight.android.update.ApkInstaller
 import org.cyblight.android.i18n.AppLocaleProvider
 import org.cyblight.android.ui.AppViewModel
@@ -33,6 +40,7 @@ import org.cyblight.android.ui.login.LoginScreen
 import org.cyblight.android.ui.login.TwoFactorScreen
 import org.cyblight.android.ui.main.MainScreen
 import org.cyblight.android.ui.components.AboutDialog
+import org.cyblight.android.ui.help.HelpScreen
 import org.cyblight.android.ui.settings.SettingsScreen
 import org.cyblight.android.ui.theme.CybLightTheme
 import org.cyblight.android.ui.update.UpdateCheckDialog
@@ -61,9 +69,6 @@ class MainActivity : AppCompatActivity() {
                 contract = ActivityResultContracts.RequestPermission(),
             ) { granted ->
                 viewModel.setNotificationsEnabled(granted)
-                if (granted) {
-                    SystemSettings.openAppNotificationSettings(context)
-                }
             }
 
             LaunchedEffect(uiState.screen) {
@@ -93,13 +98,13 @@ class MainActivity : AppCompatActivity() {
                     color = MaterialTheme.colorScheme.background,
                 ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    when {
-                        uiState.showSettings -> {
+                    when (uiState.detailScreen) {
+                        DetailScreen.Settings -> {
                             SettingsScreen(
                                 locale = uiState.locale,
                                 themeMode = uiState.themeMode,
                                 notificationsEnabled = uiState.notificationsEnabled,
-                                onBack = viewModel::closeSettings,
+                                onBack = viewModel::navigateBack,
                                 onLocaleSelected = viewModel::setLocale,
                                 onThemeModeSelected = viewModel::setThemeMode,
                                 onNotificationsEnabledChange = viewModel::setNotificationsEnabled,
@@ -110,10 +115,84 @@ class MainActivity : AppCompatActivity() {
                                         )
                                     }
                                 },
-                                onAbout = { showAbout = true },
+                                onHelp = viewModel::openHelp,
+                                onSecurity = viewModel::openSecurity,
+                                onEasterEggs = viewModel::openEasterEggs,
+                                onOpenLightCatcherGame = viewModel::openLightCatcherGame,
                             )
                         }
-                        uiState.screen == AppScreen.Loading -> {
+                        DetailScreen.Help -> {
+                            HelpScreen(onBack = viewModel::navigateBack)
+                        }
+                        DetailScreen.Security -> {
+                            SecurityScreen(
+                                onBack = viewModel::navigateBack,
+                                onOpenSessions = viewModel::openSessions,
+                            )
+                        }
+                        DetailScreen.Sessions -> {
+                            SessionsScreen(
+                                sessions = uiState.sessions,
+                                currentSessionId = uiState.currentSessionId,
+                                isLoading = uiState.isSessionsLoading,
+                                error = uiState.sessionsError?.let { code ->
+                                    when (code) {
+                                        "sessions_load_failed" -> stringResource(R.string.error_load_sessions)
+                                        "sessions_revoke_failed" -> stringResource(R.string.error_revoke_session)
+                                        else -> code
+                                    }
+                                },
+                                isRevoking = uiState.isSessionRevoking,
+                                onBack = viewModel::navigateBack,
+                                onRevoke = viewModel::revokeSession,
+                                onRefresh = viewModel::refreshSessions,
+                            )
+                        }
+                        DetailScreen.EasterEggs -> {
+                            EasterEggsScreen(
+                                flags = uiState.easterFlags,
+                                isLoading = uiState.isEasterLoading,
+                                error = uiState.easterError?.let { code ->
+                                    when (code) {
+                                        "easter_load_failed" -> stringResource(R.string.error_load_easter)
+                                        else -> code
+                                    }
+                                },
+                                onBack = viewModel::navigateBack,
+                            )
+                        }
+                        DetailScreen.OwnProfile -> {
+                            ProfileScreen(
+                                title = stringResource(R.string.profile_title),
+                                profile = uiState.profile,
+                                isOwnProfile = true,
+                                isLoading = uiState.isProfileLoading,
+                                error = uiState.profileError?.let { code ->
+                                    when (code) {
+                                        "profile_load_failed" -> stringResource(R.string.error_load_profile)
+                                        else -> code
+                                    }
+                                },
+                                onBack = viewModel::navigateBack,
+                            )
+                        }
+                        DetailScreen.FriendProfile -> {
+                            ProfileScreen(
+                                title = uiState.profileUsername.orEmpty(),
+                                profile = uiState.profile,
+                                isOwnProfile = false,
+                                isLoading = uiState.isProfileLoading,
+                                error = uiState.profileError?.let { code ->
+                                    when (code) {
+                                        "profile_load_failed" -> stringResource(R.string.error_load_profile)
+                                        else -> code
+                                    }
+                                },
+                                onBack = viewModel::navigateBack,
+                            )
+                        }
+                        DetailScreen.None -> when (uiState.screen) {
+                        AppScreen.Loading -> {
                             Box(
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center,
@@ -121,32 +200,36 @@ class MainActivity : AppCompatActivity() {
                                 CircularProgressIndicator()
                             }
                         }
-                        uiState.screen == AppScreen.Login -> {
+                        AppScreen.Login -> {
                             LoginScreen(
                                 isSubmitting = uiState.isSubmitting,
                                 errorCode = uiState.loginError,
                                 onSettings = viewModel::openSettings,
+                                onHelp = viewModel::openHelp,
                                 onAbout = { showAbout = true },
                                 onCheckUpdates = viewModel::checkForUpdatesManual,
                                 onReportBug = { BugReport.open(context) },
+                                onDonate = { viewModel.openDonate(context) },
                                 onLogin = viewModel::login,
                                 onPasskeyLogin = { login ->
                                     viewModel.loginWithPasskey(this@MainActivity, login)
                                 },
                             )
                         }
-                        uiState.screen == AppScreen.TwoFactor -> {
+                        AppScreen.TwoFactor -> {
                             TwoFactorScreen(
                                 isSubmitting = uiState.isSubmitting,
                                 errorCode = uiState.loginError,
                                 onSettings = viewModel::openSettings,
+                                onHelp = viewModel::openHelp,
                                 onAbout = { showAbout = true },
                                 onCheckUpdates = viewModel::checkForUpdatesManual,
                                 onReportBug = { BugReport.open(context) },
+                                onDonate = { viewModel.openDonate(context) },
                                 onVerify = viewModel::verify2FA,
                             )
                         }
-                        uiState.screen == AppScreen.Main -> {
+                        AppScreen.Main -> {
                             val user = uiState.user
                             if (user != null) {
                                 MainScreen(
@@ -161,10 +244,14 @@ class MainActivity : AppCompatActivity() {
                                     isChatLoading = uiState.isChatLoading,
                                     isSending = uiState.isSending,
                                     onSettings = viewModel::openSettings,
+                                    onHelp = viewModel::openHelp,
                                     onAbout = { showAbout = true },
                                     onCheckUpdates = viewModel::checkForUpdatesManual,
                                     onReportBug = { BugReport.open(context) },
+                                    onDonate = { viewModel.openDonate(context) },
                                     onLogout = viewModel::logout,
+                                    onOpenProfile = viewModel::openOwnProfile,
+                                    onOpenFriendProfile = viewModel::openFriendProfile,
                                     onRefresh = viewModel::refreshSocialData,
                                     onOpenChat = viewModel::openChat,
                                     onCloseChat = viewModel::closeChat,
@@ -172,10 +259,19 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
                         }
+                        }
                     }
 
                     if (showAbout) {
                         AboutDialog(onDismiss = { showAbout = false })
+                    }
+
+                    if (uiState.showLightCatcherGame) {
+                        LightCatcherGameDialog(
+                            isUnlocking = uiState.lightCatcherUnlocking,
+                            onDismiss = viewModel::dismissLightCatcherGame,
+                            onWin = viewModel::onLightCatcherGameWon,
+                        )
                     }
 
                     UpdateCheckDialog(

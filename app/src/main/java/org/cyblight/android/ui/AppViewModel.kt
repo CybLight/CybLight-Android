@@ -11,8 +11,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.cyblight.android.data.ApiClient
+import android.content.Context
+import org.cyblight.android.data.api.EasterFlagsDto
 import org.cyblight.android.data.api.FriendDto
 import org.cyblight.android.data.api.MessageDto
+import org.cyblight.android.data.api.ProfileDto
+import org.cyblight.android.data.api.SessionDto
 import org.cyblight.android.data.api.UserDto
 import org.cyblight.android.data.preferences.AppPreferences
 import org.cyblight.android.data.preferences.ThemeMode
@@ -22,7 +26,10 @@ import org.cyblight.android.data.repository.SessionRefreshResult
 import org.cyblight.android.data.repository.ConversationPreview
 import org.cyblight.android.data.repository.FriendsRepository
 import org.cyblight.android.data.repository.MessagesRepository
+import org.cyblight.android.data.repository.ProfileRepository
+import org.cyblight.android.data.repository.SessionsRepository
 import org.cyblight.android.data.session.SessionManager
+import org.cyblight.android.util.ExternalLinks
 import org.cyblight.android.i18n.LocaleManager
 import org.cyblight.android.update.AppUpdateInfo
 import org.cyblight.android.update.ManualUpdateCheckState
@@ -30,6 +37,7 @@ import org.cyblight.android.update.UpdatePreferences
 import org.cyblight.android.update.UpdateRepository
 import org.cyblight.android.update.UpdateStatus
 import org.cyblight.android.update.UpdateUiState
+import org.cyblight.android.util.SystemSettings
 import java.io.File
 
 enum class AppScreen {
@@ -37,6 +45,17 @@ enum class AppScreen {
     Login,
     TwoFactor,
     Main,
+}
+
+enum class DetailScreen {
+    None,
+    Settings,
+    Help,
+    Security,
+    Sessions,
+    EasterEggs,
+    OwnProfile,
+    FriendProfile,
 }
 
 data class AppUiState(
@@ -57,7 +76,22 @@ data class AppUiState(
     val isSending: Boolean = false,
     val update: UpdateUiState = UpdateUiState(),
     val manualUpdateCheck: ManualUpdateCheckState = ManualUpdateCheckState(),
-    val showSettings: Boolean = false,
+    val detailScreen: DetailScreen = DetailScreen.None,
+    val helpReturnToSettings: Boolean = false,
+    val profileUsername: String? = null,
+    val profile: ProfileDto? = null,
+    val isProfileLoading: Boolean = false,
+    val profileError: String? = null,
+    val sessions: List<SessionDto> = emptyList(),
+    val currentSessionId: String? = null,
+    val isSessionsLoading: Boolean = false,
+    val sessionsError: String? = null,
+    val isSessionRevoking: Boolean = false,
+    val easterFlags: EasterFlagsDto? = null,
+    val isEasterLoading: Boolean = false,
+    val easterError: String? = null,
+    val showLightCatcherGame: Boolean = false,
+    val lightCatcherUnlocking: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val notificationsEnabled: Boolean = true,
 )
@@ -69,6 +103,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val authRepository = AuthRepository(api, sessionManager)
     private val friendsRepository = FriendsRepository(api)
     private val messagesRepository = MessagesRepository(api)
+    private val profileRepository = ProfileRepository(api)
+    private val sessionsRepository = SessionsRepository(api)
     private val updateRepository = UpdateRepository(application)
     private val updatePreferences = UpdatePreferences(application)
     private var pendingUpdate: AppUpdateInfo? = null
@@ -93,12 +129,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val savedLocale = sessionManager.getLocale()
                 val savedTheme = appPreferences.getThemeMode()
-                val savedNotifications = appPreferences.getNotificationsEnabled()
+                val notifications = resolveNotificationsEnabled()
                 LocaleManager.apply(savedLocale)
                 _uiState.value = _uiState.value.copy(
                     locale = savedLocale,
                     themeMode = savedTheme,
-                    notificationsEnabled = savedNotifications,
+                    notificationsEnabled = notifications,
                 )
 
                 val user = authRepository.restoreSession()
@@ -273,17 +309,247 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setNotificationsEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            appPreferences.setNotificationsEnabled(enabled)
-            _uiState.value = _uiState.value.copy(notificationsEnabled = enabled)
+            val resolved = enabled && SystemSettings.areNotificationsEnabled(getApplication())
+            appPreferences.setNotificationsEnabled(resolved)
+            _uiState.value = _uiState.value.copy(notificationsEnabled = resolved)
         }
     }
 
-    fun openSettings() {
-        _uiState.value = _uiState.value.copy(showSettings = true)
+    private suspend fun resolveNotificationsEnabled(): Boolean {
+        val systemEnabled = SystemSettings.areNotificationsEnabled(getApplication())
+        val saved = appPreferences.getNotificationsEnabled()
+        val resolved = saved && systemEnabled
+        if (saved != resolved) {
+            appPreferences.setNotificationsEnabled(resolved)
+        }
+        return resolved
     }
 
-    fun closeSettings() {
-        _uiState.value = _uiState.value.copy(showSettings = false)
+    fun openSettings() {
+        _uiState.value = _uiState.value.copy(detailScreen = DetailScreen.Settings)
+    }
+
+    fun openHelp() {
+        val returnToSettings = _uiState.value.detailScreen == DetailScreen.Settings
+        _uiState.value = _uiState.value.copy(
+            detailScreen = DetailScreen.Help,
+            helpReturnToSettings = returnToSettings,
+        )
+    }
+
+    fun openSecurity() {
+        _uiState.value = _uiState.value.copy(detailScreen = DetailScreen.Security)
+    }
+
+    fun openSessions() {
+        _uiState.value = _uiState.value.copy(
+            detailScreen = DetailScreen.Sessions,
+            sessionsError = null,
+            isSessionsLoading = true,
+        )
+        loadSessions()
+    }
+
+    fun openEasterEggs() {
+        _uiState.value = _uiState.value.copy(
+            detailScreen = DetailScreen.EasterEggs,
+            easterError = null,
+            isEasterLoading = true,
+        )
+        loadEasterFlags()
+    }
+
+    fun openOwnProfile() {
+        _uiState.value = _uiState.value.copy(
+            detailScreen = DetailScreen.OwnProfile,
+            profileUsername = null,
+            profile = null,
+            profileError = null,
+            isProfileLoading = true,
+        )
+        loadOwnProfile()
+    }
+
+    fun openFriendProfile(username: String) {
+        _uiState.value = _uiState.value.copy(
+            detailScreen = DetailScreen.FriendProfile,
+            profileUsername = username,
+            profile = null,
+            profileError = null,
+            isProfileLoading = true,
+        )
+        loadFriendProfile(username)
+    }
+
+    fun navigateBack() {
+        when (_uiState.value.detailScreen) {
+            DetailScreen.Sessions -> _uiState.value = _uiState.value.copy(detailScreen = DetailScreen.Security)
+            DetailScreen.Help -> {
+                _uiState.value = if (_uiState.value.helpReturnToSettings) {
+                    _uiState.value.copy(
+                        detailScreen = DetailScreen.Settings,
+                        helpReturnToSettings = false,
+                    )
+                } else {
+                    _uiState.value.copy(
+                        detailScreen = DetailScreen.None,
+                        helpReturnToSettings = false,
+                    )
+                }
+            }
+            DetailScreen.Security, DetailScreen.EasterEggs -> {
+                _uiState.value = _uiState.value.copy(detailScreen = DetailScreen.Settings)
+            }
+            else -> {
+                _uiState.value = _uiState.value.copy(
+                    detailScreen = DetailScreen.None,
+                    profileUsername = null,
+                    profile = null,
+                    profileError = null,
+                    sessionsError = null,
+                    easterError = null,
+                )
+            }
+        }
+    }
+
+    fun openDonate(context: Context) {
+        val locale = _uiState.value.locale
+        ExternalLinks.openUrl(context, "https://cyblight.org/$locale/donate/")
+    }
+
+    fun refreshSessions() {
+        loadSessions()
+    }
+
+    fun revokeSession(sessionId: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSessionRevoking = true, sessionsError = null)
+            sessionsRepository.revokeSession(sessionId)
+                .onSuccess { loggedOut ->
+                    if (loggedOut) {
+                        forceLogout()
+                    } else {
+                        loadSessions()
+                        _uiState.value = _uiState.value.copy(isSessionRevoking = false)
+                    }
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(
+                        isSessionRevoking = false,
+                        sessionsError = "sessions_revoke_failed",
+                    )
+                }
+        }
+    }
+
+    private fun loadOwnProfile() {
+        viewModelScope.launch {
+            profileRepository.loadOwnProfile()
+                .onSuccess { profile ->
+                    _uiState.value = _uiState.value.copy(
+                        profile = profile,
+                        isProfileLoading = false,
+                    )
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(
+                        isProfileLoading = false,
+                        profileError = "profile_load_failed",
+                    )
+                }
+        }
+    }
+
+    private fun loadFriendProfile(username: String) {
+        viewModelScope.launch {
+            profileRepository.loadProfile(username)
+                .onSuccess { profile ->
+                    if (_uiState.value.profileUsername != username) return@onSuccess
+                    _uiState.value = _uiState.value.copy(
+                        profile = profile,
+                        isProfileLoading = false,
+                    )
+                }
+                .onFailure {
+                    if (_uiState.value.profileUsername != username) return@onFailure
+                    _uiState.value = _uiState.value.copy(
+                        isProfileLoading = false,
+                        profileError = "profile_load_failed",
+                    )
+                }
+        }
+    }
+
+    private fun loadSessions() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSessionsLoading = true, sessionsError = null)
+            sessionsRepository.loadSessions()
+                .onSuccess { snapshot ->
+                    _uiState.value = _uiState.value.copy(
+                        sessions = snapshot.sessions,
+                        currentSessionId = snapshot.currentSessionId,
+                        isSessionsLoading = false,
+                    )
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(
+                        isSessionsLoading = false,
+                        sessionsError = "sessions_load_failed",
+                    )
+                }
+        }
+    }
+
+    private fun loadEasterFlags() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isEasterLoading = true, easterError = null)
+            profileRepository.loadEasterFlags()
+                .onSuccess { flags ->
+                    _uiState.value = _uiState.value.copy(
+                        easterFlags = flags,
+                        isEasterLoading = false,
+                    )
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(
+                        isEasterLoading = false,
+                        easterError = "easter_load_failed",
+                    )
+                }
+        }
+    }
+
+    fun openLightCatcherGame() {
+        _uiState.value = _uiState.value.copy(showLightCatcherGame = true)
+    }
+
+    fun dismissLightCatcherGame() {
+        _uiState.value = _uiState.value.copy(showLightCatcherGame = false)
+    }
+
+    fun onLightCatcherGameWon() {
+        val flags = _uiState.value.easterFlags
+        if (flags?.lightCatcher == true) {
+            dismissLightCatcherGame()
+            return
+        }
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(lightCatcherUnlocking = true)
+            profileRepository.unlockLightCatcher()
+                .onSuccess {
+                    val current = _uiState.value.easterFlags
+                    _uiState.value = _uiState.value.copy(
+                        showLightCatcherGame = false,
+                        lightCatcherUnlocking = false,
+                        easterFlags = current?.copy(lightCatcher = true)
+                            ?: EasterFlagsDto(lightCatcher = true),
+                    )
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(lightCatcherUnlocking = false)
+                }
+        }
     }
 
     fun loginWithPasskey(activity: Activity, login: String?) {

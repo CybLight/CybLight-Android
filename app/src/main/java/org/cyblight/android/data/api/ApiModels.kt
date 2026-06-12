@@ -92,10 +92,79 @@ data class PasskeyLoginResponse(
     val error: String? = null,
 )
 
+data class EasterFlagsDto(
+    val strawberry: Boolean = false,
+    @SerializedName("darkTrigger") val darkTrigger: Boolean = false,
+    @SerializedName("profileMirror") val profileMirror: Boolean = false,
+    @SerializedName("lightCatcher") val lightCatcher: Boolean = false,
+)
+
+data class LightCatcherResponse(
+    val ok: Boolean = false,
+    @SerializedName("lightCatcher") val lightCatcher: Boolean = false,
+    val error: String? = null,
+)
+
+data class MeUserDto(
+    val id: String = "",
+    val login: String = "",
+    val easter: EasterFlagsDto? = null,
+)
+
 data class MeResponse(
     val ok: Boolean = false,
-    val user: UserDto? = null,
+    val user: MeUserDto? = null,
     val error: String? = null,
+)
+
+data class ProfileDto(
+    val id: String = "",
+    val username: String = "",
+    val avatar: String? = null,
+    @SerializedName("avatarUrl") val avatarUrl: String? = null,
+    val bio: String? = null,
+    @SerializedName("aboutMe") val aboutMe: String? = null,
+    val gender: String? = null,
+    @SerializedName("dateOfBirth") val dateOfBirth: String? = null,
+    @SerializedName("createdAt") val createdAt: Long = 0L,
+    @SerializedName("friendsCount") val friendsCount: Int = 0,
+    val verified: Boolean = false,
+    val role: String? = null,
+    @SerializedName("isOnline") val isOnline: Boolean? = null,
+    @SerializedName("lastSeenAt") val lastSeenAt: Long? = null,
+)
+
+data class ProfileResponse(
+    val ok: Boolean = false,
+    val profile: ProfileDto? = null,
+    val error: String? = null,
+)
+
+data class SessionDto(
+    val id: String = "",
+    @SerializedName("created_at") val createdAt: Long = 0L,
+    @SerializedName("expires_at") val expiresAt: Long = 0L,
+    @SerializedName("last_seen_at") val lastSeenAt: Long = 0L,
+    @SerializedName("user_agent") val userAgent: String? = null,
+    val browser: String? = null,
+    val os: String? = null,
+    @SerializedName("deviceType") val deviceType: String? = null,
+    val country: String? = null,
+    val city: String? = null,
+)
+
+data class SessionsData(
+    val current: String? = null,
+    val sessions: List<SessionDto> = emptyList(),
+)
+
+data class RevokeSessionRequest(
+    val id: String,
+)
+
+data class RevokeSessionData(
+    val removed: Int = 0,
+    @SerializedName("loggedOut") val loggedOut: Boolean = false,
 )
 
 data class FriendsListResponse(

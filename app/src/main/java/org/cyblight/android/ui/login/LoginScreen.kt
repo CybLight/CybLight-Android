@@ -43,9 +43,11 @@ fun LoginScreen(
     isSubmitting: Boolean,
     errorCode: String?,
     onSettings: () -> Unit,
+    onHelp: () -> Unit,
     onAbout: () -> Unit,
     onCheckUpdates: () -> Unit,
     onReportBug: () -> Unit,
+    onDonate: () -> Unit,
     onLogin: (login: String, password: String, turnstileToken: String) -> Unit,
     onPasskeyLogin: (login: String?) -> Unit,
 ) {
@@ -68,9 +70,11 @@ fun LoginScreen(
         ) {
             AppMenu(
                 onSettings = onSettings,
+                onHelp = onHelp,
                 onAbout = onAbout,
                 onCheckUpdates = onCheckUpdates,
                 onReportBug = onReportBug,
+                onDonate = onDonate,
             )
         }
 
@@ -167,9 +171,11 @@ fun TwoFactorScreen(
     isSubmitting: Boolean,
     errorCode: String?,
     onSettings: () -> Unit,
+    onHelp: () -> Unit,
     onAbout: () -> Unit,
     onCheckUpdates: () -> Unit,
     onReportBug: () -> Unit,
+    onDonate: () -> Unit,
     onVerify: (code: String, rememberDevice: Boolean) -> Unit,
 ) {
     var code by rememberSaveable { mutableStateOf("") }
@@ -189,9 +195,11 @@ fun TwoFactorScreen(
         ) {
             AppMenu(
                 onSettings = onSettings,
+                onHelp = onHelp,
                 onAbout = onAbout,
                 onCheckUpdates = onCheckUpdates,
                 onReportBug = onReportBug,
+                onDonate = onDonate,
             )
         }
         CybLightLogo()

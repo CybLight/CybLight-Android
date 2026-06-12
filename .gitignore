@@ -39,6 +39,7 @@ captures/
 .env.*
 !.env.example
 secrets.properties
+keystore.properties
 
 # Log files
 *.log

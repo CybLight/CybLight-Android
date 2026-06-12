@@ -4,6 +4,7 @@ import android.app.Activity
 import org.cyblight.android.auth.PasskeyAuthException
 import org.cyblight.android.auth.PasskeyAuthHelper
 import org.cyblight.android.data.api.CybLightApi
+import org.cyblight.android.data.api.MeUserDto
 import org.cyblight.android.data.api.LoginRequest
 import org.cyblight.android.data.api.PasskeyLoginRequest
 import org.cyblight.android.data.api.PasskeyOptionsRequest
@@ -123,7 +124,8 @@ class AuthRepository(
             val token = extractAuthToken(response.headers().values("Set-Cookie"))
                 ?: return AuthResult.Error("missing_token")
 
-            val user = body.user ?: api.me().user ?: return AuthResult.Error("invalid_response")
+            val user = resolveUser(body.user, api.me().user)
+                ?: return AuthResult.Error("invalid_response")
             sessionManager.saveSession(token, user.id, user.login)
             AuthResult.Success(user)
         } catch (error: PasskeyAuthException) {
@@ -166,7 +168,10 @@ class AuthRepository(
         return try {
             val me = api.me()
             when {
-                me.ok && me.user != null -> me.user
+                me.ok && me.user != null -> UserDto(
+                    id = me.user.id,
+                    login = me.user.login,
+                )
                 me.ok -> readCachedUser()
                 else -> {
                     sessionManager.clearAndNotifyExpired()
@@ -193,6 +198,16 @@ class AuthRepository(
     suspend fun logout() {
         runCatching { api.logout() }
         sessionManager.clear()
+    }
+
+    private fun resolveUser(partial: UserDto?, meUser: MeUserDto?): UserDto? {
+        if (meUser != null && meUser.id.isNotBlank() && meUser.login.isNotBlank()) {
+            return UserDto(id = meUser.id, login = meUser.login)
+        }
+        if (partial != null && partial.id.isNotBlank() && partial.login.isNotBlank()) {
+            return partial
+        }
+        return null
     }
 
     private fun parseErrorBody(raw: String?): String {

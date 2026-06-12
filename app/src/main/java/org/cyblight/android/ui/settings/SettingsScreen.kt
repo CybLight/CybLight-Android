@@ -2,6 +2,8 @@ package org.cyblight.android.ui.settings
 
 import android.os.Build
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,10 +13,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.BatteryChargingFull
-import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Celebration
+import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.SettingsApplications
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -29,15 +33,24 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import org.cyblight.android.BuildConfig
 import org.cyblight.android.R
+import org.cyblight.android.util.ExternalLinks
 import org.cyblight.android.data.preferences.ThemeMode
 import org.cyblight.android.i18n.LocaleManager
 import org.cyblight.android.util.SystemSettings
@@ -53,11 +66,48 @@ fun SettingsScreen(
     onThemeModeSelected: (ThemeMode) -> Unit,
     onNotificationsEnabledChange: (Boolean) -> Unit,
     onRequestNotificationPermission: () -> Unit,
-    onAbout: () -> Unit,
+    onHelp: () -> Unit,
+    onSecurity: () -> Unit,
+    onEasterEggs: () -> Unit,
+    onOpenLightCatcherGame: () -> Unit,
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var languageMenuExpanded by remember { mutableStateOf(false) }
     var themeMenuExpanded by remember { mutableStateOf(false) }
+    var systemNotificationsEnabled by remember {
+        mutableStateOf(SystemSettings.areNotificationsEnabled(context))
+    }
+    var versionTapCount by remember { mutableStateOf(0) }
+
+    LaunchedEffect(versionTapCount) {
+        if (versionTapCount in 1..6) {
+            delay(2500)
+            versionTapCount = 0
+        }
+    }
+
+    fun syncNotificationState() {
+        val enabled = SystemSettings.areNotificationsEnabled(context)
+        systemNotificationsEnabled = enabled
+        if (notificationsEnabled != enabled) {
+            onNotificationsEnabledChange(enabled)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        syncNotificationState()
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                syncNotificationState()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Scaffold(
         topBar = {
@@ -77,6 +127,17 @@ fun SettingsScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState()),
         ) {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.menu_help)) },
+                supportingContent = { Text(stringResource(R.string.help_menu_hint)) },
+                leadingContent = { Icon(Icons.Outlined.HelpOutline, contentDescription = null) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onHelp),
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
             Text(
                 text = stringResource(R.string.settings_section_appearance),
                 style = MaterialTheme.typography.labelLarge,
@@ -84,17 +145,12 @@ fun SettingsScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
 
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_theme)) },
-                supportingContent = { Text(themeModeLabel(themeMode)) },
-                leadingContent = { Icon(Icons.Outlined.Palette, contentDescription = null) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { themeMenuExpanded = true },
-            )
-            DropdownMenu(
+            SettingsDropdownRow(
                 expanded = themeMenuExpanded,
-                onDismissRequest = { themeMenuExpanded = false },
+                onExpandedChange = { themeMenuExpanded = it },
+                headline = stringResource(R.string.settings_theme),
+                supporting = themeModeLabel(themeMode),
+                leadingIcon = { Icon(Icons.Outlined.Palette, contentDescription = null) },
             ) {
                 ThemeMode.entries.forEach { mode ->
                     DropdownMenuItem(
@@ -107,17 +163,12 @@ fun SettingsScreen(
                 }
             }
 
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.language)) },
-                supportingContent = { Text(LocaleManager.displayName(locale)) },
-                leadingContent = { Icon(Icons.Outlined.Language, contentDescription = null) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { languageMenuExpanded = true },
-            )
-            DropdownMenu(
+            SettingsDropdownRow(
                 expanded = languageMenuExpanded,
-                onDismissRequest = { languageMenuExpanded = false },
+                onExpandedChange = { languageMenuExpanded = it },
+                headline = stringResource(R.string.language),
+                supporting = LocaleManager.displayName(locale),
+                leadingIcon = { Icon(Icons.Outlined.Language, contentDescription = null) },
             ) {
                 LocaleManager.supported.forEach { code ->
                     DropdownMenuItem(
@@ -143,7 +194,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_notifications)) },
                 supportingContent = {
                     Text(
-                        if (SystemSettings.areNotificationsEnabled(context)) {
+                        if (systemNotificationsEnabled) {
                             stringResource(R.string.settings_notifications_enabled)
                         } else {
                             stringResource(R.string.settings_notifications_disabled)
@@ -153,15 +204,17 @@ fun SettingsScreen(
                 leadingContent = { Icon(Icons.Outlined.Notifications, contentDescription = null) },
                 trailingContent = {
                     Switch(
-                        checked = notificationsEnabled,
+                        checked = systemNotificationsEnabled,
                         onCheckedChange = { enabled ->
-                            if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                onRequestNotificationPermission()
-                            } else {
-                                onNotificationsEnabledChange(enabled)
-                                if (enabled) {
+                            if (enabled) {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    onRequestNotificationPermission()
+                                } else {
                                     SystemSettings.openAppNotificationSettings(context)
                                 }
+                            } else {
+                                onNotificationsEnabledChange(false)
+                                SystemSettings.openAppNotificationSettings(context)
                             }
                         },
                     )
@@ -213,19 +266,108 @@ fun SettingsScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             Text(
-                text = stringResource(R.string.settings_section_about),
+                text = stringResource(R.string.settings_section_account),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
 
             ListItem(
-                headlineContent = { Text(stringResource(R.string.menu_about)) },
-                leadingContent = { Icon(Icons.Outlined.Info, contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.security_title)) },
+                supportingContent = { Text(stringResource(R.string.security_hint)) },
+                leadingContent = { Icon(Icons.Outlined.Security, contentDescription = null) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onAbout),
+                    .clickable(onClick = onSecurity),
             )
+
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.easter_eggs_title)) },
+                supportingContent = { Text(stringResource(R.string.easter_eggs_menu_hint)) },
+                leadingContent = { Icon(Icons.Outlined.Celebration, contentDescription = null) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onEasterEggs),
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            Text(
+                text = stringResource(R.string.settings_section_about),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.about_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    text = stringResource(
+                        R.string.about_creator,
+                        stringResource(R.string.about_creator_value),
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    text = stringResource(R.string.about_website_link),
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium,
+                    ),
+                    modifier = Modifier.clickable {
+                        ExternalLinks.openUrl(context, BuildConfig.WEBSITE_URL)
+                    },
+                )
+                Text(
+                    text = stringResource(R.string.about_version, BuildConfig.VERSION_NAME),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .clickable {
+                            versionTapCount++
+                            if (versionTapCount >= 7) {
+                                versionTapCount = 0
+                                onOpenLightCatcherGame()
+                            }
+                        },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsDropdownRow(
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    headline: String,
+    supporting: String,
+    leadingIcon: @Composable () -> Unit,
+    menuContent: @Composable () -> Unit,
+) {
+    Box(modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            headlineContent = { Text(headline) },
+            supportingContent = { Text(supporting) },
+            leadingContent = leadingIcon,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onExpandedChange(true) },
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { onExpandedChange(false) },
+        ) {
+            menuContent()
         }
     }
 }

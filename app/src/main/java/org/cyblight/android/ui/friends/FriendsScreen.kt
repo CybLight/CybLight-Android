@@ -33,6 +33,7 @@ fun FriendsScreen(
     error: String?,
     onRefresh: () -> Unit,
     onOpenChat: (friendId: String, username: String) -> Unit,
+    onOpenProfile: (username: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when {
@@ -88,7 +89,11 @@ fun FriendsScreen(
                     )
                 }
                 items(friends, key = { it.id }) { friend ->
-                    FriendCard(friend = friend, onOpenChat = onOpenChat)
+                    FriendCard(
+                        friend = friend,
+                        onOpenChat = onOpenChat,
+                        onOpenProfile = onOpenProfile,
+                    )
                 }
             }
         }
@@ -99,6 +104,7 @@ fun FriendsScreen(
 private fun FriendCard(
     friend: FriendDto,
     onOpenChat: (friendId: String, username: String) -> Unit,
+    onOpenProfile: (username: String) -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -111,7 +117,11 @@ private fun FriendCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onOpenProfile(friend.username) },
+            ) {
                 Text(friend.username, fontWeight = FontWeight.SemiBold)
                 Text(
                     text = if (friend.isOnline) stringResource(R.string.online) else stringResource(R.string.offline),

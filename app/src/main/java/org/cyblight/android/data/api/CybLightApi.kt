@@ -23,6 +23,19 @@ interface CybLightApi {
     @POST("auth/logout")
     suspend fun logout(): ApiEnvelope<Map<String, Any>>
 
+    @GET("profile/me")
+    suspend fun myProfile(): ProfileResponse
+
+    @GET("profile/{username}")
+    suspend fun profile(@Path("username") username: String): ProfileResponse
+
+    @GET("auth/sessions")
+    suspend fun sessions(): ApiEnvelope<SessionsData>
+
+    @Headers("Origin: https://cyblight.org")
+    @POST("auth/sessions/revoke")
+    suspend fun revokeSession(@Body body: RevokeSessionRequest): ApiEnvelope<RevokeSessionData>
+
     @GET("friends/list")
     suspend fun friendsList(): FriendsListResponse
 
@@ -43,4 +56,7 @@ interface CybLightApi {
     @Headers("Origin: https://cyblight.org")
     @POST("auth/passkey/login")
     suspend fun passkeyLogin(@Body body: PasskeyLoginRequest): Response<PasskeyLoginResponse>
+
+    @POST("auth/easter/light-catcher")
+    suspend fun unlockLightCatcher(): LightCatcherResponse
 }

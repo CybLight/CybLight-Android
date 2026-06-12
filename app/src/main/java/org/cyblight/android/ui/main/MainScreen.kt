@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Group
-import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,10 +45,14 @@ fun MainScreen(
     isChatLoading: Boolean,
     isSending: Boolean,
     onSettings: () -> Unit,
+    onHelp: () -> Unit,
     onAbout: () -> Unit,
     onCheckUpdates: () -> Unit,
     onReportBug: () -> Unit,
+    onDonate: () -> Unit,
     onLogout: () -> Unit,
+    onOpenProfile: () -> Unit,
+    onOpenFriendProfile: (username: String) -> Unit,
     onRefresh: () -> Unit,
     onOpenChat: (friendId: String, username: String) -> Unit,
     onCloseChat: () -> Unit,
@@ -75,17 +78,21 @@ fun MainScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.welcome_user, user.login)) },
-                navigationIcon = { CybLightLogo(size = 36.dp) },
+                navigationIcon = {
+                    IconButton(onClick = onOpenProfile) {
+                        CybLightLogo(size = 36.dp)
+                    }
+                },
                 actions = {
                     AppMenu(
                         onSettings = onSettings,
+                        onHelp = onHelp,
                         onAbout = onAbout,
                         onCheckUpdates = onCheckUpdates,
                         onReportBug = onReportBug,
+                        onDonate = onDonate,
+                        onLogout = onLogout,
                     )
-                    IconButton(onClick = onLogout) {
-                        Icon(Icons.Outlined.Logout, contentDescription = stringResource(R.string.logout))
-                    }
                 },
             )
         },
@@ -113,6 +120,7 @@ fun MainScreen(
                 error = friendsError,
                 onRefresh = onRefresh,
                 onOpenChat = onOpenChat,
+                onOpenProfile = onOpenFriendProfile,
                 modifier = Modifier.padding(padding),
             )
             else -> MessagesScreen(
