@@ -41,6 +41,30 @@ interface CybLightApi {
     @GET("friends/list")
     suspend fun friendsList(): FriendsListResponse
 
+    @GET("friends/pending")
+    suspend fun pendingFriends(): PendingRequestsResponse
+
+    @GET("friends/sent")
+    suspend fun sentFriends(): SentRequestsResponse
+
+    @GET("friends/presence/{userId}")
+    suspend fun friendPresence(@Path("userId") userId: String): FriendPresenceResponse
+
+    @GET("search/users")
+    suspend fun searchUsers(@Query("q") query: String): SearchUsersResponse
+
+    @POST("friends/add")
+    suspend fun addFriend(@Body body: AddFriendRequest): FriendActionResponse
+
+    @POST("friends/accept")
+    suspend fun acceptFriend(@Body body: FriendIdRequest): FriendActionResponse
+
+    @POST("friends/reject")
+    suspend fun rejectFriend(@Body body: FriendIdRequest): FriendActionResponse
+
+    @POST("friends/remove")
+    suspend fun removeFriend(@Body body: FriendIdRequest): FriendActionResponse
+
     @GET("messages/unread-summary")
     suspend fun unreadSummary(): UnreadSummaryResponse
 

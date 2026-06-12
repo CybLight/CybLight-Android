@@ -31,6 +31,7 @@ class AppPreferences(private val context: Context) {
     private val appLockBiometricKey = booleanPreferencesKey("app_lock_biometric")
     private val appLockPinSaltKey = stringPreferencesKey("app_lock_pin_salt")
     private val appLockPinHashKey = stringPreferencesKey("app_lock_pin_hash")
+    private val appLockTimeoutKey = longPreferencesKey("app_lock_timeout_ms")
     private val lastSeenLoginEventIdKey = stringPreferencesKey("last_seen_login_event_id")
     private val ignoreLoginEventsUntilKey = longPreferencesKey("ignore_login_events_until")
 
@@ -68,6 +69,18 @@ class AppPreferences(private val context: Context) {
 
     suspend fun getAppLockBiometric(): Boolean =
         appLockBiometric.first()
+
+    suspend fun getAppLockTimeout(): AppLockTimeout {
+        val millis = context.appPreferencesStore.data.first()[appLockTimeoutKey]
+            ?: AppLockTimeout.IMMEDIATE.millis
+        return AppLockTimeout.fromMillis(millis)
+    }
+
+    suspend fun setAppLockTimeout(timeout: AppLockTimeout) {
+        context.appPreferencesStore.edit { prefs ->
+            prefs[appLockTimeoutKey] = timeout.millis
+        }
+    }
 
     suspend fun hasAppLockPin(): Boolean {
         val prefs = context.appPreferencesStore.data.first()

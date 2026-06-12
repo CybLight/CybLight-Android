@@ -239,6 +239,10 @@ fun PasskeysScreen(
 private fun passkeyRegisterErrorMessage(code: String): String {
     return when (code) {
         "cancelled" -> stringResource(R.string.error_passkey_cancelled)
+        "asset_links_failed" -> stringResource(R.string.error_passkey_asset_links_failed)
+        "origin_mismatch" -> stringResource(R.string.error_passkey_origin_mismatch)
+        "challenge_mismatch", "invalid_challenge" -> stringResource(R.string.error_passkey_challenge_mismatch)
+        "invalid_client_data" -> stringResource(R.string.error_passkey_register_failed)
         "passkey_failed" -> stringResource(R.string.error_passkey_register_failed)
         else -> stringResource(R.string.error_passkey_register_failed)
     }

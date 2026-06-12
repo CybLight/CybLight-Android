@@ -1,5 +1,6 @@
 package org.cyblight.android.ui.main
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Celebration
@@ -48,11 +49,21 @@ private const val TAB_EASTER = 3
 fun MainScreen(
     user: UserDto,
     friends: List<FriendDto>,
+    pendingRequests: List<FriendDto>,
+    sentRequests: List<FriendDto>,
+    isFriendsLoading: Boolean,
+    friendSearchResults: List<FriendDto>,
+    isFriendSearchLoading: Boolean,
+    friendSearchError: String?,
+    friendsActionMessage: String?,
+    friendsActionError: String?,
     conversations: List<ConversationPreview>,
     friendsError: String?,
     messagesError: String?,
     chatFriendId: String?,
     chatFriendName: String?,
+    chatFriendIsOnline: Boolean,
+    chatFriendLastSeenAt: Long?,
     chatMessages: List<MessageDto>,
     isChatLoading: Boolean,
     isSending: Boolean,
@@ -69,6 +80,14 @@ fun MainScreen(
     onOpenProfile: () -> Unit,
     onOpenFriendProfile: (username: String) -> Unit,
     onRefresh: () -> Unit,
+    onSearchUsers: (String) -> Unit,
+    onClearFriendSearch: () -> Unit,
+    onClearFriendsActionFeedback: () -> Unit,
+    onAddFriend: (String) -> Unit,
+    onAcceptFriendRequest: (String, String) -> Unit,
+    onRejectFriendRequest: (String) -> Unit,
+    onRemoveFriend: (String, String) -> Unit,
+    onCancelFriendRequest: (String) -> Unit,
     onOpenChat: (friendId: String, username: String) -> Unit,
     onCloseChat: () -> Unit,
     onSendMessage: (String) -> Unit,
@@ -88,12 +107,15 @@ fun MainScreen(
     if (chatFriendId != null && chatFriendName != null) {
         ChatScreen(
             friendName = chatFriendName,
+            friendIsOnline = chatFriendIsOnline,
+            friendLastSeenAt = chatFriendLastSeenAt,
             messages = chatMessages,
             currentUserId = user.id,
             isLoading = isChatLoading,
             isSending = isSending,
             error = messagesError,
             onBack = onCloseChat,
+            onOpenProfile = onOpenFriendProfile,
             onSend = onSendMessage,
         )
         return
@@ -111,7 +133,12 @@ fun MainScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.welcome_user, user.login)) },
+                title = {
+                    Text(
+                        text = stringResource(R.string.welcome_user, user.login),
+                        modifier = Modifier.clickable(onClick = onOpenProfile),
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onOpenProfile) {
                         CybLightLogo(size = 36.dp)
@@ -162,11 +189,26 @@ fun MainScreen(
         when (selectedTab) {
             TAB_FRIENDS -> FriendsScreen(
                 friends = friends,
-                isLoading = friends.isEmpty() && friendsError == null,
+                pendingRequests = pendingRequests,
+                sentRequests = sentRequests,
+                isLoading = isFriendsLoading,
                 error = friendsError,
+                searchResults = friendSearchResults,
+                isSearchLoading = isFriendSearchLoading,
+                searchError = friendSearchError,
+                actionMessage = friendsActionMessage,
+                actionError = friendsActionError,
                 onRefresh = onRefresh,
+                onSearch = onSearchUsers,
+                onClearSearch = onClearFriendSearch,
+                onClearActionFeedback = onClearFriendsActionFeedback,
                 onOpenChat = onOpenChat,
                 onOpenProfile = onOpenFriendProfile,
+                onAddFriend = onAddFriend,
+                onAcceptRequest = onAcceptFriendRequest,
+                onRejectRequest = onRejectFriendRequest,
+                onRemoveFriend = onRemoveFriend,
+                onCancelRequest = onCancelFriendRequest,
                 modifier = Modifier.padding(padding),
             )
             TAB_MESSAGES -> MessagesScreen(
@@ -175,6 +217,7 @@ fun MainScreen(
                 error = messagesError,
                 onRefresh = onRefresh,
                 onOpenChat = onOpenChat,
+                onOpenProfile = onOpenFriendProfile,
                 modifier = Modifier.padding(padding),
             )
             TAB_SECURITY -> SecurityScreen(

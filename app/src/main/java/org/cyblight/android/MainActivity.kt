@@ -75,7 +75,7 @@ class MainActivity : AppCompatActivity() {
             var pendingAutofillCommit by remember { mutableStateOf(false) }
             var showAbout by remember { mutableStateOf(false) }
             var isAppLocked by rememberSaveable { mutableStateOf(false) }
-            var shouldLockOnResume by remember { mutableStateOf(false) }
+            var isColdStart by rememberSaveable { mutableStateOf(true) }
             var appLockError by remember { mutableStateOf<String?>(null) }
             val lifecycleOwner = LocalLifecycleOwner.current
             val coroutineScope = rememberCoroutineScope()
@@ -86,13 +86,13 @@ class MainActivity : AppCompatActivity() {
                     when (event) {
                         Lifecycle.Event.ON_STOP -> {
                             if (uiState.screen == AppScreen.Main && uiState.appLockEnabled) {
-                                shouldLockOnResume = true
+                                viewModel.onAppBackgrounded()
                             }
                         }
                         Lifecycle.Event.ON_START -> {
-                            if (shouldLockOnResume &&
-                                uiState.screen == AppScreen.Main &&
-                                uiState.appLockEnabled
+                            if (uiState.screen == AppScreen.Main &&
+                                uiState.appLockEnabled &&
+                                viewModel.shouldShowAppLock(isColdStart = false)
                             ) {
                                 isAppLocked = true
                             }
@@ -104,10 +104,22 @@ class MainActivity : AppCompatActivity() {
                 onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
             }
 
+            LaunchedEffect(uiState.screen, uiState.appLockEnabled) {
+                if (uiState.screen == AppScreen.Main && uiState.appLockEnabled) {
+                    if (viewModel.shouldShowAppLock(isColdStart = isColdStart)) {
+                        isAppLocked = true
+                    }
+                    isColdStart = false
+                }
+            }
+
             val notificationPermissionLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.RequestPermission(),
             ) { granted ->
                 viewModel.setNotificationsEnabled(granted)
+                if (!granted && !org.cyblight.android.util.SystemSettings.areNotificationsEnabled(context)) {
+                    org.cyblight.android.util.SystemSettings.openAppNotificationSettings(context)
+                }
             }
 
             LaunchedEffect(uiState.screen) {
@@ -147,6 +159,7 @@ class MainActivity : AppCompatActivity() {
                                 appLockEnabled = uiState.appLockEnabled,
                                 appLockBiometric = uiState.appLockBiometric,
                                 appLockPinConfigured = uiState.appLockPinConfigured,
+                                appLockTimeout = uiState.appLockTimeout,
                                 biometricAvailable = biometricAvailable,
                                 onBack = viewModel::navigateBack,
                                 onLocaleSelected = viewModel::setLocale,
@@ -156,6 +169,7 @@ class MainActivity : AppCompatActivity() {
                                 onAppLockEnabledChange = viewModel::setAppLockEnabled,
                                 onAppLockBiometricChange = viewModel::setAppLockBiometric,
                                 onSetupAppLockPin = viewModel::setupAppLockPin,
+                                onAppLockTimeoutSelected = viewModel::setAppLockTimeout,
                                 onRequestNotificationPermission = {
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                         notificationPermissionLauncher.launch(
@@ -330,11 +344,21 @@ class MainActivity : AppCompatActivity() {
                                 MainScreen(
                                     user = user,
                                     friends = uiState.friends,
+                                    pendingRequests = uiState.pendingRequests,
+                                    sentRequests = uiState.sentRequests,
+                                    isFriendsLoading = uiState.isFriendsLoading,
+                                    friendSearchResults = uiState.friendSearchResults,
+                                    isFriendSearchLoading = uiState.isFriendSearchLoading,
+                                    friendSearchError = uiState.friendSearchError,
+                                    friendsActionMessage = uiState.friendsActionMessage,
+                                    friendsActionError = uiState.friendsActionError,
                                     conversations = uiState.conversations,
                                     friendsError = uiState.friendsError,
                                     messagesError = uiState.messagesError,
                                     chatFriendId = uiState.chatFriendId,
                                     chatFriendName = uiState.chatFriendName,
+                                    chatFriendIsOnline = uiState.chatFriendIsOnline,
+                                    chatFriendLastSeenAt = uiState.chatFriendLastSeenAt,
                                     chatMessages = uiState.chatMessages,
                                     isChatLoading = uiState.isChatLoading,
                                     isSending = uiState.isSending,
@@ -348,6 +372,14 @@ class MainActivity : AppCompatActivity() {
                                     onOpenProfile = viewModel::openOwnProfile,
                                     onOpenFriendProfile = viewModel::openFriendProfile,
                                     onRefresh = viewModel::refreshSocialData,
+                                    onSearchUsers = viewModel::searchUsers,
+                                    onClearFriendSearch = viewModel::clearFriendSearch,
+                                    onClearFriendsActionFeedback = viewModel::clearFriendsActionFeedback,
+                                    onAddFriend = viewModel::addFriend,
+                                    onAcceptFriendRequest = viewModel::acceptFriendRequest,
+                                    onRejectFriendRequest = viewModel::rejectFriendRequest,
+                                    onRemoveFriend = viewModel::removeFriend,
+                                    onCancelFriendRequest = viewModel::cancelFriendRequest,
                                     onOpenChat = viewModel::openChat,
                                     onCloseChat = viewModel::closeChat,
                                     onSendMessage = viewModel::sendMessage,
@@ -413,6 +445,7 @@ class MainActivity : AppCompatActivity() {
                                     if (ok) {
                                         isAppLocked = false
                                         appLockError = null
+                                        viewModel.onAppUnlocked()
                                     } else {
                                         appLockError = context.getString(R.string.app_lock_wrong_pin)
                                     }
@@ -424,6 +457,7 @@ class MainActivity : AppCompatActivity() {
                                     onSuccess = {
                                         isAppLocked = false
                                         appLockError = null
+                                        viewModel.onAppUnlocked()
                                     },
                                 )
                             },

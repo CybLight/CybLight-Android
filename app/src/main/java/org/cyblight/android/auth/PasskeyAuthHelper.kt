@@ -7,6 +7,7 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetPublicKeyCredentialOption
 import androidx.credentials.PublicKeyCredential
+import android.util.Log
 import androidx.credentials.exceptions.CreateCredentialCancellationException
 import androidx.credentials.exceptions.CreateCredentialException
 import androidx.credentials.exceptions.GetCredentialCancellationException
@@ -21,6 +22,8 @@ import org.cyblight.android.data.api.PasskeyPublicKeyOptions
 import org.cyblight.android.data.api.PasskeyRegistrationPayload
 import org.json.JSONArray
 import org.json.JSONObject
+
+private const val TAG = "PasskeyAuth"
 
 object PasskeyAuthHelper {
     suspend fun getCredential(
@@ -61,13 +64,27 @@ object PasskeyAuthHelper {
         } catch (error: CreateCredentialCancellationException) {
             throw PasskeyAuthException("cancelled")
         } catch (error: CreateCredentialException) {
-            throw PasskeyAuthException("passkey_failed")
+            Log.e(TAG, "createCredential failed: type=${error.type}, message=${error.message}", error)
+            throw PasskeyAuthException(mapCreateCredentialError(error))
         }
 
         val publicKeyCredential = result as? CreatePublicKeyCredentialResponse
             ?: throw PasskeyAuthException("invalid_response")
 
         return parseRegistrationResponse(publicKeyCredential.registrationResponseJson)
+    }
+
+    private fun mapCreateCredentialError(error: CreateCredentialException): String {
+        val type = error.type.lowercase()
+        val message = error.message?.lowercase().orEmpty()
+        if (type.contains("dom") ||
+            message.contains("asset link") ||
+            message.contains("digital asset") ||
+            message.contains("assetlinks")
+        ) {
+            return "asset_links_failed"
+        }
+        return "passkey_failed"
     }
 
     private fun buildCreationRequestJson(options: PasskeyCreationOptions): String {

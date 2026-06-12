@@ -9,6 +9,10 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.cyblight.android.auth.PasskeyAuthException
 import org.cyblight.android.data.ApiClient
@@ -23,6 +27,7 @@ import org.cyblight.android.data.api.SessionDto
 import org.cyblight.android.data.api.TrustedDeviceDto
 import org.cyblight.android.data.api.UserDto
 import org.cyblight.android.data.preferences.AppPreferences
+import org.cyblight.android.data.preferences.AppLockTimeout
 import org.cyblight.android.data.preferences.ThemeMode
 import org.cyblight.android.data.repository.AuthRepository
 import org.cyblight.android.data.repository.AuthResult
@@ -77,12 +82,22 @@ data class AppUiState(
     val isSubmitting: Boolean = false,
     val pending2FAUserId: String? = null,
     val friends: List<FriendDto> = emptyList(),
+    val pendingRequests: List<FriendDto> = emptyList(),
+    val sentRequests: List<FriendDto> = emptyList(),
+    val isFriendsLoading: Boolean = false,
+    val friendSearchResults: List<FriendDto> = emptyList(),
+    val isFriendSearchLoading: Boolean = false,
+    val friendSearchError: String? = null,
+    val friendsActionMessage: String? = null,
+    val friendsActionError: String? = null,
     val conversations: List<ConversationPreview> = emptyList(),
     val friendsError: String? = null,
     val messagesError: String? = null,
     val chatMessages: List<MessageDto> = emptyList(),
     val chatFriendId: String? = null,
     val chatFriendName: String? = null,
+    val chatFriendIsOnline: Boolean = false,
+    val chatFriendLastSeenAt: Long? = null,
     val isChatLoading: Boolean = false,
     val isSending: Boolean = false,
     val update: UpdateUiState = UpdateUiState(),
@@ -126,6 +141,7 @@ data class AppUiState(
     val appLockEnabled: Boolean = false,
     val appLockBiometric: Boolean = true,
     val appLockPinConfigured: Boolean = false,
+    val appLockTimeout: AppLockTimeout = AppLockTimeout.IMMEDIATE,
 )
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -142,6 +158,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val updatePreferences = UpdatePreferences(application)
     private var pendingUpdate: AppUpdateInfo? = null
     private val loginNotificationMonitor = LoginNotificationMonitor(application)
+    private var chatPresenceJob: Job? = null
+    private var appLockBackgroundedAtMs: Long? = null
+    private var skipAppLockOnce = false
 
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
@@ -168,6 +187,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val appLockEnabled = appPreferences.getAppLockEnabled()
                 val appLockBiometric = appPreferences.getAppLockBiometric()
                 val appLockPinConfigured = appPreferences.hasAppLockPin()
+                val appLockTimeout = appPreferences.getAppLockTimeout()
                 LocaleManager.apply(savedLocale)
                 _uiState.value = _uiState.value.copy(
                     locale = savedLocale,
@@ -177,6 +197,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     appLockEnabled = appLockEnabled && appLockPinConfigured,
                     appLockBiometric = appLockBiometric,
                     appLockPinConfigured = appLockPinConfigured,
+                    appLockTimeout = appLockTimeout,
                 )
 
                 val user = authRepository.restoreSession()
@@ -217,6 +238,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             appLockEnabled = _uiState.value.appLockEnabled,
             appLockBiometric = _uiState.value.appLockBiometric,
             appLockPinConfigured = _uiState.value.appLockPinConfigured,
+            appLockTimeout = _uiState.value.appLockTimeout,
         )
     }
 
@@ -432,8 +454,42 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             if (enabled && !appPreferences.hasAppLockPin()) return@launch
             appPreferences.setAppLockEnabled(enabled)
+            if (!enabled) {
+                appLockBackgroundedAtMs = null
+            }
             _uiState.value = _uiState.value.copy(appLockEnabled = enabled)
         }
+    }
+
+    fun setAppLockTimeout(timeout: AppLockTimeout) {
+        viewModelScope.launch {
+            appPreferences.setAppLockTimeout(timeout)
+            _uiState.value = _uiState.value.copy(appLockTimeout = timeout)
+        }
+    }
+
+    fun onAppBackgrounded() {
+        if (!_uiState.value.appLockEnabled) return
+        appLockBackgroundedAtMs = System.currentTimeMillis()
+    }
+
+    fun onAppUnlocked() {
+        appLockBackgroundedAtMs = null
+    }
+
+    fun shouldShowAppLock(isColdStart: Boolean): Boolean {
+        val state = _uiState.value
+        if (!state.appLockEnabled || !state.appLockPinConfigured) return false
+        if (skipAppLockOnce) {
+            skipAppLockOnce = false
+            return false
+        }
+        if (isColdStart) return true
+
+        val backgroundedAt = appLockBackgroundedAtMs ?: return false
+        val timeout = state.appLockTimeout.millis
+        if (timeout == 0L) return true
+        return System.currentTimeMillis() - backgroundedAt >= timeout
     }
 
     suspend fun verifyAppLockPin(pin: String): Boolean =
@@ -447,6 +503,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun onAuthenticated() {
+        skipAppLockOnce = true
         viewModelScope.launch {
             loginNotificationMonitor.markOwnLoginGracePeriod()
             LoginNotificationWorker.schedule(getApplication())
@@ -997,7 +1054,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 appLockEnabled = _uiState.value.appLockEnabled,
                 appLockBiometric = _uiState.value.appLockBiometric,
                 appLockPinConfigured = _uiState.value.appLockPinConfigured,
+                appLockTimeout = _uiState.value.appLockTimeout,
             )
+            appLockBackgroundedAtMs = null
+            skipAppLockOnce = false
             LoginNotificationWorker.cancel(getApplication())
         }
     }
@@ -1016,11 +1076,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshSocialData() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(friendsError = null, messagesError = null)
+            _uiState.value = _uiState.value.copy(
+                friendsError = null,
+                messagesError = null,
+                isFriendsLoading = true,
+            )
 
-            friendsRepository.loadFriends()
+            val friendsDeferred = async { friendsRepository.loadFriends() }
+            val pendingDeferred = async { friendsRepository.loadPendingRequests() }
+            val sentDeferred = async { friendsRepository.loadSentRequests() }
+
+            val friendsResult = friendsDeferred.await()
+            val pendingResult = pendingDeferred.await()
+            val sentResult = sentDeferred.await()
+
+            friendsResult
                 .onSuccess { friends ->
-                    _uiState.value = _uiState.value.copy(friends = friends)
+                    _uiState.value = _uiState.value.copy(
+                        friends = friends,
+                        pendingRequests = pendingResult.getOrElse { emptyList() },
+                        sentRequests = sentResult.getOrElse { emptyList() },
+                        isFriendsLoading = false,
+                    )
                     messagesRepository.loadConversations(friends)
                         .onSuccess { conversations ->
                             _uiState.value = _uiState.value.copy(conversations = conversations)
@@ -1030,20 +1107,152 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         }
                 }
                 .onFailure {
-                    _uiState.value = _uiState.value.copy(friendsError = "friends_load_failed")
+                    _uiState.value = _uiState.value.copy(
+                        friendsError = "friends_load_failed",
+                        isFriendsLoading = false,
+                    )
+                }
+        }
+    }
+
+    fun searchUsers(query: String) {
+        viewModelScope.launch {
+            val trimmed = query.trim()
+            if (trimmed.length < 2) {
+                _uiState.value = _uiState.value.copy(
+                    friendSearchResults = emptyList(),
+                    friendSearchError = if (trimmed.isEmpty()) null else "search_query_too_short",
+                    isFriendSearchLoading = false,
+                )
+                return@launch
+            }
+
+            _uiState.value = _uiState.value.copy(
+                isFriendSearchLoading = true,
+                friendSearchError = null,
+            )
+
+            friendsRepository.searchUsers(trimmed)
+                .onSuccess { users ->
+                    _uiState.value = _uiState.value.copy(
+                        friendSearchResults = users,
+                        isFriendSearchLoading = false,
+                    )
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(
+                        friendSearchResults = emptyList(),
+                        isFriendSearchLoading = false,
+                        friendSearchError = "search_failed",
+                    )
+                }
+        }
+    }
+
+    fun clearFriendSearch() {
+        _uiState.value = _uiState.value.copy(
+            friendSearchResults = emptyList(),
+            friendSearchError = null,
+            isFriendSearchLoading = false,
+        )
+    }
+
+    fun clearFriendsActionFeedback() {
+        _uiState.value = _uiState.value.copy(
+            friendsActionMessage = null,
+            friendsActionError = null,
+        )
+    }
+
+    fun addFriend(username: String) {
+        viewModelScope.launch {
+            friendsRepository.addFriend(username)
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(friendsActionMessage = "friend_request_sent")
+                    refreshSocialData()
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(friendsActionError = "friend_action_failed")
+                }
+        }
+    }
+
+    fun acceptFriendRequest(friendId: String, username: String) {
+        viewModelScope.launch {
+            friendsRepository.acceptFriend(friendId)
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        friendsActionMessage = "friend_accepted:$username",
+                    )
+                    refreshSocialData()
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(friendsActionError = "friend_action_failed")
+                }
+        }
+    }
+
+    fun rejectFriendRequest(friendId: String) {
+        viewModelScope.launch {
+            friendsRepository.rejectFriend(friendId)
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(friendsActionMessage = "friend_request_rejected")
+                    refreshSocialData()
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(friendsActionError = "friend_action_failed")
+                }
+        }
+    }
+
+    fun removeFriend(friendId: String, username: String) {
+        viewModelScope.launch {
+            friendsRepository.removeFriend(friendId)
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        friendsActionMessage = "friend_removed:$username",
+                    )
+                    refreshSocialData()
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(friendsActionError = "friend_action_failed")
+                }
+        }
+    }
+
+    fun cancelFriendRequest(friendId: String) {
+        viewModelScope.launch {
+            friendsRepository.removeFriend(friendId)
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(friendsActionMessage = "request_cancelled")
+                    refreshSocialData()
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(friendsActionError = "friend_action_failed")
                 }
         }
     }
 
     fun openChat(friendId: String, friendName: String) {
+        chatPresenceJob?.cancel()
+        val cachedFriend = _uiState.value.friends.find { it.id == friendId }
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 chatFriendId = friendId,
                 chatFriendName = friendName,
+                chatFriendIsOnline = cachedFriend?.isOnline ?: false,
+                chatFriendLastSeenAt = cachedFriend?.lastSeenAt,
                 isChatLoading = true,
                 messagesError = null,
                 chatMessages = emptyList(),
             )
+            refreshChatFriendPresence(friendId)
+            chatPresenceJob = viewModelScope.launch {
+                while (isActive) {
+                    delay(5_000)
+                    refreshChatFriendPresence(friendId)
+                }
+            }
 
             messagesRepository.loadMessages(friendId)
                 .onSuccess { messages ->
@@ -1065,13 +1274,30 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun closeChat() {
+        chatPresenceJob?.cancel()
+        chatPresenceJob = null
         _uiState.value = _uiState.value.copy(
             chatFriendId = null,
             chatFriendName = null,
+            chatFriendIsOnline = false,
+            chatFriendLastSeenAt = null,
             chatMessages = emptyList(),
             messagesError = null,
         )
         refreshSocialData()
+    }
+
+    private fun refreshChatFriendPresence(friendId: String) {
+        viewModelScope.launch {
+            friendsRepository.loadFriendPresence(friendId)
+                .onSuccess { presence ->
+                    if (_uiState.value.chatFriendId != friendId) return@onSuccess
+                    _uiState.value = _uiState.value.copy(
+                        chatFriendIsOnline = presence.isOnline,
+                        chatFriendLastSeenAt = presence.lastSeenAt,
+                    )
+                }
+        }
     }
 
     fun sendMessage(content: String) {

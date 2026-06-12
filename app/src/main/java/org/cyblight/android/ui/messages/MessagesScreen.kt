@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.cyblight.android.R
 import org.cyblight.android.data.repository.ConversationPreview
+import org.cyblight.android.ui.components.PresenceLabel
 
 @Composable
 fun MessagesScreen(
@@ -31,6 +32,7 @@ fun MessagesScreen(
     error: String?,
     onRefresh: () -> Unit,
     onOpenChat: (friendId: String, username: String) -> Unit,
+    onOpenProfile: (username: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when {
@@ -74,7 +76,11 @@ fun MessagesScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(conversations, key = { it.friend.id }) { preview ->
-                    ConversationCard(preview = preview, onOpenChat = onOpenChat)
+                    ConversationCard(
+                        preview = preview,
+                        onOpenChat = onOpenChat,
+                        onOpenProfile = onOpenProfile,
+                    )
                 }
             }
         }
@@ -85,6 +91,7 @@ fun MessagesScreen(
 private fun ConversationCard(
     preview: ConversationPreview,
     onOpenChat: (friendId: String, username: String) -> Unit,
+    onOpenProfile: (username: String) -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -99,15 +106,14 @@ private fun ConversationCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(preview.friend.username, fontWeight = FontWeight.SemiBold)
                 Text(
-                    text = if (preview.friend.isOnline) {
-                        stringResource(R.string.online)
-                    } else {
-                        stringResource(R.string.offline)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = preview.friend.username,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickable { onOpenProfile(preview.friend.username) },
+                )
+                PresenceLabel(
+                    isOnline = preview.friend.isOnline,
+                    lastSeenAt = preview.friend.lastSeenAt,
                 )
             }
             if (preview.unreadCount > 0) {

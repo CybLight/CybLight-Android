@@ -297,12 +297,52 @@ data class FriendsListResponse(
     val error: String? = null,
 )
 
+data class PendingRequestsResponse(
+    val ok: Boolean = false,
+    @SerializedName("pendingRequests") val pendingRequests: List<FriendDto> = emptyList(),
+    val error: String? = null,
+)
+
+data class SentRequestsResponse(
+    val ok: Boolean = false,
+    @SerializedName("sentRequests") val sentRequests: List<FriendDto> = emptyList(),
+    val error: String? = null,
+)
+
+data class SearchUsersResponse(
+    val ok: Boolean = false,
+    val users: List<FriendDto> = emptyList(),
+    val error: String? = null,
+)
+
+data class FriendActionResponse(
+    val ok: Boolean = false,
+    val error: String? = null,
+    val message: String? = null,
+)
+
+data class AddFriendRequest(
+    @SerializedName("friendUsername") val friendUsername: String,
+)
+
+data class FriendIdRequest(
+    @SerializedName("friendId") val friendId: String,
+)
+
 data class FriendDto(
     val id: String,
     val username: String,
     val avatar: String? = null,
     val isOnline: Boolean = false,
     @SerializedName("lastSeenAt") val lastSeenAt: Long? = null,
+    @SerializedName("createdAt") val createdAt: Long? = null,
+)
+
+data class FriendPresenceResponse(
+    val ok: Boolean = false,
+    val isOnline: Boolean = false,
+    @SerializedName("lastSeenAt") val lastSeenAt: Long? = null,
+    val error: String? = null,
 )
 
 data class UnreadSummaryResponse(

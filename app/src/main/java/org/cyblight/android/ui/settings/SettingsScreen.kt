@@ -1,6 +1,9 @@
 package org.cyblight.android.ui.settings
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,6 +55,7 @@ import kotlinx.coroutines.delay
 import org.cyblight.android.BuildConfig
 import org.cyblight.android.R
 import org.cyblight.android.util.ExternalLinks
+import org.cyblight.android.data.preferences.AppLockTimeout
 import org.cyblight.android.data.preferences.ThemeMode
 import org.cyblight.android.i18n.LocaleManager
 import org.cyblight.android.ui.applock.PinSetupDialog
@@ -67,6 +71,7 @@ fun SettingsScreen(
     appLockEnabled: Boolean,
     appLockBiometric: Boolean,
     appLockPinConfigured: Boolean,
+    appLockTimeout: AppLockTimeout,
     biometricAvailable: Boolean,
     onBack: () -> Unit,
     onLocaleSelected: (String) -> Unit,
@@ -76,6 +81,7 @@ fun SettingsScreen(
     onAppLockEnabledChange: (Boolean) -> Unit,
     onAppLockBiometricChange: (Boolean) -> Unit,
     onSetupAppLockPin: (String, Boolean) -> Unit,
+    onAppLockTimeoutSelected: (AppLockTimeout) -> Unit,
     onRequestNotificationPermission: () -> Unit,
     onHelp: () -> Unit,
     onOpenLightCatcherGame: () -> Unit,
@@ -84,6 +90,7 @@ fun SettingsScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     var languageMenuExpanded by remember { mutableStateOf(false) }
     var themeMenuExpanded by remember { mutableStateOf(false) }
+    var appLockTimeoutMenuExpanded by remember { mutableStateOf(false) }
     var systemNotificationsEnabled by remember {
         mutableStateOf(SystemSettings.areNotificationsEnabled(context))
     }
@@ -124,7 +131,7 @@ fun SettingsScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(Unit, notificationsEnabled) {
         syncNotificationState()
     }
 
@@ -236,13 +243,23 @@ fun SettingsScreen(
                         checked = systemNotificationsEnabled,
                         onCheckedChange = { enabled ->
                             if (enabled) {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                val alreadyAllowed = SystemSettings.areNotificationsEnabled(context)
+                                if (alreadyAllowed) {
+                                    onNotificationsEnabledChange(true)
+                                    systemNotificationsEnabled = true
+                                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                    ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.POST_NOTIFICATIONS,
+                                    ) != PackageManager.PERMISSION_GRANTED
+                                ) {
                                     onRequestNotificationPermission()
                                 } else {
                                     SystemSettings.openAppNotificationSettings(context)
                                 }
                             } else {
                                 onNotificationsEnabledChange(false)
+                                systemNotificationsEnabled = false
                                 SystemSettings.openAppNotificationSettings(context)
                             }
                         },
@@ -311,6 +328,26 @@ fun SettingsScreen(
                     )
                 },
             )
+
+            if (appLockPinConfigured) {
+                SettingsDropdownRow(
+                    expanded = appLockTimeoutMenuExpanded,
+                    onExpandedChange = { appLockTimeoutMenuExpanded = it },
+                    headline = stringResource(R.string.settings_app_lock_timeout),
+                    supporting = appLockTimeoutLabel(appLockTimeout),
+                    leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null) },
+                ) {
+                    AppLockTimeout.entries.forEach { timeout ->
+                        DropdownMenuItem(
+                            text = { Text(appLockTimeoutLabel(timeout)) },
+                            onClick = {
+                                appLockTimeoutMenuExpanded = false
+                                onAppLockTimeoutSelected(timeout)
+                            },
+                        )
+                    }
+                }
+            }
 
             if (biometricAvailable) {
                 ListItem(
@@ -459,4 +496,13 @@ private fun themeModeLabel(mode: ThemeMode): String = when (mode) {
     ThemeMode.SYSTEM -> stringResource(R.string.settings_theme_system)
     ThemeMode.LIGHT -> stringResource(R.string.settings_theme_light)
     ThemeMode.DARK -> stringResource(R.string.settings_theme_dark)
+}
+
+@Composable
+private fun appLockTimeoutLabel(timeout: AppLockTimeout): String = when (timeout) {
+    AppLockTimeout.IMMEDIATE -> stringResource(R.string.settings_app_lock_timeout_immediate)
+    AppLockTimeout.SEC_30 -> stringResource(R.string.settings_app_lock_timeout_30s)
+    AppLockTimeout.MIN_1 -> stringResource(R.string.settings_app_lock_timeout_1m)
+    AppLockTimeout.MIN_5 -> stringResource(R.string.settings_app_lock_timeout_5m)
+    AppLockTimeout.MIN_15 -> stringResource(R.string.settings_app_lock_timeout_15m)
 }

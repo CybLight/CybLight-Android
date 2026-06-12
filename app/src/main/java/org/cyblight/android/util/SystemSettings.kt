@@ -19,10 +19,19 @@ object SystemSettings {
     }
 
     fun openAppNotificationSettings(context: Context) {
-        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        val packageName = context.packageName
+        val intents = listOf(
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                putExtra("android.provider.extra.APP_PACKAGE", packageName)
+            },
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", packageName, null)
+            },
+        )
+        for (intent in intents) {
+            if (launchSettings(context, intent)) return
         }
-        launchSettings(context, intent)
     }
 
     fun requestIgnoreBatteryOptimizations(activity: Activity) {
@@ -51,13 +60,14 @@ object SystemSettings {
         launchSettings(context, intent)
     }
 
-    private fun launchSettings(context: Context, intent: Intent) {
+    private fun launchSettings(context: Context, intent: Intent): Boolean {
         val activity = ExternalLinks.findActivity(context)
         val launchIntent = intent.apply {
             if (activity == null) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        runCatching {
+        return runCatching {
             (activity ?: context).startActivity(launchIntent)
-        }
+            true
+        }.getOrDefault(false)
     }
 }

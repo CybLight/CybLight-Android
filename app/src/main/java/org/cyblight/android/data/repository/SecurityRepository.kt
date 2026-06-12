@@ -79,6 +79,8 @@ class SecurityRepository(private val api: CybLightApi) {
                 return Result.failure(IllegalStateException(registerResponse.error ?: "passkey_failed"))
             }
             Result.success(Unit)
+        } catch (error: PasskeyAuthException) {
+            Result.failure(error)
         } catch (error: Exception) {
             Result.failure(IllegalStateException(error.toPasskeyErrorCode()))
         }

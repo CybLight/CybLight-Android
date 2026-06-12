@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RES = ROOT / "app" / "src" / "main" / "res"
 
 # Smaller value = smaller letters inside the icon safe zone.
-CONTENT_SCALE = 0.68
+CONTENT_SCALE = 0.56
 
 BACKGROUND_COLOR = (0xF2, 0x74, 0x1F, 255)
 
@@ -30,6 +30,15 @@ mipmap_sizes = {
     "mipmap-xhdpi": 96,
     "mipmap-xxhdpi": 144,
     "mipmap-xxxhdpi": 192,
+}
+
+# In-app logo (CybLightLogo composable, up to ~112dp).
+logo_sizes = {
+    "drawable-mdpi": 96,
+    "drawable-hdpi": 144,
+    "drawable-xhdpi": 192,
+    "drawable-xxhdpi": 288,
+    "drawable-xxxhdpi": 384,
 }
 
 
@@ -80,6 +89,10 @@ def main() -> None:
     for folder, size in mipmap_sizes.items():
         save_mipmap(folder, "ic_launcher.png", size, src)
         save_mipmap(folder, "ic_launcher_round.png", size, src)
+
+    print("In-app logo:")
+    for folder, size in logo_sizes.items():
+        save_mipmap(folder, "ic_cyblight_logo.png", size, src)
 
 
 if __name__ == "__main__":

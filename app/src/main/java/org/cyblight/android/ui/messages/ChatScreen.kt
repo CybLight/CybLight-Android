@@ -1,10 +1,10 @@
 package org.cyblight.android.ui.messages
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -33,11 +32,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import org.cyblight.android.R
-import org.cyblight.android.ui.components.CybOutlinedTextField
 import kotlinx.coroutines.delay
+import org.cyblight.android.R
 import org.cyblight.android.data.api.MessageDto
+import org.cyblight.android.ui.components.PresenceLabel
 import java.text.DateFormat
 import java.util.Date
 
@@ -45,17 +45,20 @@ import java.util.Date
 @Composable
 fun ChatScreen(
     friendName: String,
+    friendIsOnline: Boolean,
+    friendLastSeenAt: Long?,
     messages: List<MessageDto>,
     currentUserId: String,
     isLoading: Boolean,
     isSending: Boolean,
     error: String?,
     onBack: () -> Unit,
+    onOpenProfile: (username: String) -> Unit,
     onSend: (String) -> Unit,
 ) {
-    var draft by remember { mutableStateOf("") }
+    var draft by remember { mutableStateOf(TextFieldValue()) }
+    var suppressedPreviewUrl by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
-
     LaunchedEffect(messages.size, isLoading) {
         if (isLoading || messages.isEmpty()) return@LaunchedEffect
         delay(50)
@@ -67,7 +70,17 @@ fun ChatScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(friendName) },
+                title = {
+                    Column(
+                        modifier = Modifier.clickable { onOpenProfile(friendName) },
+                    ) {
+                        Text(friendName)
+                        PresenceLabel(
+                            isOnline = friendIsOnline,
+                            lastSeenAt = friendLastSeenAt,
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
@@ -132,37 +145,31 @@ fun ChatScreen(
                 )
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CybOutlinedTextField(
-                    value = draft,
-                    onValueChange = { draft = it },
-                    placeholder = stringResource(R.string.message_placeholder),
-                    modifier = Modifier.weight(1f),
-                    singleLine = false,
-                    maxLines = 4,
-                )
-                IconButton(
-                    onClick = {
-                        val text = draft
-                        draft = ""
-                        onSend(text)
-                    },
-                    enabled = !isSending && draft.isNotBlank(),
-                ) {
-                    Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = stringResource(R.string.send))
-                }
-            }
+            ChatInputSection(
+                draft = draft,
+                onDraftChange = { value ->
+                    draft = value
+                    val url = ChatFormatUtils.extractFirstUrl(value.text)
+                    if (url == null) {
+                        suppressedPreviewUrl = null
+                    }
+                },
+                suppressedPreviewUrl = suppressedPreviewUrl,
+                onSuppressPreview = {
+                    suppressedPreviewUrl = ChatFormatUtils.extractFirstUrl(draft.text)
+                },
+                isSending = isSending,
+                onSend = onSend,
+            )
         }
     }
 }
 
 @Composable
-private fun MessageBubble(message: MessageDto, isMine: Boolean) {
+private fun MessageBubble(
+    message: MessageDto,
+    isMine: Boolean,
+) {
     val alignment = if (isMine) Alignment.End else Alignment.Start
     val bg = if (isMine) {
         MaterialTheme.colorScheme.primary
@@ -174,9 +181,13 @@ private fun MessageBubble(message: MessageDto, isMine: Boolean) {
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
+    val bubbleLinkColor = if (isMine) {
+        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.95f)
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
     val timestamp = message.createdAt.takeIf { it > 0L } ?: System.currentTimeMillis()
     val time = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(timestamp))
-    val text = message.content.ifBlank { " " }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -188,7 +199,12 @@ private fun MessageBubble(message: MessageDto, isMine: Boolean) {
                 .background(bg)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
-            Text(text, color = fg)
+            ChatMessageContent(
+                rawContent = message.content,
+                textColor = fg,
+                linkColor = bubbleLinkColor,
+                messageId = message.id,
+            )
         }
         Text(
             text = time,
