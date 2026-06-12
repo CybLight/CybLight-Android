@@ -1,7 +1,9 @@
 package org.cyblight.android.data.repository
 
 import android.app.Activity
+import android.util.Base64
 import org.cyblight.android.auth.PasskeyAuthException
+import org.json.JSONObject
 import org.cyblight.android.auth.PasskeyAuthHelper
 import org.cyblight.android.data.api.CybLightApi
 import org.cyblight.android.data.api.MeUserDto
@@ -122,11 +124,11 @@ class AuthRepository(
             }
 
             val token = extractAuthToken(response.headers().values("Set-Cookie"))
+                ?: body.token?.takeIf { it.isNotBlank() }
                 ?: return AuthResult.Error("missing_token")
 
             sessionManager.updateToken(token)
-            val meUser = runCatching { api.me().user }.getOrNull()
-            val user = resolveUser(body.user, meUser)
+            val user = resolvePasskeyUser(body.user, token)
                 ?: return AuthResult.Error("invalid_response")
             sessionManager.saveSession(token, user.id, user.login)
             AuthResult.Success(user)
@@ -134,6 +136,34 @@ class AuthRepository(
             AuthResult.Error(error.code)
         } catch (_: Exception) {
             AuthResult.Error("passkey_failed")
+        }
+    }
+
+    private suspend fun resolvePasskeyUser(partial: UserDto?, token: String): UserDto? {
+        val login = partial?.login?.takeIf { it.isNotBlank() }
+        val id = partial?.id?.takeIf { it.isNotBlank() }
+            ?: jwtSubject(token)
+
+        if (!login.isNullOrBlank() && !id.isNullOrBlank()) {
+            return UserDto(id = id, login = login)
+        }
+
+        val meUser = runCatching { api.me().user }.getOrNull()
+        return resolveUser(partial, meUser)
+    }
+
+    private fun jwtSubject(token: String): String? {
+        return try {
+            val payload = token.split('.').getOrNull(1) ?: return null
+            val decoded = Base64.decode(
+                payload,
+                Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP,
+            )
+            JSONObject(String(decoded, Charsets.UTF_8))
+                .optString("sub")
+                .takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            null
         }
     }
 

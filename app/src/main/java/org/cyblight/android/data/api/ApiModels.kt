@@ -89,6 +89,7 @@ data class PasskeyLoginRequest(
 data class PasskeyLoginResponse(
     val ok: Boolean = false,
     val user: UserDto? = null,
+    val token: String? = null,
     val error: String? = null,
 )
 

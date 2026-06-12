@@ -76,7 +76,6 @@ class SessionManager(private val context: Context) {
             prefs.remove(tokenKey)
             prefs.remove(userIdKey)
             prefs.remove(loginKey)
-            prefs.remove(deviceTokenKey)
         }
     }
 

@@ -49,7 +49,7 @@ class UpdateRepository(
 
                 AppUpdateInfo(
                     versionName = remoteVersion,
-                    releaseNotes = release.body?.trim().orEmpty(),
+                    releaseNotes = formatReleaseNotesForDisplay(release.body?.trim().orEmpty()),
                     downloadUrl = downloadUrl,
                     assetName = apkAsset.name,
                 )
