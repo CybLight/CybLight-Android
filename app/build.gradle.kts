@@ -40,6 +40,10 @@ android {
             "GITHUB_RELEASES_URL",
             "\"https://api.github.com/repos/CybLight/CybLight-Android/releases/latest\"",
         )
+
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+        }
     }
 
     signingConfigs {
@@ -77,6 +81,20 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    packaging {
+        jniLibs {
+            excludes += listOf("**/libsignal_jni_testing.so")
+        }
+        resources {
+            excludes += listOf(
+                "libsignal_jni_*.dylib",
+                "libsignal_jni_testing_*.dylib",
+                "signal_jni_*.dll",
+                "signal_jni_testing_*.dll",
+            )
+        }
     }
 }
 
