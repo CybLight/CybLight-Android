@@ -111,7 +111,10 @@ class MessagesRepository(
                     registrationId = encrypted.registrationId,
                 ),
             )
-            if (response.ok) Result.success(Unit) else Result.failure(Exception(response.error ?: "edit_failed"))
+            if (response.ok) {
+                signalCrypto.cacheSentPlaintext(userId, messageId, trimmed)
+                Result.success(Unit)
+            } else Result.failure(Exception(response.error ?: "edit_failed"))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -191,6 +194,9 @@ class MessagesRepository(
                 ),
             )
             if (response.ok) {
+                response.message?.id?.let { messageId ->
+                    signalCrypto.cacheSentPlaintext(userId, messageId, trimmed)
+                }
                 Result.success(Unit)
             } else {
                 Result.failure(Exception(response.error ?: "send_failed"))

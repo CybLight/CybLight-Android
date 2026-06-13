@@ -33,7 +33,12 @@ data class SignalKeyStatusResponse(
     val ok: Boolean = false,
     val registered: Boolean = false,
     @SerializedName("registrationId") val registrationId: Int? = null,
+    @SerializedName("identityKeyPublic") val identityKeyPublic: String? = null,
+    @SerializedName("signedPreKeyId") val signedPreKeyId: Int? = null,
+    @SerializedName("kyberPreKeyId") val kyberPreKeyId: Int? = null,
     @SerializedName("unusedOneTimePreKeys") val unusedOneTimePreKeys: Int = 0,
+    @SerializedName("oldestUnusedPreKeyId") val oldestUnusedPreKeyId: Int? = null,
+    @SerializedName("newestUnusedPreKeyId") val newestUnusedPreKeyId: Int? = null,
     val error: String? = null,
 )
 
