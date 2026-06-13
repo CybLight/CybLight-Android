@@ -109,6 +109,7 @@ fun SettingsScreen(
     onCreateSignalBackup: suspend (password: String) -> Result<String>,
     onRestoreSignalBackup: suspend (content: String, password: String) -> Result<Unit>,
     signalBackupErrorMessage: (String) -> String,
+    onPickBackupFile: (onPicked: (String) -> Unit) -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -516,6 +517,7 @@ fun SettingsScreen(
                 onCreateBackup = onCreateSignalBackup,
                 onRestoreBackup = onRestoreSignalBackup,
                 backupErrorMessage = signalBackupErrorMessage,
+                onPickBackupFile = onPickBackupFile,
             )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))

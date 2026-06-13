@@ -158,6 +158,24 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            var backupImportConsumer by remember { mutableStateOf<((String) -> Unit)?>(null) }
+            val backupFilePickerLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument(),
+            ) { uri ->
+                val consumer = backupImportConsumer
+                backupImportConsumer = null
+                if (uri == null || consumer == null) return@rememberLauncherForActivityResult
+                runCatching {
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        consumer(stream.bufferedReader().readText())
+                    }
+                }
+            }
+            val pickBackupFile: (onPicked: (String) -> Unit) -> Unit = { onPicked ->
+                backupImportConsumer = onPicked
+                backupFilePickerLauncher.launch(arrayOf("*/*"))
+            }
+
             LaunchedEffect(uiState.screen) {
                 if (uiState.screen == AppScreen.Login || uiState.screen == AppScreen.TwoFactor) {
                     pendingAutofillCommit = true
@@ -253,6 +271,7 @@ class MainActivity : AppCompatActivity() {
                                 onCreateSignalBackup = viewModel::createSignalBackup,
                                 onRestoreSignalBackup = viewModel::restoreSignalBackup,
                                 signalBackupErrorMessage = viewModel::signalBackupErrorMessage,
+                                onPickBackupFile = pickBackupFile,
                             )
                         }
                         DetailScreen.Help -> {

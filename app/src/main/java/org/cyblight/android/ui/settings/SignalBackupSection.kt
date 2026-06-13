@@ -1,8 +1,6 @@
 package org.cyblight.android.ui.settings
 
 import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -40,6 +38,7 @@ fun SignalBackupSection(
     onCreateBackup: suspend (password: String) -> Result<String>,
     onRestoreBackup: suspend (content: String, password: String) -> Result<Unit>,
     backupErrorMessage: (String) -> String,
+    onPickBackupFile: (onPicked: (String) -> Unit) -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -52,22 +51,6 @@ fun SignalBackupSection(
     var busy by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var statusIsError by remember { mutableStateOf(false) }
-
-    val importLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-    ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        runCatching {
-            context.contentResolver.openInputStream(uri)?.use { stream ->
-                pendingImportContent = stream.bufferedReader().readText()
-                showImportDialog = true
-                importPassword = ""
-            }
-        }.onFailure {
-            statusMessage = backupErrorMessage("backup_file_invalid")
-            statusIsError = true
-        }
-    }
 
     Text(
         text = stringResource(R.string.settings_signal_backup_section),
@@ -104,7 +87,11 @@ fun SignalBackupSection(
         modifier = Modifier.fillMaxWidth(),
         trailingContent = {
             TextButton(onClick = {
-                importLauncher.launch(arrayOf("*/*"))
+                onPickBackupFile { content ->
+                    pendingImportContent = content
+                    showImportDialog = true
+                    importPassword = ""
+                }
             }) {
                 Text(stringResource(R.string.settings_signal_backup_action))
             }
