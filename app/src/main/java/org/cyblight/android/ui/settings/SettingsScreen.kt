@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.BatteryChargingFull
 import androidx.compose.material.icons.outlined.HelpOutline
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.SettingsApplications
+import androidx.compose.material.icons.outlined.Swipe
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -59,6 +61,9 @@ import org.cyblight.android.BuildConfig
 import org.cyblight.android.R
 import org.cyblight.android.util.ExternalLinks
 import org.cyblight.android.data.preferences.AppLockTimeout
+import org.cyblight.android.data.preferences.RootBackBehavior
+import org.cyblight.android.data.preferences.SwipeBackEdgeWidth
+import org.cyblight.android.data.preferences.SwipeBackSensitivity
 import org.cyblight.android.data.preferences.ThemeMode
 import org.cyblight.android.i18n.LocaleManager
 import org.cyblight.android.ui.applock.PinSetupDialog
@@ -90,6 +95,16 @@ fun SettingsScreen(
     onRequestNotificationPermission: () -> Unit,
     onHelp: () -> Unit,
     onOpenLightCatcherGame: () -> Unit,
+    swipeBackEnabled: Boolean,
+    systemBackEnabled: Boolean,
+    swipeBackSensitivity: SwipeBackSensitivity,
+    swipeBackEdgeWidth: SwipeBackEdgeWidth,
+    rootBackBehavior: RootBackBehavior,
+    onSwipeBackEnabledChange: (Boolean) -> Unit,
+    onSystemBackEnabledChange: (Boolean) -> Unit,
+    onSwipeBackSensitivitySelected: (SwipeBackSensitivity) -> Unit,
+    onSwipeBackEdgeWidthSelected: (SwipeBackEdgeWidth) -> Unit,
+    onRootBackBehaviorSelected: (RootBackBehavior) -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -97,6 +112,9 @@ fun SettingsScreen(
     var languageMenuExpanded by remember { mutableStateOf(false) }
     var themeMenuExpanded by remember { mutableStateOf(false) }
     var appLockTimeoutMenuExpanded by remember { mutableStateOf(false) }
+    var swipeSensitivityMenuExpanded by remember { mutableStateOf(false) }
+    var swipeEdgeMenuExpanded by remember { mutableStateOf(false) }
+    var rootBackMenuExpanded by remember { mutableStateOf(false) }
     var systemNotificationsEnabled by remember {
         mutableStateOf(SystemSettings.areNotificationsEnabled(context))
     }
@@ -218,6 +236,93 @@ fun SettingsScreen(
                         onClick = {
                             languageMenuExpanded = false
                             onLocaleSelected(code)
+                        },
+                    )
+                }
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            Text(
+                text = stringResource(R.string.settings_section_gestures),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_swipe_back)) },
+                supportingContent = { Text(stringResource(R.string.settings_swipe_back_hint)) },
+                leadingContent = { Icon(Icons.Outlined.Swipe, contentDescription = null) },
+                trailingContent = {
+                    Switch(
+                        checked = swipeBackEnabled,
+                        onCheckedChange = onSwipeBackEnabledChange,
+                    )
+                },
+            )
+
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_system_back)) },
+                supportingContent = { Text(stringResource(R.string.settings_system_back_hint)) },
+                leadingContent = { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null) },
+                trailingContent = {
+                    Switch(
+                        checked = systemBackEnabled,
+                        onCheckedChange = onSystemBackEnabledChange,
+                    )
+                },
+            )
+
+            SettingsDropdownRow(
+                expanded = swipeSensitivityMenuExpanded,
+                onExpandedChange = { swipeSensitivityMenuExpanded = it },
+                headline = stringResource(R.string.settings_swipe_sensitivity),
+                supporting = swipeBackSensitivityLabel(swipeBackSensitivity),
+                leadingIcon = { Icon(Icons.Outlined.Swipe, contentDescription = null) },
+            ) {
+                SwipeBackSensitivity.entries.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(swipeBackSensitivityLabel(option)) },
+                        onClick = {
+                            swipeSensitivityMenuExpanded = false
+                            onSwipeBackSensitivitySelected(option)
+                        },
+                    )
+                }
+            }
+
+            SettingsDropdownRow(
+                expanded = swipeEdgeMenuExpanded,
+                onExpandedChange = { swipeEdgeMenuExpanded = it },
+                headline = stringResource(R.string.settings_swipe_edge),
+                supporting = swipeBackEdgeWidthLabel(swipeBackEdgeWidth),
+                leadingIcon = { Icon(Icons.Outlined.Swipe, contentDescription = null) },
+            ) {
+                SwipeBackEdgeWidth.entries.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(swipeBackEdgeWidthLabel(option)) },
+                        onClick = {
+                            swipeEdgeMenuExpanded = false
+                            onSwipeBackEdgeWidthSelected(option)
+                        },
+                    )
+                }
+            }
+
+            SettingsDropdownRow(
+                expanded = rootBackMenuExpanded,
+                onExpandedChange = { rootBackMenuExpanded = it },
+                headline = stringResource(R.string.settings_root_back_behavior),
+                supporting = rootBackBehaviorLabel(rootBackBehavior),
+                leadingIcon = { Icon(Icons.Outlined.Swipe, contentDescription = null) },
+            ) {
+                RootBackBehavior.entries.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(rootBackBehaviorLabel(option)) },
+                        onClick = {
+                            rootBackMenuExpanded = false
+                            onRootBackBehaviorSelected(option)
                         },
                     )
                 }
@@ -537,4 +642,25 @@ private fun appLockTimeoutLabel(timeout: AppLockTimeout): String = when (timeout
     AppLockTimeout.MIN_1 -> stringResource(R.string.settings_app_lock_timeout_1m)
     AppLockTimeout.MIN_5 -> stringResource(R.string.settings_app_lock_timeout_5m)
     AppLockTimeout.MIN_15 -> stringResource(R.string.settings_app_lock_timeout_15m)
+}
+
+@Composable
+private fun swipeBackSensitivityLabel(option: SwipeBackSensitivity): String = when (option) {
+    SwipeBackSensitivity.LOW -> stringResource(R.string.settings_swipe_sensitivity_low)
+    SwipeBackSensitivity.NORMAL -> stringResource(R.string.settings_swipe_sensitivity_normal)
+    SwipeBackSensitivity.HIGH -> stringResource(R.string.settings_swipe_sensitivity_high)
+}
+
+@Composable
+private fun swipeBackEdgeWidthLabel(option: SwipeBackEdgeWidth): String = when (option) {
+    SwipeBackEdgeWidth.NARROW -> stringResource(R.string.settings_swipe_edge_narrow)
+    SwipeBackEdgeWidth.NORMAL -> stringResource(R.string.settings_swipe_edge_normal)
+    SwipeBackEdgeWidth.WIDE -> stringResource(R.string.settings_swipe_edge_wide)
+}
+
+@Composable
+private fun rootBackBehaviorLabel(option: RootBackBehavior): String = when (option) {
+    RootBackBehavior.HOME_THEN_EXIT -> stringResource(R.string.settings_root_back_home_then_exit)
+    RootBackBehavior.EXIT_IMMEDIATELY -> stringResource(R.string.settings_root_back_exit)
+    RootBackBehavior.MINIMIZE -> stringResource(R.string.settings_root_back_minimize)
 }

@@ -12,6 +12,8 @@ import org.cyblight.android.data.api.UnpinMessageRequest
 data class ConversationPreview(
     val friend: FriendDto,
     val unreadCount: Int,
+    val preview: String? = null,
+    val latestAt: Long = 0L,
 )
 
 data class ChatThread(
@@ -28,12 +30,16 @@ class MessagesRepository(private val api: CybLightApi) {
             }
 
             val previews = friends.map { friend ->
+                val conversation = unread.conversationPreviews[friend.id]
                 ConversationPreview(
                     friend = friend,
                     unreadCount = unread.unreadByUser[friend.id] ?: 0,
+                    preview = conversation?.preview?.takeIf { it.isNotBlank() },
+                    latestAt = conversation?.latestAt ?: 0L,
                 )
             }.sortedWith(
-                compareByDescending<ConversationPreview> { it.unreadCount }
+                compareByDescending<ConversationPreview> { it.latestAt }
+                    .thenByDescending { it.unreadCount }
                     .thenBy { it.friend.username.lowercase() },
             )
 

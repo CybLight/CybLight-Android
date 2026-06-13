@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import org.cyblight.android.auth.PasskeyAuthException
 import org.cyblight.android.data.ApiClient
 import android.content.Context
+import org.cyblight.android.BuildConfig
 import org.cyblight.android.data.api.EasterFlagsDto
 import org.cyblight.android.data.api.EasterProgress
 import org.cyblight.android.data.api.FriendDto
@@ -31,7 +32,13 @@ import org.cyblight.android.data.api.TrustedDeviceDto
 import org.cyblight.android.data.api.UserDto
 import org.cyblight.android.data.preferences.AppPreferences
 import org.cyblight.android.data.preferences.AppLockTimeout
+import org.cyblight.android.data.preferences.RootBackBehavior
+import org.cyblight.android.data.preferences.SwipeBackEdgeWidth
+import org.cyblight.android.data.preferences.SwipeBackSensitivity
 import org.cyblight.android.data.preferences.ThemeMode
+import org.cyblight.android.data.home.ChangelogRelease
+import org.cyblight.android.data.home.HomeContent
+import org.cyblight.android.data.home.HomeContentRepository
 import org.cyblight.android.data.repository.AuthRepository
 import org.cyblight.android.data.repository.AuthResult
 import org.cyblight.android.data.repository.SessionRefreshResult
@@ -61,6 +68,7 @@ import org.cyblight.android.util.SystemSettings
 import org.cyblight.android.ui.messages.ChatEditTarget
 import org.cyblight.android.ui.messages.ChatFormatUtils
 import org.cyblight.android.ui.messages.ChatReplyTarget
+import org.cyblight.android.ui.main.MainTab
 import java.io.File
 import java.util.Calendar
 
@@ -92,6 +100,7 @@ enum class DetailScreen {
     Sessions,
     OwnProfile,
     FriendProfile,
+    Changelog,
 }
 
 data class AppUiState(
@@ -117,6 +126,7 @@ data class AppUiState(
     val chatPinnedMessage: PinnedMessageDto? = null,
     val chatReplyTarget: ChatReplyTarget? = null,
     val chatEditTarget: ChatEditTarget? = null,
+    val chatDraftText: String = "",
     val chatFriendId: String? = null,
     val chatFriendName: String? = null,
     val chatFriendIsOnline: Boolean = false,
@@ -167,6 +177,19 @@ data class AppUiState(
     val appLockBiometric: Boolean = true,
     val appLockPinConfigured: Boolean = false,
     val appLockTimeout: AppLockTimeout = AppLockTimeout.IMMEDIATE,
+    val selectedMainTab: MainTab = MainTab.Home,
+    val friendsSubTab: Int = 0,
+    val homeContent: HomeContent? = null,
+    val isHomeLoading: Boolean = false,
+    val homeError: String? = null,
+    val changelogReleases: List<ChangelogRelease> = emptyList(),
+    val isChangelogLoading: Boolean = false,
+    val changelogError: String? = null,
+    val swipeBackEnabled: Boolean = true,
+    val systemBackEnabled: Boolean = true,
+    val swipeBackSensitivity: SwipeBackSensitivity = SwipeBackSensitivity.NORMAL,
+    val swipeBackEdgeWidth: SwipeBackEdgeWidth = SwipeBackEdgeWidth.NORMAL,
+    val rootBackBehavior: RootBackBehavior = RootBackBehavior.HOME_THEN_EXIT,
 )
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -181,6 +204,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val securityRepository = SecurityRepository(api)
     private val updateRepository = UpdateRepository(application)
     private val updatePreferences = UpdatePreferences(application)
+    private val homeContentRepository = HomeContentRepository()
     private var pendingUpdate: AppUpdateInfo? = null
     private val loginNotificationMonitor = LoginNotificationMonitor(application)
     private val messageNotificationMonitor = MessageNotificationMonitor(application)
@@ -218,6 +242,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val appLockBiometric = appPreferences.getAppLockBiometric()
                 val appLockPinConfigured = appPreferences.hasAppLockPin()
                 val appLockTimeout = appPreferences.getAppLockTimeout()
+                val swipeBackEnabled = appPreferences.getSwipeBackEnabled()
+                val systemBackEnabled = appPreferences.getSystemBackEnabled()
+                val swipeBackSensitivity = appPreferences.getSwipeBackSensitivity()
+                val swipeBackEdgeWidth = appPreferences.getSwipeBackEdgeWidth()
+                val rootBackBehavior = appPreferences.getRootBackBehavior()
                 LocaleManager.apply(savedLocale)
                 _uiState.value = _uiState.value.copy(
                     locale = savedLocale,
@@ -229,6 +258,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     appLockBiometric = appLockBiometric,
                     appLockPinConfigured = appLockPinConfigured,
                     appLockTimeout = appLockTimeout,
+                    swipeBackEnabled = swipeBackEnabled,
+                    systemBackEnabled = systemBackEnabled,
+                    swipeBackSensitivity = swipeBackSensitivity,
+                    swipeBackEdgeWidth = swipeBackEdgeWidth,
+                    rootBackBehavior = rootBackBehavior,
                 )
 
                 val user = authRepository.restoreSession()
@@ -243,6 +277,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         SessionRefreshResult.Expired -> forceLogout()
                         else -> {
                             refreshSocialData()
+                            refreshHomeContent()
                             LoginNotificationWorker.schedule(getApplication())
                             MessageNotificationWorker.schedule(getApplication())
                             PushTokenRegistrar.registerCurrentToken(getApplication())
@@ -607,7 +642,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openAccountSecurity(context: Context) {
         val locale = _uiState.value.locale
-        ExternalLinks.openUrl(context, "https://cyblight.org/$locale/account-security/")
+        ExternalLinks.openUrl(context, "${BuildConfig.LOGIN_URL}/$locale/account-security/")
     }
 
     fun openPasskeys() {
@@ -774,6 +809,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun navigateBack() {
         when (_uiState.value.detailScreen) {
+            DetailScreen.Changelog -> {
+                _uiState.value = _uiState.value.copy(
+                    detailScreen = DetailScreen.None,
+                    changelogError = null,
+                )
+            }
             DetailScreen.Sessions -> {
                 _uiState.value = _uiState.value.copy(
                     detailScreen = DetailScreen.None,
@@ -823,6 +864,149 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun openDonate(context: Context) {
         val locale = _uiState.value.locale
         ExternalLinks.openUrl(context, "https://cyblight.org/$locale/donate/")
+    }
+
+    fun selectMainTab(tab: MainTab) {
+        _uiState.value = _uiState.value.copy(selectedMainTab = tab)
+        when (tab) {
+            MainTab.Home -> refreshHomeContent()
+            MainTab.Security -> refreshSecurityOverview()
+            MainTab.Easter -> refreshEasterFlags()
+            else -> Unit
+        }
+    }
+
+    fun setFriendsSubTab(tab: Int) {
+        _uiState.value = _uiState.value.copy(friendsSubTab = tab.coerceIn(0, 2))
+    }
+
+    fun refreshHomeContent() {
+        viewModelScope.launch {
+            val locale = _uiState.value.locale
+            _uiState.value = _uiState.value.copy(isHomeLoading = true, homeError = null)
+            homeContentRepository.loadHomeContent(locale)
+                .onSuccess { content ->
+                    _uiState.value = _uiState.value.copy(
+                        homeContent = content,
+                        isHomeLoading = false,
+                        homeError = null,
+                    )
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(
+                        isHomeLoading = false,
+                        homeError = "home_load_failed",
+                    )
+                }
+        }
+    }
+
+    fun openChangelog() {
+        _uiState.value = _uiState.value.copy(
+            detailScreen = DetailScreen.Changelog,
+            changelogError = null,
+            isChangelogLoading = true,
+        )
+        refreshChangelog()
+    }
+
+    fun refreshChangelog() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isChangelogLoading = true, changelogError = null)
+            homeContentRepository.loadChangelog()
+                .onSuccess { releases ->
+                    _uiState.value = _uiState.value.copy(
+                        changelogReleases = releases,
+                        isChangelogLoading = false,
+                        changelogError = null,
+                    )
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(
+                        isChangelogLoading = false,
+                        changelogError = "changelog_load_failed",
+                    )
+                }
+        }
+    }
+
+    fun openWebsiteUrl(context: Context, url: String) {
+        ExternalLinks.openUrl(context, url)
+    }
+
+    sealed class BackAction {
+        data object Handled : BackAction()
+        data object ExitApp : BackAction()
+        data object MinimizeApp : BackAction()
+        data object NotHandled : BackAction()
+    }
+
+    fun handleBackNavigation(): BackAction {
+        val state = _uiState.value
+
+        if (state.detailScreen != DetailScreen.None) {
+            navigateBack()
+            return BackAction.Handled
+        }
+
+        if (!state.chatFriendId.isNullOrBlank()) {
+            closeChat()
+            return BackAction.Handled
+        }
+
+        if (state.friendsSubTab != 0) {
+            setFriendsSubTab(0)
+            return BackAction.Handled
+        }
+
+        if (state.selectedMainTab != MainTab.Home) {
+            if (state.rootBackBehavior == RootBackBehavior.EXIT_IMMEDIATELY) {
+                return BackAction.ExitApp
+            }
+            selectMainTab(MainTab.Home)
+            return BackAction.Handled
+        }
+
+        return when (state.rootBackBehavior) {
+            RootBackBehavior.EXIT_IMMEDIATELY -> BackAction.ExitApp
+            RootBackBehavior.MINIMIZE -> BackAction.MinimizeApp
+            RootBackBehavior.HOME_THEN_EXIT -> BackAction.ExitApp
+        }
+    }
+
+    fun setSwipeBackEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appPreferences.setSwipeBackEnabled(enabled)
+            _uiState.value = _uiState.value.copy(swipeBackEnabled = enabled)
+        }
+    }
+
+    fun setSystemBackEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appPreferences.setSystemBackEnabled(enabled)
+            _uiState.value = _uiState.value.copy(systemBackEnabled = enabled)
+        }
+    }
+
+    fun setSwipeBackSensitivity(sensitivity: SwipeBackSensitivity) {
+        viewModelScope.launch {
+            appPreferences.setSwipeBackSensitivity(sensitivity)
+            _uiState.value = _uiState.value.copy(swipeBackSensitivity = sensitivity)
+        }
+    }
+
+    fun setSwipeBackEdgeWidth(edgeWidth: SwipeBackEdgeWidth) {
+        viewModelScope.launch {
+            appPreferences.setSwipeBackEdgeWidth(edgeWidth)
+            _uiState.value = _uiState.value.copy(swipeBackEdgeWidth = edgeWidth)
+        }
+    }
+
+    fun setRootBackBehavior(behavior: RootBackBehavior) {
+        viewModelScope.launch {
+            appPreferences.setRootBackBehavior(behavior)
+            _uiState.value = _uiState.value.copy(rootBackBehavior = behavior)
+        }
     }
 
     fun refreshSessions() {
@@ -1062,6 +1246,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         pending2FAUserId = null,
                     )
                     refreshSocialData()
+                    refreshHomeContent()
                     onAuthenticated()
                 }
                 is AuthResult.Error -> {
@@ -1087,6 +1272,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         pending2FAUserId = null,
                     )
                     refreshSocialData()
+                    refreshHomeContent()
                     onAuthenticated()
                 }
                 is AuthResult.Requires2FA -> {
@@ -1119,6 +1305,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         pending2FAUserId = null,
                     )
                     refreshSocialData()
+                    refreshHomeContent()
                     onAuthenticated()
                 }
                 is AuthResult.Error -> {
@@ -1338,7 +1525,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             appPreferences.setActiveChatFriendId(friendId)
             messageNotificationMonitor.clearFriendNotification(friendId)
+            val savedDraft = appPreferences.getChatDraft(friendId)
             _uiState.value = _uiState.value.copy(
+                selectedMainTab = MainTab.Messages,
                 chatFriendId = friendId,
                 chatFriendName = friendName,
                 chatFriendIsOnline = cachedFriend?.isOnline ?: false,
@@ -1349,6 +1538,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 chatPinnedMessage = null,
                 chatReplyTarget = null,
                 chatEditTarget = null,
+                chatDraftText = savedDraft,
             )
             val saved = appPreferences.getArchivistProgress()
             archivistTracker = if (saved != null && saved.chatId == friendId) {
@@ -1417,9 +1607,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             chatPinnedMessage = null,
             chatReplyTarget = null,
             chatEditTarget = null,
+            chatDraftText = "",
             messagesError = null,
         )
         refreshSocialData()
+    }
+
+    fun updateChatDraft(text: String) {
+        val friendId = _uiState.value.chatFriendId ?: return
+        if (_uiState.value.chatEditTarget != null) return
+        viewModelScope.launch {
+            appPreferences.setChatDraft(friendId, text)
+            _uiState.value = _uiState.value.copy(chatDraftText = text)
+        }
     }
 
     fun clearChatReply() {
@@ -1604,6 +1804,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             action
                 .onSuccess {
+                    if (editTarget == null) {
+                        appPreferences.setChatDraft(friendId, "")
+                    }
                     reloadChat(friendId)
                     if (editTarget != null) {
                         markArchivistAction(friendId) { it.edited = true }
@@ -1614,6 +1817,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         isSending = false,
                         chatReplyTarget = null,
                         chatEditTarget = null,
+                        chatDraftText = if (editTarget == null) "" else _uiState.value.chatDraftText,
                     )
                 }
                 .onFailure {

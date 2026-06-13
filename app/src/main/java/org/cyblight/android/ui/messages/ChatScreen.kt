@@ -72,6 +72,7 @@ private const val EDIT_TIME_LIMIT_MS = 15 * 60 * 1000L
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
+    friendId: String,
     friendName: String,
     friendIsOnline: Boolean,
     friendLastSeenAt: Long?,
@@ -84,6 +85,8 @@ fun ChatScreen(
     error: String?,
     replyTarget: ChatReplyTarget?,
     editTarget: ChatEditTarget?,
+    savedDraft: String,
+    onDraftSaved: (String) -> Unit,
     onBack: () -> Unit,
     onOpenProfile: (username: String) -> Unit,
     onSend: (String) -> Unit,
@@ -98,7 +101,7 @@ fun ChatScreen(
     onForwardMessage: (String, String) -> Unit,
     onReactMessage: (String, String) -> Unit,
 ) {
-    var draft by remember { mutableStateOf(TextFieldValue()) }
+    var draft by remember(friendId) { mutableStateOf(TextFieldValue(savedDraft)) }
     var suppressedPreviewUrl by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -112,9 +115,13 @@ fun ChatScreen(
     var pendingDeleteIds by remember { mutableStateOf<List<String>?>(null) }
     var pendingUnpinMessage by remember { mutableStateOf<MessageDto?>(null) }
 
-    LaunchedEffect(editTarget?.messageId) {
-        if (editTarget != null) {
-            draft = TextFieldValue(ChatFormatUtils.stripMetadataTokens(editTarget.content))
+    LaunchedEffect(friendId, editTarget?.messageId) {
+        draft = if (editTarget != null) {
+            TextFieldValue(ChatFormatUtils.stripMetadataTokens(editTarget.content))
+        } else {
+            TextFieldValue(savedDraft)
+        }
+        if (editTarget == null) {
             selectionMode = false
             selectedIds = emptySet()
         }
@@ -457,6 +464,9 @@ fun ChatScreen(
                     draft = draft,
                     onDraftChange = { value ->
                         draft = value
+                        if (editTarget == null) {
+                            onDraftSaved(value.text)
+                        }
                         val url = ChatFormatUtils.extractFirstUrl(value.text)
                         if (url == null) {
                             suppressedPreviewUrl = null
@@ -471,12 +481,18 @@ fun ChatScreen(
                     onClearReply = onClearReply,
                     onClearEdit = {
                         onClearEdit()
-                        draft = TextFieldValue()
+                        draft = TextFieldValue(savedDraft)
                     },
                     isSending = isSending,
                     onSend = { content ->
+                        val wasEditing = editTarget != null
                         onSend(content)
-                        draft = TextFieldValue()
+                        if (wasEditing) {
+                            draft = TextFieldValue(savedDraft)
+                        } else {
+                            onDraftSaved("")
+                            draft = TextFieldValue()
+                        }
                     },
                 )
             }

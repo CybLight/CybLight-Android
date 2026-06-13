@@ -370,6 +370,12 @@ data class FriendPresenceResponse(
     val error: String? = null,
 )
 
+data class ConversationPreviewDto(
+    val preview: String = "",
+    @SerializedName("latestAt") val latestAt: Long = 0L,
+    val kind: String = "message",
+)
+
 data class UnreadDetailDto(
     @SerializedName("senderId") val senderId: String = "",
     @SerializedName("senderLogin") val senderLogin: String = "",
@@ -383,6 +389,7 @@ data class UnreadSummaryResponse(
     @SerializedName("totalUnread") val totalUnread: Int = 0,
     @SerializedName("unreadByUser") val unreadByUser: Map<String, Int> = emptyMap(),
     @SerializedName("unreadDetails") val unreadDetails: List<UnreadDetailDto> = emptyList(),
+    @SerializedName("conversationPreviews") val conversationPreviews: Map<String, ConversationPreviewDto> = emptyMap(),
 )
 
 data class PushRegisterRequest(

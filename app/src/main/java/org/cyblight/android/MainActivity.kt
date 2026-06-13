@@ -9,6 +9,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -43,7 +44,9 @@ import org.cyblight.android.notifications.NotificationHelper
 import org.cyblight.android.ui.AppViewModel
 import org.cyblight.android.ui.login.LoginScreen
 import org.cyblight.android.ui.login.TwoFactorScreen
+import org.cyblight.android.ui.home.ChangelogScreen
 import org.cyblight.android.ui.main.MainScreen
+import org.cyblight.android.ui.navigation.SwipeBackContainer
 import org.cyblight.android.ui.components.AboutDialog
 import org.cyblight.android.ui.help.HelpScreen
 import org.cyblight.android.ui.settings.SettingsScreen
@@ -182,6 +185,28 @@ class MainActivity : AppCompatActivity() {
                     color = MaterialTheme.colorScheme.background,
                 ) {
                 Box(modifier = Modifier.fillMaxSize()) {
+                    val navigationReady = uiState.screen == AppScreen.Main && !isAppLocked
+
+                    val performBackNavigation: () -> Unit = {
+                        when (viewModel.handleBackNavigation()) {
+                            AppViewModel.BackAction.ExitApp -> finish()
+                            AppViewModel.BackAction.MinimizeApp -> moveTaskToBack(true)
+                            else -> Unit
+                        }
+                    }
+
+                    BackHandler(
+                        enabled = navigationReady && uiState.systemBackEnabled,
+                        onBack = performBackNavigation,
+                    )
+
+                    SwipeBackContainer(
+                        enabled = navigationReady && uiState.swipeBackEnabled,
+                        edgeWidth = uiState.swipeBackEdgeWidth,
+                        sensitivity = uiState.swipeBackSensitivity,
+                        onSwipeBack = performBackNavigation,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
                     when (uiState.detailScreen) {
                         DetailScreen.Settings -> {
                             SettingsScreen(
@@ -214,6 +239,16 @@ class MainActivity : AppCompatActivity() {
                                 },
                                 onHelp = viewModel::openHelp,
                                 onOpenLightCatcherGame = viewModel::openLightCatcherGame,
+                                swipeBackEnabled = uiState.swipeBackEnabled,
+                                systemBackEnabled = uiState.systemBackEnabled,
+                                swipeBackSensitivity = uiState.swipeBackSensitivity,
+                                swipeBackEdgeWidth = uiState.swipeBackEdgeWidth,
+                                rootBackBehavior = uiState.rootBackBehavior,
+                                onSwipeBackEnabledChange = viewModel::setSwipeBackEnabled,
+                                onSystemBackEnabledChange = viewModel::setSystemBackEnabled,
+                                onSwipeBackSensitivitySelected = viewModel::setSwipeBackSensitivity,
+                                onSwipeBackEdgeWidthSelected = viewModel::setSwipeBackEdgeWidth,
+                                onRootBackBehaviorSelected = viewModel::setRootBackBehavior,
                             )
                         }
                         DetailScreen.Help -> {
@@ -335,6 +370,20 @@ class MainActivity : AppCompatActivity() {
                                 onBack = viewModel::navigateBack,
                             )
                         }
+                        DetailScreen.Changelog -> {
+                            ChangelogScreen(
+                                releases = uiState.changelogReleases,
+                                isLoading = uiState.isChangelogLoading,
+                                error = uiState.changelogError?.let { code ->
+                                    when (code) {
+                                        "changelog_load_failed" -> stringResource(R.string.changelog_load_failed)
+                                        else -> code
+                                    }
+                                },
+                                onBack = viewModel::navigateBack,
+                                onRefresh = viewModel::refreshChangelog,
+                            )
+                        }
                         DetailScreen.None -> when (uiState.screen) {
                         AppScreen.Loading -> {
                             Box(
@@ -378,6 +427,8 @@ class MainActivity : AppCompatActivity() {
                             if (user != null) {
                                 MainScreen(
                                     user = user,
+                                    selectedTab = uiState.selectedMainTab,
+                                    friendsSubTab = uiState.friendsSubTab,
                                     friends = uiState.friends,
                                     pendingRequests = uiState.pendingRequests,
                                     sentRequests = uiState.sentRequests,
@@ -398,8 +449,17 @@ class MainActivity : AppCompatActivity() {
                                     chatPinnedMessage = uiState.chatPinnedMessage,
                                     chatReplyTarget = uiState.chatReplyTarget,
                                     chatEditTarget = uiState.chatEditTarget,
+                                    chatDraftText = uiState.chatDraftText,
                                     isChatLoading = uiState.isChatLoading,
                                     isSending = uiState.isSending,
+                                    homeContent = uiState.homeContent,
+                                    isHomeLoading = uiState.isHomeLoading,
+                                    homeError = uiState.homeError?.let { code ->
+                                        when (code) {
+                                            "home_load_failed" -> stringResource(R.string.home_load_failed)
+                                            else -> code
+                                        }
+                                    },
                                     onSettings = viewModel::openSettings,
                                     onHelp = viewModel::openHelp,
                                     onAbout = { showAbout = true },
@@ -431,6 +491,7 @@ class MainActivity : AppCompatActivity() {
                                     onDeleteChatMessages = viewModel::deleteChatMessages,
                                     onForwardChatMessage = viewModel::forwardChatMessage,
                                     onReactChatMessage = viewModel::reactToChatMessage,
+                                    onUpdateChatDraft = viewModel::updateChatDraft,
                                     easterFlags = uiState.easterFlags,
                                     easterProgress = uiState.easterProgress,
                                     isEasterLoading = uiState.isEasterLoading,
@@ -453,6 +514,11 @@ class MainActivity : AppCompatActivity() {
                                     onOpenLoginHistory = viewModel::openLoginHistory,
                                     onOpenSessions = viewModel::openSessions,
                                     onEasterTabSelected = viewModel::refreshEasterFlags,
+                                    onSelectTab = viewModel::selectMainTab,
+                                    onFriendsSubTabChange = viewModel::setFriendsSubTab,
+                                    onRefreshHome = viewModel::refreshHomeContent,
+                                    onOpenUrl = { url -> viewModel.openWebsiteUrl(context, url) },
+                                    onOpenChangelog = viewModel::openChangelog,
                                 )
                             }
                         }
@@ -516,6 +582,7 @@ class MainActivity : AppCompatActivity() {
                                 )
                             },
                         )
+                    }
                     }
                 }
                 }

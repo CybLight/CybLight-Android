@@ -67,6 +67,8 @@ fun FriendsScreen(
     searchError: String?,
     actionMessage: String?,
     actionError: String?,
+    selectedSubTab: Int = TAB_FRIENDS,
+    onSubTabChange: (Int) -> Unit = {},
     onRefresh: () -> Unit,
     onSearch: (String) -> Unit,
     onClearSearch: () -> Unit,
@@ -80,7 +82,7 @@ fun FriendsScreen(
     onCancelRequest: (friendId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var selectedTab by rememberSaveable { mutableIntStateOf(TAB_FRIENDS) }
+    val selectedTab = selectedSubTab.coerceIn(TAB_FRIENDS, TAB_SENT)
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var showSearchResults by rememberSaveable { mutableStateOf(false) }
     var removeTarget by remember { mutableStateOf<FriendDto?>(null) }
@@ -221,7 +223,7 @@ fun FriendsScreen(
                         ) {
                             Tab(
                                 selected = selectedTab == TAB_FRIENDS,
-                                onClick = { selectedTab = TAB_FRIENDS },
+                                onClick = { onSubTabChange(TAB_FRIENDS) },
                                 text = {
                                     Text(
                                         stringResource(R.string.my_friends_count, friends.size),
@@ -232,7 +234,7 @@ fun FriendsScreen(
                             )
                             Tab(
                                 selected = selectedTab == TAB_INCOMING,
-                                onClick = { selectedTab = TAB_INCOMING },
+                                onClick = { onSubTabChange(TAB_INCOMING) },
                                 text = {
                                     Text(
                                         stringResource(R.string.incoming_requests_count, pendingRequests.size),
@@ -243,7 +245,7 @@ fun FriendsScreen(
                             )
                             Tab(
                                 selected = selectedTab == TAB_SENT,
-                                onClick = { selectedTab = TAB_SENT },
+                                onClick = { onSubTabChange(TAB_SENT) },
                                 text = {
                                     Text(
                                         stringResource(R.string.sent_requests_count, sentRequests.size),

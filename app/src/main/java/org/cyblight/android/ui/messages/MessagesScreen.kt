@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.cyblight.android.R
 import org.cyblight.android.data.repository.ConversationPreview
@@ -111,10 +112,20 @@ private fun ConversationCard(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.clickable { onOpenProfile(preview.friend.username) },
                 )
-                PresenceLabel(
-                    isOnline = preview.friend.isOnline,
-                    lastSeenAt = preview.friend.lastSeenAt,
-                )
+                if (!preview.preview.isNullOrBlank()) {
+                    Text(
+                        text = preview.preview,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    PresenceLabel(
+                        isOnline = preview.friend.isOnline,
+                        lastSeenAt = preview.friend.lastSeenAt,
+                    )
+                }
             }
             if (preview.unreadCount > 0) {
                 BadgedBox(badge = { Badge { Text(preview.unreadCount.toString()) } }) {

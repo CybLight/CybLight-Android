@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Celebration
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -17,10 +18,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -31,27 +28,26 @@ import org.cyblight.android.data.api.FriendDto
 import org.cyblight.android.data.api.MessageDto
 import org.cyblight.android.data.api.PinnedMessageDto
 import org.cyblight.android.data.api.UserDto
+import org.cyblight.android.data.home.HomeContent
 import org.cyblight.android.data.repository.ConversationPreview
 import org.cyblight.android.data.repository.SecurityOverview
 import org.cyblight.android.ui.components.AppMenu
 import org.cyblight.android.ui.components.CybLightLogo
 import org.cyblight.android.ui.easter.EasterEggsScreen
 import org.cyblight.android.ui.friends.FriendsScreen
+import org.cyblight.android.ui.home.HomeScreen
 import org.cyblight.android.ui.messages.ChatEditTarget
 import org.cyblight.android.ui.messages.ChatReplyTarget
 import org.cyblight.android.ui.messages.ChatScreen
 import org.cyblight.android.ui.messages.MessagesScreen
 import org.cyblight.android.ui.security.SecurityScreen
 
-private const val TAB_FRIENDS = 0
-private const val TAB_MESSAGES = 1
-private const val TAB_SECURITY = 2
-private const val TAB_EASTER = 3
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     user: UserDto,
+    selectedTab: MainTab,
+    friendsSubTab: Int,
     friends: List<FriendDto>,
     pendingRequests: List<FriendDto>,
     sentRequests: List<FriendDto>,
@@ -72,8 +68,12 @@ fun MainScreen(
     chatPinnedMessage: PinnedMessageDto?,
     chatReplyTarget: ChatReplyTarget?,
     chatEditTarget: ChatEditTarget?,
+    chatDraftText: String,
     isChatLoading: Boolean,
     isSending: Boolean,
+    homeContent: HomeContent?,
+    isHomeLoading: Boolean,
+    homeError: String?,
     easterFlags: EasterFlagsDto?,
     easterProgress: EasterProgress,
     isEasterLoading: Boolean,
@@ -109,6 +109,7 @@ fun MainScreen(
     onDeleteChatMessages: (List<String>) -> Unit,
     onForwardChatMessage: (String, String) -> Unit,
     onReactChatMessage: (String, String) -> Unit,
+    onUpdateChatDraft: (String) -> Unit,
     securityOverview: SecurityOverview?,
     isSecurityLoading: Boolean,
     isSecurityRefreshing: Boolean,
@@ -121,9 +122,15 @@ fun MainScreen(
     onOpenLoginHistory: () -> Unit,
     onOpenSessions: () -> Unit,
     onEasterTabSelected: () -> Unit,
+    onSelectTab: (MainTab) -> Unit,
+    onFriendsSubTabChange: (Int) -> Unit,
+    onRefreshHome: () -> Unit,
+    onOpenUrl: (String) -> Unit,
+    onOpenChangelog: () -> Unit,
 ) {
     if (chatFriendId != null && chatFriendName != null) {
         ChatScreen(
+            friendId = chatFriendId,
             friendName = chatFriendName,
             friendIsOnline = chatFriendIsOnline,
             friendLastSeenAt = chatFriendLastSeenAt,
@@ -136,6 +143,8 @@ fun MainScreen(
             error = messagesError,
             replyTarget = chatReplyTarget,
             editTarget = chatEditTarget,
+            savedDraft = chatDraftText,
+            onDraftSaved = onUpdateChatDraft,
             onBack = onCloseChat,
             onOpenProfile = onOpenFriendProfile,
             onSend = onSendMessage,
@@ -153,12 +162,12 @@ fun MainScreen(
         return
     }
 
-    var selectedTab by rememberSaveable { mutableIntStateOf(TAB_FRIENDS) }
-
     LaunchedEffect(selectedTab) {
         when (selectedTab) {
-            TAB_SECURITY -> onSecurityTabSelected()
-            TAB_EASTER -> onEasterTabSelected()
+            MainTab.Home -> onRefreshHome()
+            MainTab.Security -> onSecurityTabSelected()
+            MainTab.Easter -> onEasterTabSelected()
+            else -> Unit
         }
     }
 
@@ -167,8 +176,15 @@ fun MainScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = stringResource(R.string.welcome_user, user.login),
-                        modifier = Modifier.clickable(onClick = onOpenProfile),
+                        text = when (selectedTab) {
+                            MainTab.Home -> stringResource(R.string.home)
+                            else -> stringResource(R.string.welcome_user, user.login)
+                        },
+                        modifier = if (selectedTab == MainTab.Home) {
+                            Modifier
+                        } else {
+                            Modifier.clickable(onClick = onOpenProfile)
+                        },
                     )
                 },
                 navigationIcon = {
@@ -192,26 +208,32 @@ fun MainScreen(
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
-                    selected = selectedTab == TAB_FRIENDS,
-                    onClick = { selectedTab = TAB_FRIENDS },
+                    selected = selectedTab == MainTab.Home,
+                    onClick = { onSelectTab(MainTab.Home) },
+                    icon = { Icon(Icons.Outlined.Home, contentDescription = null) },
+                    label = { Text(stringResource(R.string.home)) },
+                )
+                NavigationBarItem(
+                    selected = selectedTab == MainTab.Friends,
+                    onClick = { onSelectTab(MainTab.Friends) },
                     icon = { Icon(Icons.Outlined.Group, contentDescription = null) },
                     label = { Text(stringResource(R.string.friends)) },
                 )
                 NavigationBarItem(
-                    selected = selectedTab == TAB_MESSAGES,
-                    onClick = { selectedTab = TAB_MESSAGES },
+                    selected = selectedTab == MainTab.Messages,
+                    onClick = { onSelectTab(MainTab.Messages) },
                     icon = { Icon(Icons.Outlined.Forum, contentDescription = null) },
                     label = { Text(stringResource(R.string.messages)) },
                 )
                 NavigationBarItem(
-                    selected = selectedTab == TAB_SECURITY,
-                    onClick = { selectedTab = TAB_SECURITY },
+                    selected = selectedTab == MainTab.Security,
+                    onClick = { onSelectTab(MainTab.Security) },
                     icon = { Icon(Icons.Outlined.Security, contentDescription = null) },
                     label = { Text(stringResource(R.string.security_title)) },
                 )
                 NavigationBarItem(
-                    selected = selectedTab == TAB_EASTER,
-                    onClick = { selectedTab = TAB_EASTER },
+                    selected = selectedTab == MainTab.Easter,
+                    onClick = { onSelectTab(MainTab.Easter) },
                     icon = { Icon(Icons.Outlined.Celebration, contentDescription = null) },
                     label = { Text(stringResource(R.string.easter_eggs_title)) },
                 )
@@ -219,7 +241,16 @@ fun MainScreen(
         },
     ) { padding ->
         when (selectedTab) {
-            TAB_FRIENDS -> FriendsScreen(
+            MainTab.Home -> HomeScreen(
+                content = homeContent,
+                isLoading = isHomeLoading,
+                error = homeError,
+                onRefresh = onRefreshHome,
+                onOpenUrl = onOpenUrl,
+                onOpenChangelog = onOpenChangelog,
+                modifier = Modifier.padding(padding),
+            )
+            MainTab.Friends -> FriendsScreen(
                 friends = friends,
                 pendingRequests = pendingRequests,
                 sentRequests = sentRequests,
@@ -230,6 +261,8 @@ fun MainScreen(
                 searchError = friendSearchError,
                 actionMessage = friendsActionMessage,
                 actionError = friendsActionError,
+                selectedSubTab = friendsSubTab,
+                onSubTabChange = onFriendsSubTabChange,
                 onRefresh = onRefresh,
                 onSearch = onSearchUsers,
                 onClearSearch = onClearFriendSearch,
@@ -243,7 +276,7 @@ fun MainScreen(
                 onCancelRequest = onCancelFriendRequest,
                 modifier = Modifier.padding(padding),
             )
-            TAB_MESSAGES -> MessagesScreen(
+            MainTab.Messages -> MessagesScreen(
                 conversations = conversations,
                 isLoading = conversations.isEmpty() && messagesError == null,
                 error = messagesError,
@@ -252,7 +285,7 @@ fun MainScreen(
                 onOpenProfile = onOpenFriendProfile,
                 modifier = Modifier.padding(padding),
             )
-            TAB_SECURITY -> SecurityScreen(
+            MainTab.Security -> SecurityScreen(
                 overview = securityOverview,
                 isLoading = isSecurityLoading,
                 isRefreshing = isSecurityRefreshing,
@@ -267,7 +300,7 @@ fun MainScreen(
                 onOpenSessions = onOpenSessions,
                 modifier = Modifier.padding(padding),
             )
-            TAB_EASTER -> EasterEggsScreen(
+            MainTab.Easter -> EasterEggsScreen(
                 flags = easterFlags,
                 progress = easterProgress,
                 isLoading = isEasterLoading,

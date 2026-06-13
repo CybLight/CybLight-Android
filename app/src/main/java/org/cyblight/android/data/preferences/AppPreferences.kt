@@ -41,6 +41,13 @@ class AppPreferences(private val context: Context) {
     private val biometricUnlockCountKey = intPreferencesKey("biometric_unlock_count")
     private val nightGuardElapsedKey = longPreferencesKey("night_guard_elapsed_ms")
     private val archivistProgressKey = stringPreferencesKey("archivist_progress")
+    private val swipeBackEnabledKey = booleanPreferencesKey("swipe_back_enabled")
+    private val systemBackEnabledKey = booleanPreferencesKey("system_back_enabled")
+    private val swipeBackSensitivityKey = stringPreferencesKey("swipe_back_sensitivity")
+    private val swipeBackEdgeWidthKey = stringPreferencesKey("swipe_back_edge_width")
+    private val rootBackBehaviorKey = stringPreferencesKey("root_back_behavior")
+
+    private fun chatDraftKey(friendId: String) = stringPreferencesKey("chat_draft_$friendId")
 
     val themeMode: Flow<ThemeMode> = context.appPreferencesStore.data.map { prefs ->
         ThemeMode.entries.firstOrNull { it.name == prefs[themeKey] } ?: ThemeMode.SYSTEM
@@ -241,6 +248,20 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    suspend fun getChatDraft(friendId: String): String =
+        context.appPreferencesStore.data.first()[chatDraftKey(friendId)].orEmpty()
+
+    suspend fun setChatDraft(friendId: String, text: String) {
+        context.appPreferencesStore.edit { prefs ->
+            val key = chatDraftKey(friendId)
+            if (text.isBlank()) {
+                prefs.remove(key)
+            } else {
+                prefs[key] = text
+            }
+        }
+    }
+
     suspend fun getArchivistProgress(): ArchivistProgressSnapshot? {
         val raw = context.appPreferencesStore.data.first()[archivistProgressKey] ?: return null
         val parts = raw.split('\t')
@@ -270,6 +291,51 @@ class AppPreferences(private val context: Context) {
         ).joinToString("\t")
         context.appPreferencesStore.edit { prefs ->
             prefs[archivistProgressKey] = encoded
+        }
+    }
+
+    suspend fun getSwipeBackEnabled(): Boolean =
+        context.appPreferencesStore.data.first()[swipeBackEnabledKey] ?: true
+
+    suspend fun getSystemBackEnabled(): Boolean =
+        context.appPreferencesStore.data.first()[systemBackEnabledKey] ?: true
+
+    suspend fun getSwipeBackSensitivity(): SwipeBackSensitivity =
+        SwipeBackSensitivity.fromName(context.appPreferencesStore.data.first()[swipeBackSensitivityKey])
+
+    suspend fun getSwipeBackEdgeWidth(): SwipeBackEdgeWidth =
+        SwipeBackEdgeWidth.fromName(context.appPreferencesStore.data.first()[swipeBackEdgeWidthKey])
+
+    suspend fun getRootBackBehavior(): RootBackBehavior =
+        RootBackBehavior.fromName(context.appPreferencesStore.data.first()[rootBackBehaviorKey])
+
+    suspend fun setSwipeBackEnabled(enabled: Boolean) {
+        context.appPreferencesStore.edit { prefs ->
+            prefs[swipeBackEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setSystemBackEnabled(enabled: Boolean) {
+        context.appPreferencesStore.edit { prefs ->
+            prefs[systemBackEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setSwipeBackSensitivity(sensitivity: SwipeBackSensitivity) {
+        context.appPreferencesStore.edit { prefs ->
+            prefs[swipeBackSensitivityKey] = sensitivity.name
+        }
+    }
+
+    suspend fun setSwipeBackEdgeWidth(edgeWidth: SwipeBackEdgeWidth) {
+        context.appPreferencesStore.edit { prefs ->
+            prefs[swipeBackEdgeWidthKey] = edgeWidth.name
+        }
+    }
+
+    suspend fun setRootBackBehavior(behavior: RootBackBehavior) {
+        context.appPreferencesStore.edit { prefs ->
+            prefs[rootBackBehaviorKey] = behavior.name
         }
     }
 }

@@ -58,6 +58,26 @@ private val EasterBadgeFoundBackground = Color(0x2622C55E)
 private val EasterBadgeLockedRed = Color(0xFFEF4444)
 private val EasterBadgeLockedBackground = Color(0x26EF4444)
 
+private const val EASTER_EGGS_TOTAL = 12
+
+private fun countUnlockedEasterEggs(flags: EasterFlagsDto?): Int {
+    if (flags == null) return 0
+    return listOf(
+        flags.strawberry,
+        flags.darkTrigger,
+        flags.profileMirror,
+        flags.lightCatcher,
+        flags.postmaster,
+        flags.developerMode,
+        flags.themeFlux,
+        flags.nightGuard,
+        flags.trustedFingerprint,
+        flags.bridge,
+        flags.echo,
+        flags.archivist,
+    ).count { it }
+}
+
 private object EasterEggPalettes {
     val lightCatcher = EasterEggPalette(
         unlockedContainer = Color(0xFF4A3B12),
@@ -312,6 +332,7 @@ private fun EasterEggsContent(
             ),
         )
     }
+    val foundCount = remember(flags) { countUnlockedEasterEggs(flags) }
 
     Column(
         modifier = modifier
@@ -324,6 +345,11 @@ private fun EasterEggsContent(
             text = stringResource(R.string.easter_eggs_hint),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        EasterCollectionSummary(
+            found = foundCount,
+            total = EASTER_EGGS_TOTAL,
         )
 
         EasterEggsSectionTitle(
@@ -352,6 +378,34 @@ private fun EasterEggsContent(
             EasterEggCard(item = item)
         }
     }
+}
+
+@Composable
+private fun EasterCollectionSummary(
+    found: Int,
+    total: Int,
+    modifier: Modifier = Modifier,
+) {
+    val isComplete = found >= total
+    val text = if (isComplete) {
+        stringResource(R.string.easter_collection_complete)
+    } else {
+        stringResource(R.string.easter_collection_progress, found, total)
+    }
+
+    Text(
+        text = text,
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                color = if (isComplete) EasterBadgeFoundBackground else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                shape = RoundedCornerShape(10.dp),
+            )
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = if (isComplete) FontWeight.Bold else FontWeight.SemiBold,
+        color = if (isComplete) EasterBadgeFoundGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
