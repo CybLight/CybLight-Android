@@ -14,13 +14,21 @@ import org.signal.libsignal.protocol.IdentityKeyPair
 import org.signal.libsignal.protocol.SessionBuilder
 import org.signal.libsignal.protocol.SessionCipher
 import org.signal.libsignal.protocol.SignalProtocolAddress
+import org.signal.libsignal.protocol.ecc.ECKeyPair
 import org.signal.libsignal.protocol.ecc.ECPublicKey
+import org.signal.libsignal.protocol.kem.KEMKeyPair
+import org.signal.libsignal.protocol.kem.KEMKeyType
+import org.signal.libsignal.protocol.kem.KEMPublicKey
 import org.signal.libsignal.protocol.message.CiphertextMessage
 import org.signal.libsignal.protocol.message.PreKeySignalMessage
 import org.signal.libsignal.protocol.message.SignalMessage
+import org.signal.libsignal.protocol.state.KyberPreKeyRecord
 import org.signal.libsignal.protocol.state.PreKeyBundle
+import org.signal.libsignal.protocol.state.PreKeyRecord
+import org.signal.libsignal.protocol.state.SignedPreKeyRecord
 import org.signal.libsignal.protocol.state.impl.InMemorySignalProtocolStore
 import org.signal.libsignal.protocol.util.KeyHelper
+import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 data class EncryptedPayload(
@@ -34,7 +42,7 @@ class SignalCryptoManager(
     private val api: CybLightApi,
 ) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val lock = Any()
+    private val lock = ReentrantLock()
     private var nextPreKeyId = (System.currentTimeMillis() / 1000L).toInt()
 
     suspend fun ensureRegistered(userId: String) {
@@ -51,15 +59,18 @@ class SignalCryptoManager(
             return
         }
 
-        val registrationId = KeyHelper.generateRegistrationId()
+        val registrationId = KeyHelper.generateRegistrationId(false)
         val identityKeyPair = IdentityKeyPair.generate()
         val signedPreKeyId = nextKeyId()
-        val signedPreKey = KeyHelper.generateSignedPreKey(identityKeyPair, signedPreKeyId)
+        val signedPreKey = generateSignedPreKey(identityKeyPair, signedPreKeyId)
+        val kyberPreKeyId = nextKeyId()
+        val kyberPreKey = generateKyberPreKey(identityKeyPair, kyberPreKeyId)
         val store = InMemorySignalProtocolStore(identityKeyPair, registrationId)
         val oneTimePreKeys = generateOneTimePreKeys(store, ONE_TIME_PREKEY_BATCH)
 
         saveIdentity(userId, registrationId, identityKeyPair)
         store.storeSignedPreKey(signedPreKeyId, signedPreKey)
+        store.storeKyberPreKey(kyberPreKeyId, kyberPreKey)
 
         api.registerSignalKeys(
             SignalRegisterKeysRequest(
@@ -69,6 +80,11 @@ class SignalCryptoManager(
                     keyId = signedPreKeyId,
                     publicKey = base64Encode(signedPreKey.keyPair.publicKey.serialize()),
                     signature = base64Encode(signedPreKey.signature),
+                ),
+                kyberPreKey = SignalSignedPreKeyDto(
+                    keyId = kyberPreKeyId,
+                    publicKey = base64Encode(kyberPreKey.keyPair.publicKey.serialize()),
+                    signature = base64Encode(kyberPreKey.signature),
                 ),
                 oneTimePreKeys = oneTimePreKeys,
             ),
@@ -150,7 +166,7 @@ class SignalCryptoManager(
         count: Int,
     ): List<SignalPublicPreKeyDto> {
         val startId = nextKeyId()
-        val records = KeyHelper.generatePreKeys(startId, count)
+        val records = generatePreKeys(startId, count)
         val out = ArrayList<SignalPublicPreKeyDto>(records.size)
         records.forEach { record ->
             store.storePreKey(record.id, record)
@@ -166,18 +182,40 @@ class SignalCryptoManager(
     }
 
     private fun SignalKeyBundleDto.toPreKeyBundle(): PreKeyBundle {
-        val preKeyId = oneTimePreKey?.keyId
+        val preKeyId = oneTimePreKey?.keyId ?: PreKeyBundle.NULL_PRE_KEY_ID
         val preKeyPublic = oneTimePreKey?.publicKey?.let { ECPublicKey(base64Decode(it)) }
+        val kyber = kyberPreKey ?: throw IllegalStateException("kyber_prekey_missing")
         return PreKeyBundle(
             registrationId,
             deviceId,
+            preKeyId,
+            preKeyPublic,
             signedPreKey.keyId,
             ECPublicKey(base64Decode(signedPreKey.publicKey)),
             base64Decode(signedPreKey.signature),
-            preKeyId ?: 0,
-            preKeyPublic,
             IdentityKey(ECPublicKey(base64Decode(identityKey))),
+            kyber.keyId,
+            KEMPublicKey(base64Decode(kyber.publicKey)),
+            base64Decode(kyber.signature),
         )
+    }
+
+    private fun generateSignedPreKey(identityKeyPair: IdentityKeyPair, signedPreKeyId: Int): SignedPreKeyRecord {
+        val keyPair = ECKeyPair.generate()
+        val signature = identityKeyPair.privateKey.calculateSignature(keyPair.publicKey.serialize())
+        return SignedPreKeyRecord(signedPreKeyId, System.currentTimeMillis(), keyPair, signature)
+    }
+
+    private fun generateKyberPreKey(identityKeyPair: IdentityKeyPair, kyberPreKeyId: Int): KyberPreKeyRecord {
+        val keyPair = KEMKeyPair.generate(KEMKeyType.KYBER_1024)
+        val signature = identityKeyPair.privateKey.calculateSignature(keyPair.publicKey.serialize())
+        return KyberPreKeyRecord(kyberPreKeyId, System.currentTimeMillis(), keyPair, signature)
+    }
+
+    private fun generatePreKeys(startId: Int, count: Int): List<PreKeyRecord> {
+        return (0 until count).map { offset ->
+            PreKeyRecord(startId + offset, ECKeyPair.generate())
+        }
     }
 
     private fun nextKeyId(): Int {

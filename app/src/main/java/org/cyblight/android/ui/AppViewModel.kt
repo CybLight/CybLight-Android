@@ -40,6 +40,7 @@ import org.cyblight.android.data.home.ChangelogRelease
 import org.cyblight.android.data.home.HomeContent
 import org.cyblight.android.data.home.HomeContentRepository
 import org.cyblight.android.crypto.SignalCryptoManager
+import org.cyblight.android.data.repository.AuthRepository
 import org.cyblight.android.data.repository.AuthResult
 import org.cyblight.android.data.repository.SessionRefreshResult
 import org.cyblight.android.data.repository.ConversationPreview

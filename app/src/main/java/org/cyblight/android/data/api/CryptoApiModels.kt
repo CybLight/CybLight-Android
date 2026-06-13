@@ -19,6 +19,7 @@ data class SignalKeyBundleDto(
     @SerializedName("registrationId") val registrationId: Int = 0,
     @SerializedName("identityKey") val identityKey: String = "",
     @SerializedName("signedPreKey") val signedPreKey: SignalSignedPreKeyDto = SignalSignedPreKeyDto(),
+    @SerializedName("kyberPreKey") val kyberPreKey: SignalSignedPreKeyDto? = null,
     @SerializedName("oneTimePreKey") val oneTimePreKey: SignalPublicPreKeyDto? = null,
 )
 
@@ -40,6 +41,7 @@ data class SignalRegisterKeysRequest(
     @SerializedName("registrationId") val registrationId: Int,
     @SerializedName("identityKey") val identityKey: String,
     @SerializedName("signedPreKey") val signedPreKey: SignalSignedPreKeyDto,
+    @SerializedName("kyberPreKey") val kyberPreKey: SignalSignedPreKeyDto,
     @SerializedName("oneTimePreKeys") val oneTimePreKeys: List<SignalPublicPreKeyDto>,
 )
 
