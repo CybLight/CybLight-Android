@@ -46,6 +46,9 @@ private class MessageDtoDeserializer : JsonDeserializer<MessageDto> {
             id = obj.readString("id"),
             senderId = obj.readString("senderId", "sender_id"),
             content = obj.readString("content"),
+            encryption = obj.readString("encryption").ifBlank { "plaintext" },
+            signalType = obj.readNullableInt("signalType", "signal_type"),
+            registrationId = obj.readNullableInt("registrationId", "signal_registration_id"),
             createdAt = obj.readLong("createdAt", "created_at"),
             readAt = obj.readNullableLong("readAt", "read_at"),
             editedAt = obj.readNullableLong("editedAt", "edited_at"),
@@ -134,4 +137,21 @@ private fun JsonObject.readInt(vararg keys: String): Int {
         }
     }
     return 0
+}
+
+private fun JsonObject.readNullableInt(vararg keys: String): Int? {
+    for (key in keys) {
+        val element = get(key) ?: continue
+        if (element.isJsonNull) return null
+        if (element.isJsonPrimitive) {
+            val primitive = element.asJsonPrimitive
+            val parsed = when {
+                primitive.isNumber -> primitive.asInt
+                primitive.isString -> primitive.asString.trim().toIntOrNull()
+                else -> null
+            }
+            if (parsed != null) return parsed
+        }
+    }
+    return null
 }

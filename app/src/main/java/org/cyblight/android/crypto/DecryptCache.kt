@@ -14,7 +14,7 @@ class DecryptCache(context: Context) {
         if (messageId.isBlank()) return
         prefs.edit()
             .putString(cacheKey(userId, messageId), plaintext)
-            .apply()
+            .commit()
     }
 
     private fun cacheKey(userId: String, messageId: String): String =
