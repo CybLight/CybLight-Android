@@ -334,6 +334,16 @@ private fun NewsCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (!item.subtitle.isNullOrBlank()) {
+                    Text(
+                        text = item.subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
                 Text(
                     text = stringResource(R.string.home_open_on_site),
                     style = MaterialTheme.typography.labelSmall,

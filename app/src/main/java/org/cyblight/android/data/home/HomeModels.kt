@@ -4,6 +4,7 @@ data class HomeNewsItem(
     val title: String,
     val url: String,
     val imageUrl: String? = null,
+    val subtitle: String? = null,
 )
 
 data class HomeProjectItem(

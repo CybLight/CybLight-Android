@@ -1,10 +1,13 @@
 package org.cyblight.android.data.home
 
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.cyblight.android.BuildConfig
+import org.cyblight.android.R
+import org.cyblight.android.i18n.LocaleManager
 import org.cyblight.android.update.formatReleaseNotesForDisplay
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
@@ -14,20 +17,24 @@ class HomeContentRepository(
 ) {
     private val gson = Gson()
 
-    suspend fun loadHomeContent(locale: String): Result<HomeContent> = withContext(Dispatchers.IO) {
-        runCatching {
-            val normalizedLocale = locale.ifBlank { "ru" }
-            val projects = HomeContentDefaults.projects(normalizedLocale)
-            val whatsNew = HomeContentDefaults.whatsNew()
-            val fetched = fetchSiteContent(normalizedLocale)
-            HomeContent(
-                siteNotice = fetched.siteNotice,
-                news = fetched.news.ifEmpty { HomeContentDefaults.fallbackNews(normalizedLocale) },
-                projects = projects,
-                whatsNew = whatsNew,
-            )
+    suspend fun loadHomeContent(context: Context, locale: String): Result<HomeContent> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val normalizedLocale = locale.ifBlank { "ru" }
+                val resources = LocaleManager.wrapContext(context, normalizedLocale).resources
+                val projects = HomeContentDefaults.projects(resources, normalizedLocale)
+                val whatsNew = HomeContentDefaults.whatsNew(resources)
+                val fetched = fetchSiteContent(normalizedLocale)
+                HomeContent(
+                    siteNotice = fetched.siteNotice,
+                    news = fetched.news.ifEmpty {
+                        HomeContentDefaults.fallbackNews(resources, normalizedLocale)
+                    },
+                    projects = projects,
+                    whatsNew = whatsNew,
+                )
+            }
         }
-    }
 
     suspend fun loadChangelog(): Result<List<ChangelogRelease>> = withContext(Dispatchers.IO) {
         runCatching {
@@ -64,12 +71,12 @@ class HomeContentRepository(
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@runCatching FetchedSiteContent()
                 val html = response.body?.string().orEmpty()
-                parseSiteHtml(html, locale)
+                parseSiteHtml(html)
             }
         }.getOrElse { FetchedSiteContent() }
     }
 
-    private fun parseSiteHtml(html: String, locale: String): FetchedSiteContent {
+    private fun parseSiteHtml(html: String): FetchedSiteContent {
         val notice = Regex(
             """<p class="hero-content-two"[^>]*>([\s\S]*?)</p>""",
             RegexOption.IGNORE_CASE,
@@ -78,8 +85,10 @@ class HomeContentRepository(
             ?.replace(Regex("\\s+"), " ")
             ?.trim()
 
+        val bannerNews = parseHeroNewsBanners(html)
+
         val videoSection = html.substringAfter("id=\"videos\"", html)
-        val news = Regex(
+        val videoNews = Regex(
             """data-video-id="([^"]+)"[^>]*data-title="([^"]+)"""",
         ).findAll(videoSection).map { match ->
             val videoId = match.groupValues[1]
@@ -91,7 +100,57 @@ class HomeContentRepository(
             )
         }.toList()
 
+        val news = bannerNews + videoNews
+
         return FetchedSiteContent(siteNotice = notice, news = news)
+    }
+
+    private fun parseHeroNewsBanners(html: String): List<HomeNewsItem> {
+        val blocks = Regex(
+            """<aside class="hero-news-banner"[\s\S]*?</aside>""",
+            RegexOption.IGNORE_CASE,
+        ).findAll(html)
+
+        return blocks.mapNotNull { match ->
+            val block = match.value
+            val title = extractClassText(block, "hero-news-title") ?: return@mapNotNull null
+            val subtitle = extractClassText(block, "hero-news-text")
+            val rawUrl = Regex(
+                """class="[^"]*hero-news-cta[^"]*"[^>]*href="([^"]+)"""",
+                RegexOption.IGNORE_CASE,
+            ).find(block)?.groupValues?.get(1)?.trim().orEmpty()
+            if (rawUrl.isEmpty()) return@mapNotNull null
+
+            val rawImage = Regex(
+                """class="hero-news-icon"[^>]*src="([^"]+)"""",
+                RegexOption.IGNORE_CASE,
+            ).find(block)?.groupValues?.get(1)?.trim()
+
+            HomeNewsItem(
+                title = title,
+                subtitle = subtitle,
+                url = resolveSiteUrl(rawUrl),
+                imageUrl = rawImage?.let { resolveSiteUrl(it) },
+            )
+        }.toList()
+    }
+
+    private fun extractClassText(html: String, className: String): String? {
+        return Regex(
+            """class="$className"[^>]*>([\s\S]*?)</""",
+            RegexOption.IGNORE_CASE,
+        ).find(html)?.groupValues?.get(1)
+            ?.replace(Regex("<[^>]+>"), " ")
+            ?.replace(Regex("\\s+"), " ")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+    }
+
+    private fun resolveSiteUrl(raw: String): String {
+        val trimmed = raw.trim()
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed
+        val base = BuildConfig.WEBSITE_URL.trimEnd('/')
+        return if (trimmed.startsWith("/")) "$base$trimmed" else "$base/$trimmed"
     }
 
     private data class FetchedSiteContent(
@@ -107,71 +166,67 @@ class HomeContentRepository(
 }
 
 private object HomeContentDefaults {
-    fun whatsNew(): WhatsNewInfo = WhatsNewInfo(
+    fun whatsNew(resources: android.content.res.Resources): WhatsNewInfo = WhatsNewInfo(
         version = BuildConfig.VERSION_NAME,
-        features = listOf(
-            "Вкладка «Главная» с новостями и проектами CybLight",
-            "Превью последних сообщений и реакций в списке чатов",
-            "Черновики сообщений при выходе из чата",
-            "Прогресс пасхалок и карточки как на сайте",
-            "Управление жестами: свайп назад и настройки в параметрах",
-        ),
+        features = resources.getStringArray(R.array.home_whats_new_features).toList(),
     )
 
-    fun fallbackNews(locale: String): List<HomeNewsItem> = listOf(
+    fun fallbackNews(
+        resources: android.content.res.Resources,
+        locale: String,
+    ): List<HomeNewsItem> = listOf(
         HomeNewsItem(
-            title = when (locale) {
-                "en" -> "CybLight website"
-                "uk" -> "Сайт CybLight"
-                else -> "Сайт CybLight"
-            },
+            title = resources.getString(R.string.home_fallback_news_title),
             url = "${BuildConfig.WEBSITE_URL}/$locale/",
             imageUrl = "${BuildConfig.WEBSITE_URL}/images/hero.png",
         ),
     )
 
-    fun projects(locale: String): List<HomeProjectItem> {
+    fun projects(
+        resources: android.content.res.Resources,
+        locale: String,
+    ): List<HomeProjectItem> {
         val base = BuildConfig.WEBSITE_URL
         val l = locale.ifBlank { "ru" }
         return listOf(
             HomeProjectItem(
-                title = "Сайт CybLight",
-                description = "Мой основной сайт с проектами, блогом и играми.",
+                title = resources.getString(R.string.home_project_site_title),
+                description = resources.getString(R.string.home_project_site_desc),
                 imageUrl = "$base/images/hero.png",
                 url = "$base/$l/projects/",
                 tags = listOf("TypeScript", "HTML", "CSS"),
             ),
             HomeProjectItem(
-                title = "Мобильное приложение CybLight",
-                description = "Официальное Android-приложение: аккаунт, друзья, сообщения и безопасность.",
+                title = resources.getString(R.string.home_project_app_title),
+                description = resources.getString(R.string.home_project_app_desc),
                 imageUrl = "$base/images/favicon_192.png",
                 url = "$base/$l/downloads/",
                 tags = listOf("Kotlin", "Android"),
             ),
             HomeProjectItem(
-                title = "Telegram-бот Guardian",
-                description = "Бот для поддержания порядка в группах.",
+                title = resources.getString(R.string.home_project_guardian_title),
+                description = resources.getString(R.string.home_project_guardian_desc),
                 imageUrl = "$base/images/project/Guardian_BOT.jpg",
                 url = "$base/$l/projects/",
                 tags = listOf("Python"),
             ),
             HomeProjectItem(
-                title = "Priority Manager X",
-                description = "Управление приоритетами процессов и правила для Windows.",
+                title = resources.getString(R.string.home_project_pmx_title),
+                description = resources.getString(R.string.home_project_pmx_desc),
                 imageUrl = "$base/images/project/PmX-background.png",
                 url = "$base/$l/projects/",
                 tags = listOf("C#"),
             ),
             HomeProjectItem(
-                title = "Smart Home Hub",
-                description = "Оптимизация и уют для дома через умные технологии.",
+                title = resources.getString(R.string.home_project_smarthome_title),
+                description = resources.getString(R.string.home_project_smarthome_desc),
                 imageUrl = "$base/images/project/Smart%20Home%20Hub%20(640%20x%20360).png",
                 url = "$base/$l/projects/",
                 tags = listOf("Arduino", "C++"),
             ),
             HomeProjectItem(
-                title = "Fish Finder PRO",
-                description = "Эхолот для рыбалки на базе Arduino.",
+                title = resources.getString(R.string.home_project_fishfinder_title),
+                description = resources.getString(R.string.home_project_fishfinder_desc),
                 imageUrl = "$base/images/project/Fish%20Finder%20PRO.jpg",
                 url = "$base/$l/projects/",
                 tags = listOf("Arduino", "C++"),

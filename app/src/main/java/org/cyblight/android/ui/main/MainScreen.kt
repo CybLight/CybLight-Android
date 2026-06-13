@@ -1,7 +1,9 @@
 package org.cyblight.android.ui.main
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Celebration
 import androidx.compose.material.icons.outlined.Forum
@@ -20,7 +22,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.cyblight.android.R
 import org.cyblight.android.data.api.EasterFlagsDto
 import org.cyblight.android.data.api.EasterProgress
@@ -211,31 +216,31 @@ fun MainScreen(
                     selected = selectedTab == MainTab.Home,
                     onClick = { onSelectTab(MainTab.Home) },
                     icon = { Icon(Icons.Outlined.Home, contentDescription = null) },
-                    label = { Text(stringResource(R.string.home)) },
+                    label = { BottomNavLabel(stringResource(R.string.home)) },
                 )
                 NavigationBarItem(
                     selected = selectedTab == MainTab.Friends,
                     onClick = { onSelectTab(MainTab.Friends) },
                     icon = { Icon(Icons.Outlined.Group, contentDescription = null) },
-                    label = { Text(stringResource(R.string.friends)) },
+                    label = { BottomNavLabel(stringResource(R.string.friends)) },
                 )
                 NavigationBarItem(
                     selected = selectedTab == MainTab.Messages,
                     onClick = { onSelectTab(MainTab.Messages) },
                     icon = { Icon(Icons.Outlined.Forum, contentDescription = null) },
-                    label = { Text(stringResource(R.string.messages)) },
+                    label = { BottomNavLabel(stringResource(R.string.nav_tab_messages)) },
                 )
                 NavigationBarItem(
                     selected = selectedTab == MainTab.Security,
                     onClick = { onSelectTab(MainTab.Security) },
                     icon = { Icon(Icons.Outlined.Security, contentDescription = null) },
-                    label = { Text(stringResource(R.string.security_title)) },
+                    label = { BottomNavLabel(stringResource(R.string.nav_tab_security)) },
                 )
                 NavigationBarItem(
                     selected = selectedTab == MainTab.Easter,
                     onClick = { onSelectTab(MainTab.Easter) },
                     icon = { Icon(Icons.Outlined.Celebration, contentDescription = null) },
-                    label = { Text(stringResource(R.string.easter_eggs_title)) },
+                    label = { BottomNavLabel(stringResource(R.string.nav_tab_easter)) },
                 )
             }
         },
@@ -310,4 +315,19 @@ fun MainScreen(
             )
         }
     }
+}
+
+@Composable
+private fun BottomNavLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        fontSize = 11.sp,
+        lineHeight = 12.sp,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }

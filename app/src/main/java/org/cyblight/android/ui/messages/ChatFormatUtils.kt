@@ -32,8 +32,7 @@ object ChatFormatUtils {
         return noPreviewRegex.findAll(text).mapNotNull { match ->
             val encoded = match.groupValues.getOrNull(1)?.trim().orEmpty()
             if (encoded.isEmpty()) return@mapNotNull null
-            runCatching { java.net.URLDecoder.decode(encoded, StandardCharsets.UTF_8.name()) }
-                .getOrDefault(encoded)
+            decodeToken(encoded)
         }.toList()
     }
 
@@ -42,8 +41,16 @@ object ChatFormatUtils {
         return extractNoPreviewUrls(text).any { normalizeUrl(it) == target }
     }
 
+    fun appendReplyToken(content: String, messageId: String, author: String, preview: String): String {
+        val safeAuthor = encodeToken(author)
+        val safePreview = encodeToken(
+            preview.replace(Regex("""\s+"""), " ").trim().take(220),
+        )
+        return "$content\n[[CYBLIGHT_REPLY:$messageId:$safeAuthor:$safePreview]]"
+    }
+
     fun appendNoPreviewToken(content: String, url: String): String {
-        val encoded = URLEncoder.encode(url, StandardCharsets.UTF_8.name())
+        val encoded = encodeToken(url)
         return "$content\n[[CYBLIGHT_NO_PREVIEW:$encoded]]"
     }
 
@@ -71,20 +78,16 @@ object ChatFormatUtils {
         return null
     }
 
-    fun appendReplyToken(content: String, messageId: String, author: String, preview: String): String {
-        val safeAuthor = URLEncoder.encode(author, StandardCharsets.UTF_8.name())
-        val safePreview = URLEncoder.encode(
-            preview.replace(Regex("""\s+"""), " ").trim().take(220),
-            StandardCharsets.UTF_8.name(),
-        )
-        return "$content\n[[CYBLIGHT_REPLY:$messageId:$safeAuthor:$safePreview]]"
+    private fun encodeToken(value: String): String {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8.name())
+            .replace("+", "%20")
     }
 
     private fun decodeToken(value: String): String {
         if (value.isBlank()) return ""
         return runCatching {
-            java.net.URLDecoder.decode(value, StandardCharsets.UTF_8.name())
-        }.getOrDefault(value)
+            java.net.URLDecoder.decode(value.replace("+", "%20"), StandardCharsets.UTF_8.name())
+        }.getOrDefault(value.replace("+", " "))
     }
 
     private fun normalizeUrl(value: String): String {

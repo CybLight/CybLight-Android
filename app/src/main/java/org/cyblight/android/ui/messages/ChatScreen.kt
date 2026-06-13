@@ -617,12 +617,24 @@ private fun MessageBubble(
                     )
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
-                ChatMessageContent(
-                    rawContent = message.content,
-                    textColor = fg,
-                    linkColor = bubbleLinkColor,
-                    messageId = message.id,
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val replyMeta = remember(message.content) {
+                        ChatFormatUtils.extractReplyMeta(message.content)
+                    }
+                    replyMeta?.let { meta ->
+                        ChatReplySnippet(
+                            author = meta.author,
+                            text = meta.text.ifBlank { stringResource(R.string.chat_reply_message) },
+                            isOutgoing = isMine,
+                        )
+                    }
+                    ChatMessageContent(
+                        rawContent = message.content,
+                        textColor = fg,
+                        linkColor = bubbleLinkColor,
+                        messageId = message.id,
+                    )
+                }
             }
             MessageReactionsRow(
                 reactions = message.reactions,

@@ -12,6 +12,9 @@
     <string name="friends">Друзья</string>
     <string name="home">Главная</string>
     <string name="messages">Сообщения</string>
+    <string name="nav_tab_messages">Чаты</string>
+    <string name="nav_tab_security">Защита</string>
+    <string name="nav_tab_easter">Пасхалки</string>
     <string name="my_friends">Мои друзья</string>
     <string name="my_friends_count">👥 Мои друзья (%1$d)</string>
     <string name="incoming_requests_count">📥 Входящие запросы (%1$d)</string>
@@ -55,6 +58,8 @@
     <string name="write_message">Написать</string>
     <string name="message_placeholder">Сообщение…</string>
     <string name="chat_emoji">Смайлики</string>
+    <string name="chat_emoji_search">Поиск эмодзи…</string>
+    <string name="chat_emoji_not_found">Ничего не найдено</string>
     <string name="chat_link_preview_loading">Загрузка превью…</string>
     <string name="chat_pinned_label">Закреплённое сообщение</string>
     <string name="chat_pinned_fallback">Сообщение</string>
@@ -81,6 +86,7 @@
     <string name="chat_reply_to">Ответ %1$s</string>
     <string name="chat_reply_you">Вы</string>
     <string name="chat_reply_peer">Собеседник</string>
+    <string name="chat_reply_message">Сообщение</string>
     <string name="chat_editing_message">Редактирование</string>
     <string name="chat_edit_placeholder">Изменить сообщение…</string>
     <string name="chat_edited">изменено</string>
@@ -162,6 +168,27 @@
     <string name="home_news_error">Не удалось загрузить новости</string>
     <string name="home_projects_empty">Проекты недоступны</string>
     <string name="home_load_failed">Не удалось загрузить главную</string>
+    <string-array name="home_whats_new_features">
+        <item>Ответы на сообщения с цитатой, как на сайте</item>
+        <item>Больше эмодзи в чате — набор как в Telegram</item>
+        <item>Пасхалка Developer Mode в списке приложения</item>
+        <item>Вкладка «Главная» с новостями и проектами CybLight</item>
+        <item>Превью последних сообщений и реакций в списке чатов</item>
+        <item>Черновики сообщений при выходе из чата</item>
+    </string-array>
+    <string name="home_fallback_news_title">Сайт CybLight</string>
+    <string name="home_project_site_title">Сайт CybLight</string>
+    <string name="home_project_site_desc">Мой основной сайт с проектами, блогом и играми.</string>
+    <string name="home_project_app_title">Мобильное приложение CybLight</string>
+    <string name="home_project_app_desc">Официальное Android-приложение: аккаунт, друзья, сообщения и безопасность.</string>
+    <string name="home_project_guardian_title">Telegram-бот Guardian</string>
+    <string name="home_project_guardian_desc">Бот для поддержания порядка в группах.</string>
+    <string name="home_project_pmx_title">Priority Manager X</string>
+    <string name="home_project_pmx_desc">Управление приоритетами процессов и правила для Windows.</string>
+    <string name="home_project_smarthome_title">Smart Home Hub</string>
+    <string name="home_project_smarthome_desc">Оптимизация и уют для дома через умные технологии.</string>
+    <string name="home_project_fishfinder_title">Fish Finder PRO</string>
+    <string name="home_project_fishfinder_desc">Эхолот для рыбалки на базе Arduino.</string>
     <string name="changelog_title">История версий</string>
     <string name="changelog_empty">История версий недоступна</string>
     <string name="changelog_no_notes">Без описания</string>
@@ -347,6 +374,7 @@
     <string name="easter_profile_mirror_title">Зеркало профиля</string>
     <string name="easter_light_catcher_title">Ловец света</string>
     <string name="easter_postmaster_title">Postmaster</string>
+    <string name="easter_developer_mode_title">Developer Mode</string>
     <string name="easter_theme_flux_title">Маятник</string>
     <string name="light_catcher_title">Ловец света</string>
     <string name="light_catcher_rules">Лови вспыхивающие огоньки, пока не погаснут. Нужно поймать 7 за отведённое время.</string>
@@ -397,6 +425,10 @@
     <string name="easter_postmaster_desc_locked">Секрет спрятан там, где заканчиваются автоматические письма</string>
     <string name="easter_postmaster_hint_unlocked">🎊 Секрет из ящика входящих пойман!</string>
     <string name="easter_postmaster_hint_locked">💡 Подсказка: загляни в письмо о восстановлении пароля…</string>
+    <string name="easter_developer_mode_desc_unlocked">Ты открыл DevTools и поймал бегущую строку в футере</string>
+    <string name="easter_developer_mode_desc_locked">Редкий секрет для самых внимательных</string>
+    <string name="easter_developer_mode_hint_unlocked">🎊 console.log(\"found\") — секрет под капотом!</string>
+    <string name="easter_developer_mode_hint_locked">💡 Подсказка: загляни под капот сайта</string>
     <string name="easter_theme_flux_desc_unlocked">Ты раскачал сайт между светом и тьмой — настроение поймано</string>
     <string name="easter_theme_flux_desc_locked">Секрет для тех, кто не может выбрать одну тему</string>
     <string name="easter_theme_flux_hint_unlocked">🎊 Свет ↔ тьма — и секрет ваш!</string>

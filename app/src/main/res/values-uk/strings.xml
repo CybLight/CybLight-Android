@@ -12,6 +12,9 @@
     <string name="friends">Друзі</string>
     <string name="home">Головна</string>
     <string name="messages">Повідомлення</string>
+    <string name="nav_tab_messages">Чати</string>
+    <string name="nav_tab_security">Безпека</string>
+    <string name="nav_tab_easter">Пасхалки</string>
     <string name="my_friends">Мої друзі</string>
     <string name="no_friends">У вас поки немає друзів</string>
     <string name="no_friends_hint">Знайдіть користувачів і додайте їх у друзі</string>
@@ -25,6 +28,8 @@
     <string name="write_message">Написати</string>
     <string name="message_placeholder">Повідомлення…</string>
     <string name="chat_emoji">Смайлики</string>
+    <string name="chat_emoji_search">Пошук емодзі…</string>
+    <string name="chat_emoji_not_found">Нічого не знайдено</string>
     <string name="chat_link_preview_loading">Завантаження превʼю…</string>
     <string name="chat_pinned_label">Закріплене повідомлення</string>
     <string name="chat_pinned_fallback">Повідомлення</string>
@@ -51,6 +56,7 @@
     <string name="chat_reply_to">Відповідь %1$s</string>
     <string name="chat_reply_you">Ви</string>
     <string name="chat_reply_peer">Співрозмовник</string>
+    <string name="chat_reply_message">Повідомлення</string>
     <string name="chat_editing_message">Редагування</string>
     <string name="chat_edit_placeholder">Змінити повідомлення…</string>
     <string name="chat_edited">змінено</string>
@@ -132,6 +138,27 @@
     <string name="home_news_error">Не вдалося завантажити новини</string>
     <string name="home_projects_empty">Проєкти недоступні</string>
     <string name="home_load_failed">Не вдалося завантажити головну</string>
+    <string-array name="home_whats_new_features">
+        <item>Вкладка «Головна» з новинами та проєктами CybLight</item>
+        <item>Превʼю останніх повідомлень і реакцій у списку чатів</item>
+        <item>Чернетки повідомлень при виході з чату</item>
+        <item>Прогрес пасхалок і картки як на сайті</item>
+        <item>Керування жестами: свайп назад і налаштування</item>
+        <item>Посилання безпеки відкривають login.cyblight.org</item>
+    </string-array>
+    <string name="home_fallback_news_title">Сайт CybLight</string>
+    <string name="home_project_site_title">Сайт CybLight</string>
+    <string name="home_project_site_desc">Мій основний сайт з проєктами, блогом і іграми.</string>
+    <string name="home_project_app_title">Мобільний застосунок CybLight</string>
+    <string name="home_project_app_desc">Офіційний Android-застосунок: акаунт, друзі, повідомлення та безпека.</string>
+    <string name="home_project_guardian_title">Telegram-бот Guardian</string>
+    <string name="home_project_guardian_desc">Бот для підтримання порядку в групах.</string>
+    <string name="home_project_pmx_title">Priority Manager X</string>
+    <string name="home_project_pmx_desc">Керування пріоритетами процесів і правила для Windows.</string>
+    <string name="home_project_smarthome_title">Smart Home Hub</string>
+    <string name="home_project_smarthome_desc">Оптимізація та затишок для дому через розумні технології.</string>
+    <string name="home_project_fishfinder_title">Fish Finder PRO</string>
+    <string name="home_project_fishfinder_desc">Ехолот для риболовлі на базі Arduino.</string>
     <string name="changelog_title">Історія версій</string>
     <string name="changelog_empty">Історія версій недоступна</string>
     <string name="changelog_no_notes">Без опису</string>
@@ -317,6 +344,7 @@
     <string name="easter_profile_mirror_title">Дзеркало профілю</string>
     <string name="easter_light_catcher_title">Ловець світла</string>
     <string name="easter_postmaster_title">Postmaster</string>
+    <string name="easter_developer_mode_title">Developer Mode</string>
     <string name="easter_theme_flux_title">Маятник</string>
     <string name="light_catcher_title">Ловець світла</string>
     <string name="light_catcher_rules">Лови спалахи світла, поки вони не згаснуть. Потрібно зловити 7 за відведений час.</string>
@@ -367,6 +395,10 @@
     <string name="easter_postmaster_desc_locked">Секрет схований там, де закінчуються автоматичні листи</string>
     <string name="easter_postmaster_hint_unlocked">🎊 Секрет з вхідних спіймано!</string>
     <string name="easter_postmaster_hint_locked">💡 Підказка: заглянь у лист про відновлення пароля…</string>
+    <string name="easter_developer_mode_desc_unlocked">Ти відкрив DevTools і спіймав бігучий рядок у футері</string>
+    <string name="easter_developer_mode_desc_locked">Рідкісний секрет для найуважніших</string>
+    <string name="easter_developer_mode_hint_unlocked">🎊 console.log(\"found\") — секрет під капотом!</string>
+    <string name="easter_developer_mode_hint_locked">💡 Підказка: заглянь під капот сайту</string>
     <string name="easter_theme_flux_desc_unlocked">Ти розгойдав сайт між світлом і темрявою — настрій спіймано</string>
     <string name="easter_theme_flux_desc_locked">Секрет для тих, хто не може обрати одну тему</string>
     <string name="easter_theme_flux_hint_unlocked">🎊 Світло ↔ темрява — і секрет ваш!</string>

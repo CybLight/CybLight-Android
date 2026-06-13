@@ -12,6 +12,9 @@
     <string name="friends">Friends</string>
     <string name="home">Home</string>
     <string name="messages">Messages</string>
+    <string name="nav_tab_messages">Chats</string>
+    <string name="nav_tab_security">Security</string>
+    <string name="nav_tab_easter">Easter</string>
     <string name="my_friends">My friends</string>
     <string name="no_friends">You have no friends yet</string>
     <string name="no_friends_hint">Find users and add them as friends</string>
@@ -25,6 +28,8 @@
     <string name="write_message">Message</string>
     <string name="message_placeholder">Message…</string>
     <string name="chat_emoji">Emoji</string>
+    <string name="chat_emoji_search">Search emoji…</string>
+    <string name="chat_emoji_not_found">Nothing found</string>
     <string name="chat_link_preview_loading">Loading preview…</string>
     <string name="chat_pinned_label">Pinned message</string>
     <string name="chat_pinned_fallback">Message</string>
@@ -51,6 +56,7 @@
     <string name="chat_reply_to">Reply to %1$s</string>
     <string name="chat_reply_you">You</string>
     <string name="chat_reply_peer">Contact</string>
+    <string name="chat_reply_message">Message</string>
     <string name="chat_editing_message">Editing</string>
     <string name="chat_edit_placeholder">Edit message…</string>
     <string name="chat_edited">edited</string>
@@ -132,6 +138,27 @@
     <string name="home_news_error">Could not load news</string>
     <string name="home_projects_empty">Projects unavailable</string>
     <string name="home_load_failed">Could not load home</string>
+    <string-array name="home_whats_new_features">
+        <item>Home tab with CybLight news and projects</item>
+        <item>Previews of latest messages and reactions in chat list</item>
+        <item>Message drafts when leaving a chat</item>
+        <item>Easter egg progress and cards like on the website</item>
+        <item>Gesture navigation: swipe back and settings</item>
+        <item>Security links open login.cyblight.org</item>
+    </string-array>
+    <string name="home_fallback_news_title">CybLight website</string>
+    <string name="home_project_site_title">CybLight website</string>
+    <string name="home_project_site_desc">My main site with projects, blog, and games.</string>
+    <string name="home_project_app_title">CybLight Android app</string>
+    <string name="home_project_app_desc">Official Android app: account, friends, messages, and security.</string>
+    <string name="home_project_guardian_title">Telegram bot Guardian</string>
+    <string name="home_project_guardian_desc">Bot for keeping order in group chats.</string>
+    <string name="home_project_pmx_title">Priority Manager X</string>
+    <string name="home_project_pmx_desc">Process priority management and rules for Windows.</string>
+    <string name="home_project_smarthome_title">Smart Home Hub</string>
+    <string name="home_project_smarthome_desc">Comfort and optimization for your home through smart tech.</string>
+    <string name="home_project_fishfinder_title">Fish Finder PRO</string>
+    <string name="home_project_fishfinder_desc">Fish finder for fishing based on Arduino.</string>
     <string name="changelog_title">Version history</string>
     <string name="changelog_empty">Version history unavailable</string>
     <string name="changelog_no_notes">No description</string>
@@ -317,6 +344,7 @@
     <string name="easter_profile_mirror_title">Profile mirror</string>
     <string name="easter_light_catcher_title">Light catcher</string>
     <string name="easter_postmaster_title">Postmaster</string>
+    <string name="easter_developer_mode_title">Developer Mode</string>
     <string name="easter_theme_flux_title">Pendulum</string>
     <string name="light_catcher_title">Light catcher</string>
     <string name="light_catcher_rules">Tap glowing lights before they fade. Catch 7 within the time limit.</string>
@@ -367,6 +395,10 @@
     <string name="easter_postmaster_desc_locked">The secret is hidden where automated emails end</string>
     <string name="easter_postmaster_hint_unlocked">🎊 Inbox secret caught!</string>
     <string name="easter_postmaster_hint_locked">💡 Hint: check the password recovery email…</string>
+    <string name="easter_developer_mode_desc_unlocked">You opened DevTools and caught the footer marquee</string>
+    <string name="easter_developer_mode_desc_locked">A rare secret for the most attentive</string>
+    <string name="easter_developer_mode_hint_unlocked">🎊 console.log(\"found\") — secret under the hood!</string>
+    <string name="easter_developer_mode_hint_locked">💡 Hint: peek under the site hood</string>
     <string name="easter_theme_flux_desc_unlocked">You swung the site between light and dark — mood caught</string>
     <string name="easter_theme_flux_desc_locked">A secret for those who cannot pick just one theme</string>
     <string name="easter_theme_flux_hint_unlocked">🎊 Light ↔ dark — and the secret is yours!</string>

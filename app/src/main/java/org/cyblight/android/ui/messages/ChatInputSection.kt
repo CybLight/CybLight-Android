@@ -7,7 +7,11 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
@@ -88,11 +92,22 @@ fun ChatInputSection(
 
     Column(modifier = modifier.fillMaxWidth()) {
         replyTarget?.let { reply ->
-            ChatComposeBanner(
-                title = stringResource(R.string.chat_reply_to, reply.author),
-                subtitle = reply.preview,
-                onDismiss = onClearReply,
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ChatReplySnippet(
+                    author = stringResource(R.string.chat_reply_to, reply.author),
+                    text = reply.preview.ifBlank { stringResource(R.string.chat_reply_message) },
+                    isOutgoing = false,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onClearReply) {
+                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.cancel))
+                }
+            }
         }
         editTarget?.let {
             ChatComposeBanner(
@@ -250,13 +265,27 @@ private fun FormatButton(
 @Composable
 private fun EmojiPickerContent(onEmojiSelected: (String) -> Unit) {
     var selectedTab by remember { mutableIntStateOf(0) }
+    var searchQuery by remember { mutableStateOf("") }
     val categories = ChatEmojiData.categories
+    val filteredEmojis = remember(searchQuery, selectedTab) {
+        ChatEmojiData.filterEmojis(searchQuery, selectedTab)
+    }
 
     Column(modifier = Modifier.padding(bottom = 24.dp)) {
-        FlowRow(
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text(stringResource(R.string.chat_emoji_search)) },
+            singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
+        )
+
+        FlowRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             ChatEmojiData.quickEmojis.forEach { emoji ->
@@ -270,21 +299,36 @@ private fun EmojiPickerContent(onEmojiSelected: (String) -> Unit) {
             categories.forEachIndexed { index, category ->
                 Tab(
                     selected = selectedTab == index,
-                    onClick = { selectedTab = index },
+                    onClick = {
+                        selectedTab = index
+                        searchQuery = ""
+                    },
                     text = { Text(category.icon) },
                 )
             }
         }
 
-        FlowRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            categories[selectedTab].emojis.forEach { emoji ->
-                TextButton(onClick = { onEmojiSelected(emoji) }) {
-                    Text(emoji, fontSize = 24.sp)
+        if (filteredEmojis.isEmpty()) {
+            Text(
+                text = stringResource(R.string.chat_emoji_not_found),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp),
+            )
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 44.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 340.dp)
+                    .padding(horizontal = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                items(filteredEmojis) { emoji ->
+                    TextButton(onClick = { onEmojiSelected(emoji) }) {
+                        Text(emoji, fontSize = 24.sp)
+                    }
                 }
             }
         }

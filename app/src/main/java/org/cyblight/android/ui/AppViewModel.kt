@@ -443,6 +443,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             sessionManager.saveLocale(locale)
             LocaleManager.apply(locale)
             _uiState.value = _uiState.value.copy(locale = locale)
+            refreshHomeContent()
         }
     }
 
@@ -884,7 +885,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val locale = _uiState.value.locale
             _uiState.value = _uiState.value.copy(isHomeLoading = true, homeError = null)
-            homeContentRepository.loadHomeContent(locale)
+            homeContentRepository.loadHomeContent(getApplication(), locale)
                 .onSuccess { content ->
                     _uiState.value = _uiState.value.copy(
                         homeContent = content,
