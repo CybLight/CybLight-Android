@@ -89,6 +89,12 @@ private object EasterEggPalettes {
         unlockedContent = Color(0xFF80CBC4),
         lockedContent = Color(0xFF90A8A4),
     )
+    val themeFlux = EasterEggPalette(
+        unlockedContainer = Color(0xFF2A3550),
+        lockedContainer = Color(0xFF242830),
+        unlockedContent = Color(0xFFB39DDB),
+        lockedContent = Color(0xFF949AA8),
+    )
     val nightGuard = EasterEggPalette(
         unlockedContainer = Color(0xFF1A2744),
         lockedContainer = Color(0xFF222830),
@@ -293,6 +299,16 @@ private fun EasterEggsContent(
                 descLockedRes = R.string.easter_postmaster_desc_locked,
                 hintUnlockedRes = R.string.easter_postmaster_hint_unlocked,
                 hintLockedRes = R.string.easter_postmaster_hint_locked,
+            ),
+            EasterEggItem(
+                emoji = "🌗",
+                titleRes = R.string.easter_theme_flux_title,
+                unlocked = flags?.themeFlux == true,
+                palette = EasterEggPalettes.themeFlux,
+                descUnlockedRes = R.string.easter_theme_flux_desc_unlocked,
+                descLockedRes = R.string.easter_theme_flux_desc_locked,
+                hintUnlockedRes = R.string.easter_theme_flux_hint_unlocked,
+                hintLockedRes = R.string.easter_theme_flux_hint_locked,
             ),
         )
     }

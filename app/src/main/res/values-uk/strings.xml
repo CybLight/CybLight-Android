@@ -283,6 +283,7 @@
     <string name="easter_profile_mirror_title">Дзеркало профілю</string>
     <string name="easter_light_catcher_title">Ловець світла</string>
     <string name="easter_postmaster_title">Postmaster</string>
+    <string name="easter_theme_flux_title">Маятник</string>
     <string name="light_catcher_title">Ловець світла</string>
     <string name="light_catcher_rules">Лови спалахи світла, поки вони не згаснуть. Потрібно зловити 7 за відведений час.</string>
     <string name="light_catcher_progress">Зловлено: %1$d / %2$d · Залишилось %3$d с</string>
@@ -332,6 +333,10 @@
     <string name="easter_postmaster_desc_locked">Секрет схований там, де закінчуються автоматичні листи</string>
     <string name="easter_postmaster_hint_unlocked">🎊 Секрет з вхідних спіймано!</string>
     <string name="easter_postmaster_hint_locked">💡 Підказка: заглянь у лист про відновлення пароля…</string>
+    <string name="easter_theme_flux_desc_unlocked">Ти розгойдав сайт між світлом і темрявою — настрій спіймано</string>
+    <string name="easter_theme_flux_desc_locked">Секрет для тих, хто не може обрати одну тему</string>
+    <string name="easter_theme_flux_hint_unlocked">🎊 Світло ↔ темрява — і секрет ваш!</string>
+    <string name="easter_theme_flux_hint_locked">💡 Підказка: розгойдай настрій сайту — світло, темрява, світло…</string>
     <string name="error_load_easter">Не вдалося завантажити пасхалки</string>
     <string name="profile_title">Мій профіль</string>
     <string name="profile_verified">Підтверджений акаунт</string>

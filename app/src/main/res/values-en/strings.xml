@@ -283,6 +283,7 @@
     <string name="easter_profile_mirror_title">Profile mirror</string>
     <string name="easter_light_catcher_title">Light catcher</string>
     <string name="easter_postmaster_title">Postmaster</string>
+    <string name="easter_theme_flux_title">Pendulum</string>
     <string name="light_catcher_title">Light catcher</string>
     <string name="light_catcher_rules">Tap glowing lights before they fade. Catch 7 within the time limit.</string>
     <string name="light_catcher_progress">Caught: %1$d / %2$d · %3$d s left</string>
@@ -332,6 +333,10 @@
     <string name="easter_postmaster_desc_locked">The secret is hidden where automated emails end</string>
     <string name="easter_postmaster_hint_unlocked">🎊 Inbox secret caught!</string>
     <string name="easter_postmaster_hint_locked">💡 Hint: check the password recovery email…</string>
+    <string name="easter_theme_flux_desc_unlocked">You swung the site between light and dark — mood caught</string>
+    <string name="easter_theme_flux_desc_locked">A secret for those who cannot pick just one theme</string>
+    <string name="easter_theme_flux_hint_unlocked">🎊 Light ↔ dark — and the secret is yours!</string>
+    <string name="easter_theme_flux_hint_locked">💡 Hint: rock the site mood — light, dark, light…</string>
     <string name="error_load_easter">Failed to load easter eggs</string>
     <string name="profile_title">My profile</string>
     <string name="profile_verified">Verified account</string>

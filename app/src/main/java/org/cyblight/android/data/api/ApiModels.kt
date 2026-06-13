@@ -167,6 +167,7 @@ data class EasterFlagsDto(
     @SerializedName("lightCatcher") val lightCatcher: Boolean = false,
     val postmaster: Boolean = false,
     @SerializedName("developerMode") val developerMode: Boolean = false,
+    @SerializedName("themeFlux") val themeFlux: Boolean = false,
     @SerializedName("nightGuard") val nightGuard: Boolean = false,
     @SerializedName("trustedFingerprint") val trustedFingerprint: Boolean = false,
     val bridge: Boolean = false,
