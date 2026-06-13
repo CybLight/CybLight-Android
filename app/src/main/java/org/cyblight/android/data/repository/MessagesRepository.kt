@@ -176,7 +176,7 @@ class MessagesRepository(
         }
     }
 
-    suspend fun sendMessage(recipientId: String, content: String): Result<Unit> {
+    suspend fun sendMessage(recipientId: String, content: String): Result<String?> {
         val trimmed = content.trim()
         if (trimmed.isEmpty()) return Result.failure(Exception("empty_message"))
 
@@ -194,10 +194,9 @@ class MessagesRepository(
                 ),
             )
             if (response.ok) {
-                response.message?.id?.let { messageId ->
-                    signalCrypto.cacheSentPlaintext(userId, messageId, trimmed)
-                }
-                Result.success(Unit)
+                val messageId = response.message?.id?.trim().orEmpty().ifBlank { null }
+                messageId?.let { signalCrypto.cacheSentPlaintext(userId, it, trimmed) }
+                Result.success(messageId)
             } else {
                 Result.failure(Exception(response.error ?: "send_failed"))
             }

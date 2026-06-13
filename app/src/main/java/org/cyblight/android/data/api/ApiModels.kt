@@ -490,6 +490,7 @@ data class SendMessageResponse(
 )
 
 data class SentMessageDto(
-    val id: String,
+    @SerializedName(value = "id", alternate = ["message_id"])
+    val id: String = "",
     @SerializedName("created_at") val createdAt: Long? = null,
 )

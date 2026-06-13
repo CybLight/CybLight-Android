@@ -1817,33 +1817,56 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSending = true, messagesError = null)
-            val action = if (editTarget != null) {
+            if (editTarget != null) {
                 messagesRepository.editMessage(editTarget.messageId, friendId, finalContent)
-            } else {
-                messagesRepository.sendMessage(friendId, finalContent)
+                    .onSuccess {
+                        reloadChat(friendId)
+                        markArchivistAction(friendId) { it.edited = true }
+                        _uiState.value = _uiState.value.copy(
+                            isSending = false,
+                            chatReplyTarget = null,
+                            chatEditTarget = null,
+                            chatDraftText = _uiState.value.chatDraftText,
+                        )
+                    }
+                    .onFailure {
+                        _uiState.value = _uiState.value.copy(
+                            isSending = false,
+                            messagesError = "edit_failed",
+                        )
+                    }
+                return@launch
             }
-            action
-                .onSuccess {
-                    if (editTarget == null) {
-                        appPreferences.setChatDraft(friendId, "")
+
+            messagesRepository.sendMessage(friendId, finalContent)
+                .onSuccess { sentMessageId ->
+                    appPreferences.setChatDraft(friendId, "")
+                    val userId = sessionManager.getUserId().orEmpty()
+                    if (sentMessageId != null && userId.isNotBlank()) {
+                        val optimisticMessage = MessageDto(
+                            id = sentMessageId,
+                            senderId = userId,
+                            content = finalContent,
+                            encryption = "signal_v1",
+                            createdAt = System.currentTimeMillis(),
+                        )
+                        _uiState.value = _uiState.value.copy(
+                            chatMessages = _uiState.value.chatMessages + optimisticMessage,
+                        )
                     }
                     reloadChat(friendId)
-                    if (editTarget != null) {
-                        markArchivistAction(friendId) { it.edited = true }
-                    } else {
-                        maybeUnlockEchoEaster()
-                    }
+                    maybeUnlockEchoEaster()
                     _uiState.value = _uiState.value.copy(
                         isSending = false,
                         chatReplyTarget = null,
                         chatEditTarget = null,
-                        chatDraftText = if (editTarget == null) "" else _uiState.value.chatDraftText,
+                        chatDraftText = "",
                     )
                 }
                 .onFailure {
                     _uiState.value = _uiState.value.copy(
                         isSending = false,
-                        messagesError = if (editTarget != null) "edit_failed" else "send_failed",
+                        messagesError = "send_failed",
                     )
                 }
         }
