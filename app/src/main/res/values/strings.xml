@@ -172,12 +172,12 @@
     <string name="home_projects_empty">Проекты недоступны</string>
     <string name="home_load_failed">Не удалось загрузить главную</string>
     <string-array name="home_whats_new_features">
+        <item>Сквозное шифрование сообщений (Signal Protocol)</item>
+        <item>Кнопка регистрации на экране входа</item>
+        <item>Вставка логина и пароля из буфера обмена</item>
         <item>Ответы на сообщения с цитатой, как на сайте</item>
         <item>Больше эмодзи в чате — набор как в Telegram</item>
-        <item>Пасхалка Developer Mode в списке приложения</item>
-        <item>Вкладка «Главная» с новостями и проектами CybLight</item>
-        <item>Превью последних сообщений и реакций в списке чатов</item>
-        <item>Черновики сообщений при выходе из чата</item>
+        <item>Превью последних сообщений в списке чатов</item>
     </string-array>
     <string name="home_fallback_news_title">Сайт CybLight</string>
     <string name="home_project_site_title">Сайт CybLight</string>
