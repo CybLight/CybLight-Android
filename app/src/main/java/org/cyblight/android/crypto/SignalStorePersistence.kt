@@ -182,6 +182,53 @@ class SignalStorePersistence(context: Context) {
     fun hasLocalPreKey(ctx: SignalStoreContext, keyId: Int): Boolean =
         ctx.store.containsPreKey(keyId)
 
+    fun readManifest(userId: String): SignalStoreManifest? {
+        val manifestJson = prefs.getString(manifestKey(userId), null) ?: return null
+        return runCatching { gson.fromJson(manifestJson, SignalStoreManifest::class.java) }.getOrNull()
+    }
+
+    fun writeManifest(userId: String, manifest: SignalStoreManifest) {
+        prefs.edit().putString(manifestKey(userId), gson.toJson(manifest)).apply()
+    }
+
+    fun readPreKeyRecord(userId: String, keyId: Int): String? =
+        prefs.getString(recordKey(userId, "prekey", keyId), null)
+
+    fun readSignedPreKeyRecord(userId: String, keyId: Int): String? =
+        prefs.getString(recordKey(userId, "signed", keyId), null)
+
+    fun readKyberPreKeyRecord(userId: String, keyId: Int): String? =
+        prefs.getString(recordKey(userId, "kyber", keyId), null)
+
+    fun readSessionRecord(userId: String, sessionKey: String): String? =
+        prefs.getString(sessionKey(userId, sessionKey), null)
+
+    fun writePreKeyRecord(userId: String, keyId: String, value: String) {
+        val id = keyId.toIntOrNull() ?: return
+        prefs.edit().putString(recordKey(userId, "prekey", id), value).apply()
+    }
+
+    fun writeSignedPreKeyRecord(userId: String, keyId: String, value: String) {
+        val id = keyId.toIntOrNull() ?: return
+        prefs.edit().putString(recordKey(userId, "signed", id), value).apply()
+    }
+
+    fun writeKyberPreKeyRecord(userId: String, keyId: String, value: String) {
+        val id = keyId.toIntOrNull() ?: return
+        prefs.edit().putString(recordKey(userId, "kyber", id), value).apply()
+    }
+
+    fun writeSessionRecord(userId: String, sessionKey: String, value: String) {
+        prefs.edit().putString(sessionKey(userId, sessionKey), value).apply()
+    }
+
+    fun clearUser(userId: String) {
+        val editor = prefs.edit()
+        val prefix = "signal_${userId}_"
+        prefs.all.keys.filter { it.startsWith(prefix) }.forEach(editor::remove)
+        editor.apply()
+    }
+
     private fun readRecord(userId: String, kind: String, keyId: Int): ByteArray? =
         prefs.getString(recordKey(userId, kind, keyId), null)?.let(::base64Decode)
 

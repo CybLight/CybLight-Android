@@ -17,6 +17,36 @@ class DecryptCache(context: Context) {
             .commit()
     }
 
+    fun readAllForUser(userId: String): Map<String, String> {
+        val prefix = "decrypt_${userId}_"
+        val out = linkedMapOf<String, String>()
+        prefs.all.forEach { (key, value) ->
+            if (key.startsWith(prefix) && value is String) {
+                out[key.removePrefix(prefix)] = value
+            }
+        }
+        return out
+    }
+
+    fun clearUser(userId: String) {
+        val prefix = "decrypt_${userId}_"
+        val editor = prefs.edit()
+        prefs.all.keys.filter { it.startsWith(prefix) }.forEach(editor::remove)
+        editor.commit()
+    }
+
+    fun replaceAllForUser(userId: String, entries: Map<String, String>) {
+        clearUser(userId)
+        if (entries.isEmpty()) return
+        val editor = prefs.edit()
+        entries.forEach { (messageId, plaintext) ->
+            if (messageId.isNotBlank()) {
+                editor.putString(cacheKey(userId, messageId), plaintext)
+            }
+        }
+        editor.commit()
+    }
+
     private fun cacheKey(userId: String, messageId: String): String =
         "decrypt_${userId}_$messageId"
 

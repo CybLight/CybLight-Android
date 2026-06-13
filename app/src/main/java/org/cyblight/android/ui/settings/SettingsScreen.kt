@@ -105,6 +105,10 @@ fun SettingsScreen(
     onSwipeBackSensitivitySelected: (SwipeBackSensitivity) -> Unit,
     onSwipeBackEdgeWidthSelected: (SwipeBackEdgeWidth) -> Unit,
     onRootBackBehaviorSelected: (RootBackBehavior) -> Unit,
+    accountLogin: String,
+    onCreateSignalBackup: suspend (password: String) -> Result<String>,
+    onRestoreSignalBackup: suspend (content: String, password: String) -> Result<Unit>,
+    signalBackupErrorMessage: (String) -> String,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -505,6 +509,13 @@ fun SettingsScreen(
                         enableLockAfterPinSetup = false
                         showPinSetup = true
                     },
+            )
+
+            SignalBackupSection(
+                accountLogin = accountLogin,
+                onCreateBackup = onCreateSignalBackup,
+                onRestoreBackup = onRestoreSignalBackup,
+                backupErrorMessage = signalBackupErrorMessage,
             )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))

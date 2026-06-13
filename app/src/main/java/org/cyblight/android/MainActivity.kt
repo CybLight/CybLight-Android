@@ -249,6 +249,10 @@ class MainActivity : AppCompatActivity() {
                                 onSwipeBackSensitivitySelected = viewModel::setSwipeBackSensitivity,
                                 onSwipeBackEdgeWidthSelected = viewModel::setSwipeBackEdgeWidth,
                                 onRootBackBehaviorSelected = viewModel::setRootBackBehavior,
+                                accountLogin = uiState.user?.login.orEmpty().ifBlank { "user" },
+                                onCreateSignalBackup = viewModel::createSignalBackup,
+                                onRestoreSignalBackup = viewModel::restoreSignalBackup,
+                                signalBackupErrorMessage = viewModel::signalBackupErrorMessage,
                             )
                         }
                         DetailScreen.Help -> {

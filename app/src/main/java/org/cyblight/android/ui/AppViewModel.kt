@@ -40,6 +40,7 @@ import org.cyblight.android.data.home.ChangelogRelease
 import org.cyblight.android.data.home.HomeContent
 import org.cyblight.android.data.home.HomeContentRepository
 import org.cyblight.android.crypto.SignalCryptoManager
+import org.cyblight.android.crypto.backup.CyblightBackupManager
 import org.cyblight.android.data.repository.AuthRepository
 import org.cyblight.android.data.repository.AuthResult
 import org.cyblight.android.data.repository.SessionRefreshResult
@@ -200,6 +201,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val authRepository = AuthRepository(api, sessionManager)
     private val friendsRepository = FriendsRepository(api)
     private val signalCrypto = SignalCryptoManager(application, api)
+    private val backupManager = CyblightBackupManager(application)
     private val messagesRepository = MessagesRepository(api, signalCrypto) {
         sessionManager.getUserId()
     }
@@ -1028,6 +1030,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(rootBackBehavior = behavior)
         }
     }
+
+    suspend fun createSignalBackup(password: String): Result<String> = runCatching {
+        val userId = sessionManager.getUserId().orEmpty()
+        if (userId.isBlank()) throw IllegalArgumentException("backup_user_missing")
+        backupManager.createBackupFile(userId, password)
+    }
+
+    suspend fun restoreSignalBackup(content: String, password: String): Result<Unit> = runCatching {
+        val userId = sessionManager.getUserId().orEmpty()
+        if (userId.isBlank()) throw IllegalArgumentException("backup_user_missing")
+        backupManager.importBackupFile(userId, content, password)
+    }
+
+    fun signalBackupErrorMessage(code: String): String = backupManager.errorMessage(code)
 
     fun refreshSessions() {
         loadSessions()
