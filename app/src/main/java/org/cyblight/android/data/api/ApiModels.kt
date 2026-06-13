@@ -445,6 +445,9 @@ data class MessageDto(
     @SerializedName(value = "senderId", alternate = ["sender_id"])
     val senderId: String = "",
     val content: String = "",
+    val encryption: String = "plaintext",
+    @SerializedName("signalType") val signalType: Int? = null,
+    @SerializedName("registrationId") val registrationId: Int? = null,
     @SerializedName(value = "createdAt", alternate = ["created_at"])
     val createdAt: Long = 0L,
     @SerializedName(value = "readAt", alternate = ["read_at"])
@@ -456,6 +459,8 @@ data class MessageDto(
 
 data class EditMessageRequest(
     val content: String,
+    @SerializedName("signalType") val signalType: Int,
+    @SerializedName("registrationId") val registrationId: Int,
 )
 
 data class PinMessageRequest(
@@ -474,6 +479,8 @@ data class MessageActionResponse(
 data class SendMessageRequest(
     @SerializedName("recipientId") val recipientId: String,
     val content: String,
+    @SerializedName("signalType") val signalType: Int,
+    @SerializedName("registrationId") val registrationId: Int,
 )
 
 data class SendMessageResponse(

@@ -39,7 +39,7 @@ import org.cyblight.android.data.preferences.ThemeMode
 import org.cyblight.android.data.home.ChangelogRelease
 import org.cyblight.android.data.home.HomeContent
 import org.cyblight.android.data.home.HomeContentRepository
-import org.cyblight.android.data.repository.AuthRepository
+import org.cyblight.android.crypto.SignalCryptoManager
 import org.cyblight.android.data.repository.AuthResult
 import org.cyblight.android.data.repository.SessionRefreshResult
 import org.cyblight.android.data.repository.ConversationPreview
@@ -198,7 +198,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val api = ApiClient.create(sessionManager)
     private val authRepository = AuthRepository(api, sessionManager)
     private val friendsRepository = FriendsRepository(api)
-    private val messagesRepository = MessagesRepository(api)
+    private val signalCrypto = SignalCryptoManager(application, api)
+    private val messagesRepository = MessagesRepository(api, signalCrypto) {
+        sessionManager.getUserId()
+    }
     private val profileRepository = ProfileRepository(api)
     private val sessionsRepository = SessionsRepository(api)
     private val securityRepository = SecurityRepository(api)
@@ -273,6 +276,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 if (user != null) {
+                    runCatching { messagesRepository.ensureSignalKeys(user.id) }
+                        .onFailure { error ->
+                            android.util.Log.e("SignalCrypto", "Key registration failed", error)
+                        }
                     when (authRepository.refreshSession()) {
                         SessionRefreshResult.Expired -> forceLogout()
                         else -> {
@@ -627,6 +634,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun onAuthenticated() {
         skipAppLockOnce = true
         viewModelScope.launch {
+            _uiState.value.user?.id?.let { userId ->
+                runCatching { messagesRepository.ensureSignalKeys(userId) }
+                    .onFailure { error ->
+                        android.util.Log.e("SignalCrypto", "Key registration failed", error)
+                    }
+            }
             loginNotificationMonitor.markOwnLoginGracePeriod()
             messageNotificationMonitor.syncBaselineFromServer()
             LoginNotificationWorker.schedule(getApplication())
@@ -644,6 +657,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun openAccountSecurity(context: Context) {
         val locale = _uiState.value.locale
         ExternalLinks.openUrl(context, "${BuildConfig.LOGIN_URL}/$locale/account-security/")
+    }
+
+    fun openSignup(context: Context) {
+        val locale = _uiState.value.locale
+        ExternalLinks.openUrl(context, "${BuildConfig.LOGIN_URL}/$locale/signup")
     }
 
     fun openPasskeys() {
@@ -1799,7 +1817,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSending = true, messagesError = null)
             val action = if (editTarget != null) {
-                messagesRepository.editMessage(editTarget.messageId, finalContent)
+                messagesRepository.editMessage(editTarget.messageId, friendId, finalContent)
             } else {
                 messagesRepository.sendMessage(friendId, finalContent)
             }

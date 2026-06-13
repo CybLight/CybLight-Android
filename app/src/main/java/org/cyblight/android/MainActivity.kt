@@ -407,6 +407,7 @@ class MainActivity : AppCompatActivity() {
                                 onPasskeyLogin = { login ->
                                     viewModel.loginWithPasskey(this@MainActivity, login)
                                 },
+                                onRegister = { viewModel.openSignup(context) },
                             )
                         }
                         AppScreen.TwoFactor -> {

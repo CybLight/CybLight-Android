@@ -3,11 +3,14 @@
     <string name="app_name">CybLight</string>
     <string name="app_tagline">Вхід до облікового запису CybLight</string>
     <string name="sign_in">Увійти</string>
+    <string name="login_not_with_us">Ти ще не з нами?</string>
+    <string name="login_sign_up">Реєструйся!</string>
     <string name="signing_in">Входжу…</string>
     <string name="username">Логін</string>
     <string name="password">Пароль</string>
     <string name="show_password">Показати пароль</string>
     <string name="hide_password">Приховати пароль</string>
+    <string name="paste_from_clipboard">Вставити з буфера обміну</string>
     <string name="turnstile_hint">Підтвердь, що ти не робот (Turnstile).</string>
     <string name="friends">Друзі</string>
     <string name="home">Головна</string>

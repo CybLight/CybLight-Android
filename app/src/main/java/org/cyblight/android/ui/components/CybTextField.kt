@@ -2,8 +2,10 @@
 
 package org.cyblight.android.ui.components
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Icon
@@ -28,6 +30,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalAutofill
 import androidx.compose.ui.platform.LocalAutofillTree
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -55,8 +58,10 @@ fun CybOutlinedTextField(
     visualTransformation: VisualTransformation = VisualTransformation.None,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     showPasswordToggle: Boolean = false,
+    showPasteFromClipboard: Boolean = false,
     autofillType: CybAutofillType? = null,
 ) {
+    val clipboardManager = LocalClipboardManager.current
     val autofillTypes = autofillType?.let { listOf(it.toAutofillType()) } ?: emptyList()
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
     val resolvedTransformation = when {
@@ -130,20 +135,43 @@ fun CybOutlinedTextField(
         keyboardOptions = keyboardOptions,
         modifier = modifier.then(autofillModifier),
         colors = colors,
-        trailingIcon = if (showPasswordToggle) {
+        trailingIcon = if (showPasteFromClipboard || showPasswordToggle) {
             {
-                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                    Icon(
-                        imageVector = if (passwordVisible) {
-                            Icons.Outlined.VisibilityOff
-                        } else {
-                            Icons.Outlined.Visibility
-                        },
-                        contentDescription = stringResource(
-                            if (passwordVisible) R.string.hide_password else R.string.show_password,
-                        ),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                Row {
+                    if (showPasteFromClipboard) {
+                        IconButton(
+                            onClick = {
+                                val pasted = clipboardManager.getText()?.text
+                                    ?.trim()
+                                    ?.replace(Regex("""[\r\n]+"""), "")
+                                    .orEmpty()
+                                if (pasted.isNotEmpty()) {
+                                    onValueChange(pasted)
+                                }
+                            },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.ContentPaste,
+                                contentDescription = stringResource(R.string.paste_from_clipboard),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    if (showPasswordToggle) {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                imageVector = if (passwordVisible) {
+                                    Icons.Outlined.VisibilityOff
+                                } else {
+                                    Icons.Outlined.Visibility
+                                },
+                                contentDescription = stringResource(
+                                    if (passwordVisible) R.string.hide_password else R.string.show_password,
+                                ),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
             }
         } else {

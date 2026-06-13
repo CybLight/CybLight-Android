@@ -1,12 +1,14 @@
 package org.cyblight.android.data.repository
 
+import org.cyblight.android.crypto.SignalCryptoManager
 import org.cyblight.android.data.api.CybLightApi
-import org.cyblight.android.data.api.FriendDto
 import org.cyblight.android.data.api.EditMessageRequest
+import org.cyblight.android.data.api.FriendDto
 import org.cyblight.android.data.api.MessageDto
 import org.cyblight.android.data.api.PinnedMessageDto
 import org.cyblight.android.data.api.PinMessageRequest
 import org.cyblight.android.data.api.ReactMessageRequest
+import org.cyblight.android.data.api.SendMessageRequest
 import org.cyblight.android.data.api.UnpinMessageRequest
 
 data class ConversationPreview(
@@ -21,7 +23,11 @@ data class ChatThread(
     val pinned: PinnedMessageDto?,
 )
 
-class MessagesRepository(private val api: CybLightApi) {
+class MessagesRepository(
+    private val api: CybLightApi,
+    private val signalCrypto: SignalCryptoManager,
+    private val userIdProvider: suspend () -> String?,
+) {
     suspend fun loadConversations(friends: List<FriendDto>): Result<List<ConversationPreview>> {
         return try {
             val unread = api.unreadSummary()
@@ -51,12 +57,33 @@ class MessagesRepository(private val api: CybLightApi) {
 
     suspend fun loadMessages(friendId: String): Result<ChatThread> {
         return try {
+            val userId = userIdProvider()?.trim().orEmpty()
+            if (userId.isBlank()) return Result.failure(Exception("not_authenticated"))
+
             val response = api.messages(friendId)
             if (response.ok) {
+                val normalized = MessageNormalizer.normalize(response.messages)
+                val decrypted = signalCrypto.decryptMessages(userId, normalized)
+                val pinned = response.pinned?.takeIf { it.messageId.isNotBlank() && it.content.isNotBlank() }
+                    ?.let { pin ->
+                        val source = normalized.find { it.id == pin.messageId }
+                        val decryptedContent = runCatching {
+                            signalCrypto.decryptMessage(
+                                userId,
+                                source ?: MessageDto(
+                                    senderId = pin.senderId,
+                                    content = pin.content,
+                                    encryption = "signal_v1",
+                                ),
+                            )
+                        }.getOrElse { "🔒 Закреплённое сообщение" }
+                        pin.copy(content = decryptedContent)
+                    }
+
                 Result.success(
                     ChatThread(
-                        messages = MessageNormalizer.normalize(response.messages),
-                        pinned = response.pinned?.takeIf { it.messageId.isNotBlank() && it.content.isNotBlank() },
+                        messages = decrypted,
+                        pinned = pinned,
                     ),
                 )
             } else {
@@ -67,12 +94,23 @@ class MessagesRepository(private val api: CybLightApi) {
         }
     }
 
-    suspend fun editMessage(messageId: String, content: String): Result<Unit> {
+    suspend fun editMessage(messageId: String, recipientId: String, content: String): Result<Unit> {
         val trimmed = content.trim()
         if (trimmed.isEmpty()) return Result.failure(Exception("empty_message"))
 
         return try {
-            val response = api.editMessage(messageId, EditMessageRequest(trimmed))
+            val userId = userIdProvider()?.trim().orEmpty()
+            if (userId.isBlank()) return Result.failure(Exception("not_authenticated"))
+
+            val encrypted = signalCrypto.encryptMessage(userId, recipientId, trimmed)
+            val response = api.editMessage(
+                messageId,
+                EditMessageRequest(
+                    content = encrypted.content,
+                    signalType = encrypted.signalType,
+                    registrationId = encrypted.registrationId,
+                ),
+            )
             if (response.ok) Result.success(Unit) else Result.failure(Exception(response.error ?: "edit_failed"))
         } catch (e: Exception) {
             Result.failure(e)
@@ -140,10 +178,16 @@ class MessagesRepository(private val api: CybLightApi) {
         if (trimmed.isEmpty()) return Result.failure(Exception("empty_message"))
 
         return try {
+            val userId = userIdProvider()?.trim().orEmpty()
+            if (userId.isBlank()) return Result.failure(Exception("not_authenticated"))
+
+            val encrypted = signalCrypto.encryptMessage(userId, recipientId, trimmed)
             val response = api.sendMessage(
-                org.cyblight.android.data.api.SendMessageRequest(
+                SendMessageRequest(
                     recipientId = recipientId,
-                    content = trimmed,
+                    content = encrypted.content,
+                    signalType = encrypted.signalType,
+                    registrationId = encrypted.registrationId,
                 ),
             )
             if (response.ok) {
@@ -154,5 +198,9 @@ class MessagesRepository(private val api: CybLightApi) {
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    suspend fun ensureSignalKeys(userId: String) {
+        signalCrypto.ensureRegistered(userId)
     }
 }

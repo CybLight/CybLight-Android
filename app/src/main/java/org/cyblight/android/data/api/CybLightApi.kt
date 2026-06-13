@@ -108,6 +108,18 @@ interface CybLightApi {
         @Body body: UnpinMessageRequest,
     ): MessageActionResponse
 
+    @GET("crypto/keys/status")
+    suspend fun signalKeyStatus(): SignalKeyStatusResponse
+
+    @POST("crypto/keys/register")
+    suspend fun registerSignalKeys(@Body body: SignalRegisterKeysRequest): SignalKeyActionResponse
+
+    @POST("crypto/keys/prekeys")
+    suspend fun replenishSignalPreKeys(@Body body: SignalReplenishPreKeysRequest): SignalKeyActionResponse
+
+    @GET("crypto/keys/bundle/{userId}")
+    suspend fun signalKeyBundle(@Path("userId") userId: String): SignalKeyBundleResponse
+
     @POST("auth/passkey/login/options")
     suspend fun passkeyLoginOptions(@Body body: PasskeyOptionsRequest): PasskeyOptionsResponse
 

@@ -50,6 +50,7 @@ fun LoginScreen(
     onDonate: () -> Unit,
     onLogin: (login: String, password: String, turnstileToken: String) -> Unit,
     onPasskeyLogin: (login: String?) -> Unit,
+    onRegister: () -> Unit,
 ) {
     var login by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
@@ -106,6 +107,7 @@ fun LoginScreen(
             onValueChange = { login = it },
             label = stringResource(R.string.username),
             autofillType = CybAutofillType.Username,
+            showPasteFromClipboard = true,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(modifier = Modifier.height(12.dp))
@@ -115,6 +117,7 @@ fun LoginScreen(
             label = stringResource(R.string.password),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             showPasswordToggle = true,
+            showPasteFromClipboard = true,
             autofillType = CybAutofillType.Password,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -162,6 +165,21 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(stringResource(R.string.sign_in_passkey))
             }
+        }
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        Text(
+            text = stringResource(R.string.login_not_with_us),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        OutlinedButton(
+            onClick = onRegister,
+            enabled = !isSubmitting,
+        ) {
+            Text(stringResource(R.string.login_sign_up))
         }
     }
 }
@@ -216,6 +234,7 @@ fun TwoFactorScreen(
             value = code,
             onValueChange = { code = it },
             label = stringResource(R.string.two_factor_code),
+            showPasteFromClipboard = true,
             modifier = Modifier.fillMaxWidth(),
         )
         Row(

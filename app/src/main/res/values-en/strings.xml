@@ -3,11 +3,14 @@
     <string name="app_name">CybLight</string>
     <string name="app_tagline">Sign in to CybLight</string>
     <string name="sign_in">Sign in</string>
+    <string name="login_not_with_us">Not with us yet?</string>
+    <string name="login_sign_up">Sign up!</string>
     <string name="signing_in">Signing in…</string>
     <string name="username">Username</string>
     <string name="password">Password</string>
     <string name="show_password">Show password</string>
     <string name="hide_password">Hide password</string>
+    <string name="paste_from_clipboard">Paste from clipboard</string>
     <string name="turnstile_hint">Confirm you are not a robot (Turnstile).</string>
     <string name="friends">Friends</string>
     <string name="home">Home</string>
