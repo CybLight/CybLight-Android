@@ -3,6 +3,7 @@ package org.cyblight.android.ui.messages
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +35,7 @@ fun MessagesScreen(
     onRefresh: () -> Unit,
     onOpenChat: (friendId: String, username: String) -> Unit,
     onOpenProfile: (username: String) -> Unit,
+    onOpenSecurityBackup: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when {
@@ -51,31 +53,59 @@ fun MessagesScreen(
             Column(
                 modifier = modifier
                     .fillMaxSize()
-                    .clickable { onRefresh() }
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(stringResource(R.string.error_load_messages), color = MaterialTheme.colorScheme.error)
+                EncryptionReminderBanner(
+                    compact = false,
+                    onOpenSecurityBackup = onOpenSecurityBackup,
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable { onRefresh() },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(stringResource(R.string.error_load_messages), color = MaterialTheme.colorScheme.error)
+                }
             }
         }
         conversations.isEmpty() -> {
             Column(
                 modifier = modifier
                     .fillMaxSize()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("💬", style = MaterialTheme.typography.displaySmall)
-                Text(stringResource(R.string.no_conversations), style = MaterialTheme.typography.titleMedium)
+                EncryptionReminderBanner(
+                    compact = false,
+                    onOpenSecurityBackup = onOpenSecurityBackup,
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text("💬", style = MaterialTheme.typography.displaySmall)
+                    Text(stringResource(R.string.no_conversations), style = MaterialTheme.typography.titleMedium)
+                }
             }
         }
         else -> {
             LazyColumn(
                 modifier = modifier.fillMaxSize(),
+                contentPadding = PaddingValues(vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                item(key = "encryption-reminder") {
+                    EncryptionReminderBanner(
+                        compact = false,
+                        onOpenSecurityBackup = onOpenSecurityBackup,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
                 items(conversations, key = { it.friend.id }) { preview ->
                     ConversationCard(
                         preview = preview,

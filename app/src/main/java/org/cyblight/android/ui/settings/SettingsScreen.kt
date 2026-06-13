@@ -11,8 +11,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -110,6 +113,8 @@ fun SettingsScreen(
     onRestoreSignalBackup: suspend (content: String, password: String) -> Result<Unit>,
     signalBackupErrorMessage: (String) -> String,
     onPickBackupFile: (onPicked: (String) -> Unit) -> Unit,
+    focusSignalBackup: Boolean = false,
+    onSignalBackupFocused: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -126,6 +131,15 @@ fun SettingsScreen(
     var versionTapCount by remember { mutableStateOf(0) }
     var showPinSetup by remember { mutableStateOf(false) }
     var enableLockAfterPinSetup by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
+    var signalBackupScrollY by remember { mutableStateOf(0) }
+
+    LaunchedEffect(focusSignalBackup, signalBackupScrollY) {
+        if (focusSignalBackup && signalBackupScrollY > 0) {
+            scrollState.animateScrollTo(signalBackupScrollY)
+            onSignalBackupFocused()
+        }
+    }
 
     if (showPinSetup) {
         PinSetupDialog(
@@ -190,7 +204,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(scrollState),
         ) {
             ListItem(
                 headlineContent = { Text(stringResource(R.string.menu_help)) },
@@ -512,13 +526,19 @@ fun SettingsScreen(
                     },
             )
 
-            SignalBackupSection(
-                accountLogin = accountLogin,
-                onCreateBackup = onCreateSignalBackup,
-                onRestoreBackup = onRestoreSignalBackup,
-                backupErrorMessage = signalBackupErrorMessage,
-                onPickBackupFile = onPickBackupFile,
-            )
+            Box(
+                modifier = Modifier.onGloballyPositioned { coordinates ->
+                    signalBackupScrollY = coordinates.positionInParent().y.toInt()
+                },
+            ) {
+                SignalBackupSection(
+                    accountLogin = accountLogin,
+                    onCreateBackup = onCreateSignalBackup,
+                    onRestoreBackup = onRestoreSignalBackup,
+                    backupErrorMessage = signalBackupErrorMessage,
+                    onPickBackupFile = onPickBackupFile,
+                )
+            }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 

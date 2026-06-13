@@ -192,6 +192,8 @@ data class AppUiState(
     val swipeBackSensitivity: SwipeBackSensitivity = SwipeBackSensitivity.NORMAL,
     val swipeBackEdgeWidth: SwipeBackEdgeWidth = SwipeBackEdgeWidth.NORMAL,
     val rootBackBehavior: RootBackBehavior = RootBackBehavior.HOME_THEN_EXIT,
+    val encryptionReminderChatDismissed: Boolean = false,
+    val settingsFocusSignalBackup: Boolean = false,
 )
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -253,6 +255,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val swipeBackSensitivity = appPreferences.getSwipeBackSensitivity()
                 val swipeBackEdgeWidth = appPreferences.getSwipeBackEdgeWidth()
                 val rootBackBehavior = appPreferences.getRootBackBehavior()
+                val encryptionReminderChatDismissed = appPreferences.getEncryptionReminderChatDismissed()
                 LocaleManager.apply(savedLocale)
                 _uiState.value = _uiState.value.copy(
                     locale = savedLocale,
@@ -269,6 +272,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     swipeBackSensitivity = swipeBackSensitivity,
                     swipeBackEdgeWidth = swipeBackEdgeWidth,
                     rootBackBehavior = rootBackBehavior,
+                    encryptionReminderChatDismissed = encryptionReminderChatDismissed,
                 )
 
                 val user = authRepository.restoreSession()
@@ -495,7 +499,32 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openSettings() {
-        _uiState.value = _uiState.value.copy(detailScreen = DetailScreen.Settings)
+        _uiState.value = _uiState.value.copy(
+            detailScreen = DetailScreen.Settings,
+            settingsFocusSignalBackup = false,
+        )
+    }
+
+    fun openSecurityBackup() {
+        if (_uiState.value.chatFriendId != null) {
+            closeChat()
+        }
+        _uiState.value = _uiState.value.copy(
+            detailScreen = DetailScreen.Settings,
+            settingsFocusSignalBackup = true,
+        )
+    }
+
+    fun clearSettingsFocusSignalBackup() {
+        if (!_uiState.value.settingsFocusSignalBackup) return
+        _uiState.value = _uiState.value.copy(settingsFocusSignalBackup = false)
+    }
+
+    fun dismissEncryptionReminderChat() {
+        viewModelScope.launch {
+            appPreferences.setEncryptionReminderChatDismissed(true)
+            _uiState.value = _uiState.value.copy(encryptionReminderChatDismissed = true)
+        }
     }
 
     fun openHelp() {

@@ -22,6 +22,10 @@
     <string name="no_friends">У вас поки немає друзів</string>
     <string name="no_friends_hint">Знайдіть користувачів і додайте їх у друзі</string>
     <string name="no_conversations">Немає діалогів</string>
+    <string name="encryption_reminder_title">Повідомлення захищені шифруванням</string>
+    <string name="encryption_reminder_body">Збережіть резервну копію ключів, щоб не втратити доступ до переписки під час зміни пристрою або браузера.</string>
+    <string name="encryption_reminder_body_compact">Збережіть резервну копію ключів у розділі «Безпека».</string>
+    <string name="encryption_reminder_link">Перейти в розділ «Безпека» →</string>
     <string name="online">В мережі</string>
     <string name="offline">Не в мережі</string>
     <string name="presence_just_now">Був(ла) щойно</string>
@@ -142,6 +146,7 @@
     <string name="home_projects_empty">Проєкти недоступні</string>
     <string name="home_load_failed">Не вдалося завантажити головну</string>
     <string-array name="home_whats_new_features">
+        <item>Нагадування про резервну копію ключів у чатах</item>
         <item>Вкладка «Головна» з новинами та проєктами CybLight</item>
         <item>Превʼю останніх повідомлень і реакцій у списку чатів</item>
         <item>Чернетки повідомлень при виході з чату</item>
@@ -184,7 +189,7 @@
     <string name="settings_message_alerts_hint">Push про нові особисті повідомлення</string>
     <string name="settings_section_security">Безпека застосунку</string>
     <string name="settings_signal_backup_section">Резервна копія шифрування</string>
-    <string name="settings_signal_backup_hint">Файл .cyblight-backup для переносу ключів Signal між застосунком і браузером.</string>
+    <string name="settings_signal_backup_hint">Файл .cyblight-backup для переносу ключів шифрування між застосунком і браузером.</string>
     <string name="settings_signal_backup_export">Експорт</string>
     <string name="settings_signal_backup_import">Імпорт</string>
     <string name="settings_signal_backup_action">Виконати</string>

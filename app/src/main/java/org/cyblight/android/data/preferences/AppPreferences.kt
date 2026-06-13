@@ -46,6 +46,7 @@ class AppPreferences(private val context: Context) {
     private val swipeBackSensitivityKey = stringPreferencesKey("swipe_back_sensitivity")
     private val swipeBackEdgeWidthKey = stringPreferencesKey("swipe_back_edge_width")
     private val rootBackBehaviorKey = stringPreferencesKey("root_back_behavior")
+    private val encryptionReminderChatDismissedKey = booleanPreferencesKey("encryption_reminder_chat_dismissed")
 
     private fun chatDraftKey(friendId: String) = stringPreferencesKey("chat_draft_$friendId")
 
@@ -336,6 +337,15 @@ class AppPreferences(private val context: Context) {
     suspend fun setRootBackBehavior(behavior: RootBackBehavior) {
         context.appPreferencesStore.edit { prefs ->
             prefs[rootBackBehaviorKey] = behavior.name
+        }
+    }
+
+    suspend fun getEncryptionReminderChatDismissed(): Boolean =
+        context.appPreferencesStore.data.first()[encryptionReminderChatDismissedKey] ?: false
+
+    suspend fun setEncryptionReminderChatDismissed(dismissed: Boolean) {
+        context.appPreferencesStore.edit { prefs ->
+            prefs[encryptionReminderChatDismissedKey] = dismissed
         }
     }
 }

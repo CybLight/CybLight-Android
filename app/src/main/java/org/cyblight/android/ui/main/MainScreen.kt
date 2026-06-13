@@ -132,6 +132,9 @@ fun MainScreen(
     onRefreshHome: () -> Unit,
     onOpenUrl: (String) -> Unit,
     onOpenChangelog: () -> Unit,
+    encryptionReminderChatDismissed: Boolean,
+    onDismissEncryptionReminderChat: () -> Unit,
+    onOpenSecurityBackup: () -> Unit,
 ) {
     if (chatFriendId != null && chatFriendName != null) {
         ChatScreen(
@@ -163,6 +166,9 @@ fun MainScreen(
             onDeleteMessages = onDeleteChatMessages,
             onForwardMessage = onForwardChatMessage,
             onReactMessage = onReactChatMessage,
+            showEncryptionReminder = !encryptionReminderChatDismissed,
+            onDismissEncryptionReminder = onDismissEncryptionReminderChat,
+            onOpenSecurityBackup = onOpenSecurityBackup,
         )
         return
     }
@@ -288,6 +294,7 @@ fun MainScreen(
                 onRefresh = onRefresh,
                 onOpenChat = onOpenChat,
                 onOpenProfile = onOpenFriendProfile,
+                onOpenSecurityBackup = onOpenSecurityBackup,
                 modifier = Modifier.padding(padding),
             )
             MainTab.Security -> SecurityScreen(

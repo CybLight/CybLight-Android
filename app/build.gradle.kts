@@ -21,8 +21,8 @@ android {
         applicationId = "org.cyblight.android"
         minSdk = 26
         targetSdk = 34
-        versionCode = 31
-        versionName = "0.6.7"
+        versionCode = 32
+        versionName = "0.6.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

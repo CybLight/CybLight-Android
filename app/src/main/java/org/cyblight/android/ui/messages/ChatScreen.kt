@@ -100,6 +100,9 @@ fun ChatScreen(
     onDeleteMessages: (List<String>) -> Unit,
     onForwardMessage: (String, String) -> Unit,
     onReactMessage: (String, String) -> Unit,
+    showEncryptionReminder: Boolean = false,
+    onDismissEncryptionReminder: () -> Unit = {},
+    onOpenSecurityBackup: () -> Unit = {},
 ) {
     var draft by remember(friendId) { mutableStateOf(TextFieldValue(savedDraft)) }
     var suppressedPreviewUrl by remember { mutableStateOf<String?>(null) }
@@ -338,6 +341,16 @@ fun ChatScreen(
                 }
                 else -> {
                     Column(modifier = Modifier.weight(1f)) {
+                        if (!selectionMode && showEncryptionReminder) {
+                            EncryptionReminderBanner(
+                                compact = true,
+                                onOpenSecurityBackup = onOpenSecurityBackup,
+                                onDismiss = onDismissEncryptionReminder,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                            )
+                        }
                         if (!selectionMode) {
                             pinnedMessage?.let { pinned ->
                                 PinnedMessageBar(

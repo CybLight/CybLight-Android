@@ -52,6 +52,10 @@
     <string name="no_friends">У вас пока нет друзей</string>
     <string name="no_friends_hint">Найдите пользователей и добавьте их в друзья</string>
     <string name="no_conversations">Нет диалогов</string>
+    <string name="encryption_reminder_title">Сообщения защищены шифрованием</string>
+    <string name="encryption_reminder_body">Сохраните резервную копию ключей, чтобы не потерять доступ к переписке при смене устройства или браузера.</string>
+    <string name="encryption_reminder_body_compact">Сохраните резервную копию ключей в разделе «Безопасность».</string>
+    <string name="encryption_reminder_link">Перейти в раздел «Безопасность» →</string>
     <string name="online">В сети</string>
     <string name="offline">Не в сети</string>
     <string name="presence_just_now">Был(а) только что</string>
@@ -172,6 +176,7 @@
     <string name="home_projects_empty">Проекты недоступны</string>
     <string name="home_load_failed">Не удалось загрузить главную</string>
     <string-array name="home_whats_new_features">
+        <item>Напоминание о резервной копии ключей в чатах</item>
         <item>Сквозное шифрование сообщений (Signal Protocol)</item>
         <item>Кнопка регистрации на экране входа</item>
         <item>Вставка логина и пароля из буфера обмена</item>
@@ -214,7 +219,7 @@
     <string name="settings_message_alerts_hint">Push о новых личных сообщениях</string>
     <string name="settings_section_security">Безопасность приложения</string>
     <string name="settings_signal_backup_section">Резервная копия шифрования</string>
-    <string name="settings_signal_backup_hint">Файл .cyblight-backup для переноса ключей Signal между приложением и браузером.</string>
+    <string name="settings_signal_backup_hint">Файл .cyblight-backup для переноса ключей шифрования между приложением и браузером.</string>
     <string name="settings_signal_backup_export">Экспорт</string>
     <string name="settings_signal_backup_import">Импорт</string>
     <string name="settings_signal_backup_action">Выполнить</string>

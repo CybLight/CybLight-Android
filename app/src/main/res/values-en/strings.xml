@@ -22,6 +22,10 @@
     <string name="no_friends">You have no friends yet</string>
     <string name="no_friends_hint">Find users and add them as friends</string>
     <string name="no_conversations">No conversations</string>
+    <string name="encryption_reminder_title">Messages are protected with encryption</string>
+    <string name="encryption_reminder_body">Save a backup of your encryption keys so you don\'t lose access to chats when switching devices or browsers.</string>
+    <string name="encryption_reminder_body_compact">Save an encryption key backup in the Security section.</string>
+    <string name="encryption_reminder_link">Go to Security →</string>
     <string name="online">Online</string>
     <string name="offline">Offline</string>
     <string name="presence_just_now">Last seen just now</string>
@@ -142,6 +146,7 @@
     <string name="home_projects_empty">Projects unavailable</string>
     <string name="home_load_failed">Could not load home</string>
     <string-array name="home_whats_new_features">
+        <item>Encryption key backup reminder in chats</item>
         <item>Home tab with CybLight news and projects</item>
         <item>Previews of latest messages and reactions in chat list</item>
         <item>Message drafts when leaving a chat</item>
@@ -184,7 +189,7 @@
     <string name="settings_message_alerts_hint">Push notifications for new direct messages</string>
     <string name="settings_section_security">App security</string>
     <string name="settings_signal_backup_section">Encryption backup</string>
-    <string name="settings_signal_backup_hint">A .cyblight-backup file transfers Signal keys between the app and browser.</string>
+    <string name="settings_signal_backup_hint">A .cyblight-backup file transfers encryption keys between the app and browser.</string>
     <string name="settings_signal_backup_export">Export</string>
     <string name="settings_signal_backup_import">Import</string>
     <string name="settings_signal_backup_action">Run</string>

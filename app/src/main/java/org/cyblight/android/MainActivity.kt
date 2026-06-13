@@ -272,6 +272,8 @@ class MainActivity : AppCompatActivity() {
                                 onRestoreSignalBackup = viewModel::restoreSignalBackup,
                                 signalBackupErrorMessage = viewModel::signalBackupErrorMessage,
                                 onPickBackupFile = pickBackupFile,
+                                focusSignalBackup = uiState.settingsFocusSignalBackup,
+                                onSignalBackupFocused = viewModel::clearSettingsFocusSignalBackup,
                             )
                         }
                         DetailScreen.Help -> {
@@ -543,6 +545,9 @@ class MainActivity : AppCompatActivity() {
                                     onRefreshHome = viewModel::refreshHomeContent,
                                     onOpenUrl = { url -> viewModel.openWebsiteUrl(context, url) },
                                     onOpenChangelog = viewModel::openChangelog,
+                                    encryptionReminderChatDismissed = uiState.encryptionReminderChatDismissed,
+                                    onDismissEncryptionReminderChat = viewModel::dismissEncryptionReminderChat,
+                                    onOpenSecurityBackup = viewModel::openSecurityBackup,
                                 )
                             }
                         }
