@@ -118,6 +118,9 @@ fun SignalBackupSection(
                         value = exportPassword,
                         onValueChange = { exportPassword = it },
                         label = { Text(stringResource(R.string.settings_signal_backup_password)) },
+                        supportingText = {
+                            Text(stringResource(R.string.settings_signal_backup_password_export_hint))
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
@@ -192,6 +195,9 @@ fun SignalBackupSection(
                     value = importPassword,
                     onValueChange = { importPassword = it },
                     label = { Text(stringResource(R.string.settings_signal_backup_password)) },
+                    supportingText = {
+                        Text(stringResource(R.string.settings_signal_backup_password_import_hint))
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
             },

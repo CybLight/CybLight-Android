@@ -179,6 +179,8 @@ data class AppUiState(
     val appLockBiometric: Boolean = true,
     val appLockPinConfigured: Boolean = false,
     val appLockTimeout: AppLockTimeout = AppLockTimeout.IMMEDIATE,
+    val appLockSettingsLoaded: Boolean = false,
+    val pendingAppLock: Boolean = false,
     val selectedMainTab: MainTab = MainTab.Home,
     val friendsSubTab: Int = 0,
     val homeContent: HomeContent? = null,
@@ -222,6 +224,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var archivistTracker: ArchivistTracker? = null
     private var appLockBackgroundedAtMs: Long? = null
     private var skipAppLockOnce = false
+    private var unlockedThisSession = false
+    private var consumedInitialLockCheck = false
 
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
@@ -250,6 +254,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val appLockBiometric = appPreferences.getAppLockBiometric()
                 val appLockPinConfigured = appPreferences.hasAppLockPin()
                 val appLockTimeout = appPreferences.getAppLockTimeout()
+                appLockBackgroundedAtMs = appPreferences.getAppLockBackgroundedAtMs()
                 val swipeBackEnabled = appPreferences.getSwipeBackEnabled()
                 val systemBackEnabled = appPreferences.getSystemBackEnabled()
                 val swipeBackSensitivity = appPreferences.getSwipeBackSensitivity()
@@ -267,6 +272,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     appLockBiometric = appLockBiometric,
                     appLockPinConfigured = appLockPinConfigured,
                     appLockTimeout = appLockTimeout,
+                    appLockSettingsLoaded = true,
                     swipeBackEnabled = swipeBackEnabled,
                     systemBackEnabled = systemBackEnabled,
                     swipeBackSensitivity = swipeBackSensitivity,
@@ -324,7 +330,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             appLockBiometric = _uiState.value.appLockBiometric,
             appLockPinConfigured = _uiState.value.appLockPinConfigured,
             appLockTimeout = _uiState.value.appLockTimeout,
+            appLockSettingsLoaded = _uiState.value.appLockSettingsLoaded,
         )
+        appLockBackgroundedAtMs = null
+        skipAppLockOnce = false
+        unlockedThisSession = false
+        consumedInitialLockCheck = false
     }
 
     fun checkForUpdate(force: Boolean = false) {
@@ -583,11 +594,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (enableLock) {
                 appPreferences.setAppLockEnabled(true)
             }
+            val lockEnabled = enableLock || _uiState.value.appLockEnabled
             _uiState.value = _uiState.value.copy(
                 appLockPinConfigured = true,
-                appLockEnabled = enableLock || _uiState.value.appLockEnabled,
+                appLockEnabled = lockEnabled,
+                pendingAppLock = lockEnabled,
             )
         }
+    }
+
+    fun consumePendingAppLock(): Boolean {
+        val pending = _uiState.value.pendingAppLock
+        if (pending) {
+            _uiState.value = _uiState.value.copy(pendingAppLock = false)
+        }
+        return pending
     }
 
     fun setAppLockEnabled(enabled: Boolean) {
@@ -596,8 +617,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             appPreferences.setAppLockEnabled(enabled)
             if (!enabled) {
                 appLockBackgroundedAtMs = null
+                appPreferences.clearAppLockBackgroundedAtMs()
             }
-            _uiState.value = _uiState.value.copy(appLockEnabled = enabled)
+            _uiState.value = _uiState.value.copy(
+                appLockEnabled = enabled,
+                pendingAppLock = enabled,
+            )
         }
     }
 
@@ -610,7 +635,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onAppBackgrounded() {
         if (_uiState.value.appLockEnabled) {
-            appLockBackgroundedAtMs = System.currentTimeMillis()
+            unlockedThisSession = false
+            val now = System.currentTimeMillis()
+            appLockBackgroundedAtMs = now
+            viewModelScope.launch {
+                appPreferences.setAppLockBackgroundedAtMs(now)
+            }
         }
     }
 
@@ -624,18 +654,37 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onAppUnlocked() {
         appLockBackgroundedAtMs = null
+        unlockedThisSession = true
+        viewModelScope.launch {
+            appPreferences.clearAppLockBackgroundedAtMs()
+        }
     }
 
-    fun shouldShowAppLock(isColdStart: Boolean): Boolean {
+    fun shouldShowAppLockOnLaunch(): Boolean {
+        if (consumedInitialLockCheck) return false
+        consumedInitialLockCheck = true
+        return shouldRequireAppLock(treatAsFreshLaunch = true)
+    }
+
+    fun shouldShowAppLockOnResume(): Boolean =
+        shouldRequireAppLock(treatAsFreshLaunch = false)
+
+    private fun shouldRequireAppLock(treatAsFreshLaunch: Boolean): Boolean {
         val state = _uiState.value
-        if (!state.appLockEnabled || !state.appLockPinConfigured) return false
-        if (skipAppLockOnce) {
-            skipAppLockOnce = false
+        if (!state.appLockEnabled || !state.appLockPinConfigured || !state.appLockSettingsLoaded) {
             return false
         }
-        if (isColdStart) return true
+        if (skipAppLockOnce) {
+            skipAppLockOnce = false
+            unlockedThisSession = true
+            return false
+        }
 
-        val backgroundedAt = appLockBackgroundedAtMs ?: return false
+        val backgroundedAt = appLockBackgroundedAtMs
+        if (backgroundedAt == null) {
+            return treatAsFreshLaunch && !unlockedThisSession
+        }
+
         val timeout = state.appLockTimeout.millis
         if (timeout == 0L) return true
         return System.currentTimeMillis() - backgroundedAt >= timeout
@@ -665,6 +714,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun onAuthenticated() {
         skipAppLockOnce = true
+        unlockedThisSession = true
+        consumedInitialLockCheck = false
         viewModelScope.launch {
             _uiState.value.user?.id?.let { userId ->
                 runCatching { messagesRepository.ensureSignalKeys(userId) }
@@ -1398,9 +1449,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 appLockBiometric = _uiState.value.appLockBiometric,
                 appLockPinConfigured = _uiState.value.appLockPinConfigured,
                 appLockTimeout = _uiState.value.appLockTimeout,
+                appLockSettingsLoaded = _uiState.value.appLockSettingsLoaded,
             )
             appLockBackgroundedAtMs = null
             skipAppLockOnce = false
+            unlockedThisSession = false
+            consumedInitialLockCheck = false
+            viewModelScope.launch {
+                appPreferences.clearAppLockBackgroundedAtMs()
+            }
             LoginNotificationWorker.cancel(getApplication())
             MessageNotificationWorker.cancel(getApplication())
             PushTokenRegistrar.unregisterCurrentToken(getApplication())

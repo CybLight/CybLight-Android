@@ -146,9 +146,9 @@
     <string name="home_projects_empty">Проєкти недоступні</string>
     <string name="home_load_failed">Не вдалося завантажити головну</string>
     <string-array name="home_whats_new_features">
+        <item>Виправлено блокування застосунку PIN і біометрією</item>
+        <item>Підказки до пароля резервної копії шифрування</item>
         <item>Кнопка «Експорт» знову видна в налаштуваннях резервної копії</item>
-        <item>Експорт резервної копії: вибір папки та виправлення збою</item>
-        <item>Нагадування про резервну копію ключів у чатах</item>
         <item>Вкладка «Головна» з новинами та проєктами CybLight</item>
         <item>Превʼю останніх повідомлень і реакцій у списку чатів</item>
         <item>Чернетки повідомлень при виході з чату</item>
@@ -197,6 +197,8 @@
     <string name="settings_signal_backup_action">Виконати</string>
     <string name="settings_signal_backup_password">Пароль резервної копії</string>
     <string name="settings_signal_backup_password_confirm">Повторіть пароль</string>
+    <string name="settings_signal_backup_password_export_hint">Мінімум 8 символів. Запамʼятайте пароль — без нього не вдасться відновити ключі.</string>
+    <string name="settings_signal_backup_password_import_hint">Пароль, заданий під час створення резервної копії.</string>
     <string name="settings_signal_backup_password_short">Пароль має бути не коротшим за 8 символів.</string>
     <string name="settings_signal_backup_password_mismatch">Паролі не збігаються.</string>
     <string name="settings_signal_backup_password_required">Введіть пароль резервної копії.</string>
@@ -228,6 +230,7 @@
     <string name="app_lock_setup_pin">Задайте PIN</string>
     <string name="app_lock_change_pin">Змінити PIN</string>
     <string name="app_lock_wrong_pin">Невірний PIN</string>
+    <string name="app_lock_use_pin">Ввести PIN</string>
     <string name="notification_channel_security">Безпека</string>
     <string name="notification_channel_security_desc">Сповіщення про входи в акаунт</string>
     <string name="notification_channel_messages">Повідомлення</string>

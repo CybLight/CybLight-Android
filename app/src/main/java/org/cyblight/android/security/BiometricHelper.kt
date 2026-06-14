@@ -40,7 +40,7 @@ object BiometricHelper {
         val info = BiometricPrompt.PromptInfo.Builder()
             .setTitle(activity.getString(R.string.app_lock_biometric_title))
             .setSubtitle(activity.getString(R.string.app_lock_biometric_subtitle))
-            .setNegativeButtonText(activity.getString(R.string.cancel))
+            .setNegativeButtonText(activity.getString(R.string.app_lock_use_pin))
             .build()
         prompt.authenticate(info)
     }

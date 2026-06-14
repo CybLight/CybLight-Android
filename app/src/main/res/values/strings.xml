@@ -176,9 +176,9 @@
     <string name="home_projects_empty">Проекты недоступны</string>
     <string name="home_load_failed">Не удалось загрузить главную</string>
     <string-array name="home_whats_new_features">
+        <item>Исправлена блокировка приложения по PIN и биометрии</item>
+        <item>Подсказки к паролю резервной копии шифрования</item>
         <item>Кнопка «Экспорт» снова видна в настройках резервной копии</item>
-        <item>Экспорт резервной копии: выбор папки и исправление сбоя</item>
-        <item>Напоминание о резервной копии ключей в чатах</item>
         <item>Сквозное шифрование сообщений (Signal Protocol)</item>
         <item>Кнопка регистрации на экране входа</item>
         <item>Вставка логина и пароля из буфера обмена</item>
@@ -227,6 +227,8 @@
     <string name="settings_signal_backup_action">Выполнить</string>
     <string name="settings_signal_backup_password">Пароль резервной копии</string>
     <string name="settings_signal_backup_password_confirm">Повторите пароль</string>
+    <string name="settings_signal_backup_password_export_hint">Минимум 8 символов. Запомните пароль — без него нельзя восстановить ключи.</string>
+    <string name="settings_signal_backup_password_import_hint">Пароль, заданный при создании резервной копии.</string>
     <string name="settings_signal_backup_password_short">Пароль должен быть не короче 8 символов.</string>
     <string name="settings_signal_backup_password_mismatch">Пароли не совпадают.</string>
     <string name="settings_signal_backup_password_required">Введите пароль резервной копии.</string>
@@ -258,6 +260,7 @@
     <string name="app_lock_setup_pin">Задайте PIN</string>
     <string name="app_lock_change_pin">Сменить PIN</string>
     <string name="app_lock_wrong_pin">Неверный PIN</string>
+    <string name="app_lock_use_pin">Ввести PIN</string>
     <string name="notification_channel_security">Безопасность</string>
     <string name="notification_channel_security_desc">Уведомления о входах в аккаунт</string>
     <string name="notification_channel_messages">Сообщения</string>

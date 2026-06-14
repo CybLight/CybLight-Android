@@ -146,9 +146,9 @@
     <string name="home_projects_empty">Projects unavailable</string>
     <string name="home_load_failed">Could not load home</string>
     <string-array name="home_whats_new_features">
+        <item>Fixed app lock with PIN and biometrics</item>
+        <item>Hints for encryption backup password</item>
         <item>Export button visible again in encryption backup settings</item>
-        <item>Backup export: choose save folder and crash fix</item>
-        <item>Encryption key backup reminder in chats</item>
         <item>Home tab with CybLight news and projects</item>
         <item>Previews of latest messages and reactions in chat list</item>
         <item>Message drafts when leaving a chat</item>
@@ -197,6 +197,8 @@
     <string name="settings_signal_backup_action">Run</string>
     <string name="settings_signal_backup_password">Backup password</string>
     <string name="settings_signal_backup_password_confirm">Confirm password</string>
+    <string name="settings_signal_backup_password_export_hint">At least 8 characters. Remember this password — you need it to restore your keys.</string>
+    <string name="settings_signal_backup_password_import_hint">Password set when the backup was created.</string>
     <string name="settings_signal_backup_password_short">Password must be at least 8 characters.</string>
     <string name="settings_signal_backup_password_mismatch">Passwords do not match.</string>
     <string name="settings_signal_backup_password_required">Enter the backup password.</string>
@@ -228,6 +230,7 @@
     <string name="app_lock_setup_pin">Set PIN</string>
     <string name="app_lock_change_pin">Change PIN</string>
     <string name="app_lock_wrong_pin">Wrong PIN</string>
+    <string name="app_lock_use_pin">Use PIN</string>
     <string name="notification_channel_security">Security</string>
     <string name="notification_channel_security_desc">Account sign-in notifications</string>
     <string name="notification_channel_messages">Messages</string>

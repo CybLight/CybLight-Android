@@ -67,6 +67,7 @@ fun AppLockScreen(
         fun showPinFallback() {
             mode = AppLockMode.Pin
             biometricPromptActive = false
+            biometricFailures = 0
         }
 
         fun triggerBiometric() {
@@ -85,7 +86,11 @@ fun AppLockScreen(
                 },
                 { errorCode ->
                     biometricPromptActive = false
-                    if (errorCode == androidx.biometric.BiometricPrompt.ERROR_LOCKOUT ||
+                    if (errorCode == androidx.biometric.BiometricPrompt.ERROR_NEGATIVE_BUTTON ||
+                        errorCode == androidx.biometric.BiometricPrompt.ERROR_USER_CANCELED
+                    ) {
+                        showPinFallback()
+                    } else if (errorCode == androidx.biometric.BiometricPrompt.ERROR_LOCKOUT ||
                         errorCode == androidx.biometric.BiometricPrompt.ERROR_LOCKOUT_PERMANENT
                     ) {
                         showPinFallback()
@@ -161,6 +166,19 @@ fun AppLockScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(top = 12.dp),
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = ::showPinFallback,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                    ) {
+                        Icon(Icons.Outlined.Lock, contentDescription = null)
+                        Text(
+                            text = stringResource(R.string.app_lock_use_pin),
+                            modifier = Modifier.padding(start = 8.dp),
                         )
                     }
                 } else {

@@ -36,6 +36,7 @@ class AppPreferences(private val context: Context) {
     private val appLockPinSaltKey = stringPreferencesKey("app_lock_pin_salt")
     private val appLockPinHashKey = stringPreferencesKey("app_lock_pin_hash")
     private val appLockTimeoutKey = longPreferencesKey("app_lock_timeout_ms")
+    private val appLockBackgroundedAtKey = longPreferencesKey("app_lock_backgrounded_at_ms")
     private val lastSeenLoginEventIdKey = stringPreferencesKey("last_seen_login_event_id")
     private val ignoreLoginEventsUntilKey = longPreferencesKey("ignore_login_events_until")
     private val biometricUnlockCountKey = intPreferencesKey("biometric_unlock_count")
@@ -101,6 +102,23 @@ class AppPreferences(private val context: Context) {
     suspend fun setAppLockTimeout(timeout: AppLockTimeout) {
         context.appPreferencesStore.edit { prefs ->
             prefs[appLockTimeoutKey] = timeout.millis
+        }
+    }
+
+    suspend fun getAppLockBackgroundedAtMs(): Long? {
+        val value = context.appPreferencesStore.data.first()[appLockBackgroundedAtKey] ?: return null
+        return value.takeIf { it > 0L }
+    }
+
+    suspend fun setAppLockBackgroundedAtMs(timestampMs: Long) {
+        context.appPreferencesStore.edit { prefs ->
+            prefs[appLockBackgroundedAtKey] = timestampMs
+        }
+    }
+
+    suspend fun clearAppLockBackgroundedAtMs() {
+        context.appPreferencesStore.edit { prefs ->
+            prefs.remove(appLockBackgroundedAtKey)
         }
     }
 
@@ -198,6 +216,7 @@ class AppPreferences(private val context: Context) {
             prefs.remove(appLockPinSaltKey)
             prefs.remove(appLockPinHashKey)
             prefs[appLockEnabledKey] = false
+            prefs.remove(appLockBackgroundedAtKey)
         }
     }
 

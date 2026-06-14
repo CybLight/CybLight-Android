@@ -55,7 +55,6 @@ import org.cyblight.android.ui.update.UpdateCheckDialog
 import org.cyblight.android.ui.update.UpdateDialog
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -81,8 +80,7 @@ class MainActivity : AppCompatActivity() {
             val context = LocalContext.current
             var pendingAutofillCommit by remember { mutableStateOf(false) }
             var showAbout by remember { mutableStateOf(false) }
-            var isAppLocked by rememberSaveable { mutableStateOf(false) }
-            var isColdStart by rememberSaveable { mutableStateOf(true) }
+            var isAppLocked by remember { mutableStateOf(false) }
             var appLockError by remember { mutableStateOf<String?>(null) }
             var appLockSession by remember { mutableIntStateOf(0) }
             val lifecycleOwner = LocalLifecycleOwner.current
@@ -112,7 +110,7 @@ class MainActivity : AppCompatActivity() {
                 intent?.removeExtra(NotificationHelper.EXTRA_CHAT_FRIEND_NAME)
             }
 
-            DisposableEffect(lifecycleOwner, uiState.appLockEnabled, uiState.screen) {
+            DisposableEffect(lifecycleOwner, uiState.appLockEnabled, uiState.screen, uiState.appLockSettingsLoaded) {
                 val observer = LifecycleEventObserver { _, event ->
                     when (event) {
                         Lifecycle.Event.ON_STOP -> {
@@ -126,7 +124,8 @@ class MainActivity : AppCompatActivity() {
                         Lifecycle.Event.ON_START -> {
                             if (uiState.screen == AppScreen.Main &&
                                 uiState.appLockEnabled &&
-                                viewModel.shouldShowAppLock(isColdStart = false)
+                                uiState.appLockSettingsLoaded &&
+                                viewModel.shouldShowAppLockOnResume()
                             ) {
                                 isAppLocked = true
                                 appLockSession++
@@ -139,13 +138,22 @@ class MainActivity : AppCompatActivity() {
                 onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
             }
 
-            LaunchedEffect(uiState.screen, uiState.appLockEnabled) {
-                if (uiState.screen == AppScreen.Main && uiState.appLockEnabled) {
-                    if (viewModel.shouldShowAppLock(isColdStart = isColdStart)) {
+            LaunchedEffect(uiState.screen, uiState.appLockEnabled, uiState.appLockSettingsLoaded) {
+                if (uiState.screen == AppScreen.Main &&
+                    uiState.appLockEnabled &&
+                    uiState.appLockSettingsLoaded
+                ) {
+                    if (viewModel.shouldShowAppLockOnLaunch()) {
                         isAppLocked = true
                         appLockSession++
                     }
-                    isColdStart = false
+                }
+            }
+
+            LaunchedEffect(uiState.pendingAppLock) {
+                if (uiState.pendingAppLock && viewModel.consumePendingAppLock()) {
+                    isAppLocked = true
+                    appLockSession++
                 }
             }
 
@@ -230,7 +238,10 @@ class MainActivity : AppCompatActivity() {
                     color = MaterialTheme.colorScheme.background,
                 ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    val navigationReady = uiState.screen == AppScreen.Main && !isAppLocked
+                    val navigationReady = uiState.screen == AppScreen.Main &&
+                        !isAppLocked &&
+                        uiState.appLockSettingsLoaded
+                    val mainContentReady = uiState.screen != AppScreen.Main || uiState.appLockSettingsLoaded
 
                     val performBackNavigation: () -> Unit = {
                         when (viewModel.handleBackNavigation()) {
@@ -241,10 +252,17 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     BackHandler(
+                        enabled = isAppLocked && uiState.screen == AppScreen.Main,
+                    ) {
+                        // Consume back while locked so the app cannot be dismissed without unlocking.
+                    }
+
+                    BackHandler(
                         enabled = navigationReady && uiState.systemBackEnabled,
                         onBack = performBackNavigation,
                     )
 
+                    if (mainContentReady) {
                     SwipeBackContainer(
                         enabled = navigationReady && uiState.swipeBackEnabled,
                         edgeWidth = uiState.swipeBackEdgeWidth,
@@ -581,6 +599,7 @@ class MainActivity : AppCompatActivity() {
                         }
                         }
                     }
+                    }
 
                     if (showAbout) {
                         AboutDialog(onDismiss = { showAbout = false })
@@ -606,7 +625,7 @@ class MainActivity : AppCompatActivity() {
                         onDismiss = viewModel::dismissUpdate,
                     )
 
-                    if (isAppLocked && uiState.screen == AppScreen.Main && uiState.appLockEnabled) {
+                    if (isAppLocked && uiState.screen == AppScreen.Main && uiState.appLockEnabled && uiState.appLockSettingsLoaded) {
                         AppLockScreen(
                             sessionId = appLockSession,
                             biometricAvailable = biometricAvailable,
