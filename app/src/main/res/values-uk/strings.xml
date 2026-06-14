@@ -146,6 +146,7 @@
     <string name="home_projects_empty">Проєкти недоступні</string>
     <string name="home_load_failed">Не вдалося завантажити головну</string>
     <string-array name="home_whats_new_features">
+        <item>Експорт резервної копії: вибір папки та виправлення збою</item>
         <item>Нагадування про резервну копію ключів у чатах</item>
         <item>Вкладка «Головна» з новинами та проєктами CybLight</item>
         <item>Превʼю останніх повідомлень і реакцій у списку чатів</item>
@@ -189,7 +190,7 @@
     <string name="settings_message_alerts_hint">Push про нові особисті повідомлення</string>
     <string name="settings_section_security">Безпека застосунку</string>
     <string name="settings_signal_backup_section">Резервна копія шифрування</string>
-    <string name="settings_signal_backup_hint">Файл .cyblight-backup для переносу ключів шифрування між застосунком і браузером.</string>
+    <string name="settings_signal_backup_hint">Файл .cyblight-backup для переносу ключів шифрування між застосунком і браузером. Під час експорту можна вибрати папку та імʼя файлу.</string>
     <string name="settings_signal_backup_export">Експорт</string>
     <string name="settings_signal_backup_import">Імпорт</string>
     <string name="settings_signal_backup_action">Виконати</string>

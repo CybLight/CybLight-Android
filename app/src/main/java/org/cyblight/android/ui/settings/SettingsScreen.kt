@@ -113,6 +113,7 @@ fun SettingsScreen(
     onRestoreSignalBackup: suspend (content: String, password: String) -> Result<Unit>,
     signalBackupErrorMessage: (String) -> String,
     onPickBackupFile: (onPicked: (String) -> Unit) -> Unit,
+    onSaveBackupFile: (fileName: String, content: String, onResult: (Boolean?) -> Unit) -> Unit,
     focusSignalBackup: Boolean = false,
     onSignalBackupFocused: () -> Unit = {},
 ) {
@@ -537,6 +538,7 @@ fun SettingsScreen(
                     onRestoreBackup = onRestoreSignalBackup,
                     backupErrorMessage = signalBackupErrorMessage,
                     onPickBackupFile = onPickBackupFile,
+                    onSaveBackupFile = onSaveBackupFile,
                 )
             }
 

@@ -176,6 +176,7 @@
     <string name="home_projects_empty">Проекты недоступны</string>
     <string name="home_load_failed">Не удалось загрузить главную</string>
     <string-array name="home_whats_new_features">
+        <item>Экспорт резервной копии: выбор папки и исправление сбоя</item>
         <item>Напоминание о резервной копии ключей в чатах</item>
         <item>Сквозное шифрование сообщений (Signal Protocol)</item>
         <item>Кнопка регистрации на экране входа</item>
@@ -219,7 +220,7 @@
     <string name="settings_message_alerts_hint">Push о новых личных сообщениях</string>
     <string name="settings_section_security">Безопасность приложения</string>
     <string name="settings_signal_backup_section">Резервная копия шифрования</string>
-    <string name="settings_signal_backup_hint">Файл .cyblight-backup для переноса ключей шифрования между приложением и браузером.</string>
+    <string name="settings_signal_backup_hint">Файл .cyblight-backup для переноса ключей шифрования между приложением и браузером. При экспорте можно выбрать папку и имя файла.</string>
     <string name="settings_signal_backup_export">Экспорт</string>
     <string name="settings_signal_backup_import">Импорт</string>
     <string name="settings_signal_backup_action">Выполнить</string>

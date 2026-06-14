@@ -176,6 +176,33 @@ class MainActivity : AppCompatActivity() {
                 backupFilePickerLauncher.launch(arrayOf("*/*"))
             }
 
+            var backupExportPayload by remember { mutableStateOf<Pair<String, String>?>(null) }
+            var backupExportResult by remember { mutableStateOf<((Boolean?) -> Unit)?>(null) }
+            val backupSaveLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.CreateDocument("application/json"),
+            ) { uri ->
+                val payload = backupExportPayload
+                val onResult = backupExportResult
+                backupExportPayload = null
+                backupExportResult = null
+                if (payload == null || onResult == null) return@rememberLauncherForActivityResult
+                if (uri == null) {
+                    onResult(null)
+                    return@rememberLauncherForActivityResult
+                }
+                val saved = runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { stream ->
+                        stream.write(payload.second.toByteArray(Charsets.UTF_8))
+                    } ?: error("backup_save_stream_missing")
+                }.isSuccess
+                onResult(saved)
+            }
+            val saveBackupFile: (String, String, (Boolean?) -> Unit) -> Unit = { fileName, content, onResult ->
+                backupExportPayload = fileName to content
+                backupExportResult = onResult
+                backupSaveLauncher.launch(fileName)
+            }
+
             LaunchedEffect(uiState.screen) {
                 if (uiState.screen == AppScreen.Login || uiState.screen == AppScreen.TwoFactor) {
                     pendingAutofillCommit = true
@@ -272,6 +299,7 @@ class MainActivity : AppCompatActivity() {
                                 onRestoreSignalBackup = viewModel::restoreSignalBackup,
                                 signalBackupErrorMessage = viewModel::signalBackupErrorMessage,
                                 onPickBackupFile = pickBackupFile,
+                                onSaveBackupFile = saveBackupFile,
                                 focusSignalBackup = uiState.settingsFocusSignalBackup,
                                 onSignalBackupFocused = viewModel::clearSettingsFocusSignalBackup,
                             )

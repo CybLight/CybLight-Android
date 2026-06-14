@@ -146,6 +146,7 @@
     <string name="home_projects_empty">Projects unavailable</string>
     <string name="home_load_failed">Could not load home</string>
     <string-array name="home_whats_new_features">
+        <item>Backup export: choose save folder and crash fix</item>
         <item>Encryption key backup reminder in chats</item>
         <item>Home tab with CybLight news and projects</item>
         <item>Previews of latest messages and reactions in chat list</item>
@@ -189,7 +190,7 @@
     <string name="settings_message_alerts_hint">Push notifications for new direct messages</string>
     <string name="settings_section_security">App security</string>
     <string name="settings_signal_backup_section">Encryption backup</string>
-    <string name="settings_signal_backup_hint">A .cyblight-backup file transfers encryption keys between the app and browser.</string>
+    <string name="settings_signal_backup_hint">A .cyblight-backup file transfers encryption keys between the app and browser. You can choose the folder and file name when exporting.</string>
     <string name="settings_signal_backup_export">Export</string>
     <string name="settings_signal_backup_import">Import</string>
     <string name="settings_signal_backup_action">Run</string>

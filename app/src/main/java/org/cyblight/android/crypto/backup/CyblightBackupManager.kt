@@ -101,6 +101,7 @@ class CyblightBackupManager(context: Context) {
         "backup_user_mismatch" -> "Эта копия создана для другого аккаунта."
         "backup_file_invalid", "backup_payload_invalid", "backup_format_unsupported" ->
             "Некорректный файл резервной копии."
+        "backup_share_failed", "backup_save_failed" -> "Не удалось сохранить резервную копию."
         else -> "Не удалось обработать резервную копию."
     }
 }
