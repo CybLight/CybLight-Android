@@ -146,6 +146,7 @@
     <string name="home_projects_empty">Проєкти недоступні</string>
     <string name="home_load_failed">Не вдалося завантажити головну</string>
     <string-array name="home_whats_new_features">
+        <item>Кнопка «Експорт» знову видна в налаштуваннях резервної копії</item>
         <item>Експорт резервної копії: вибір папки та виправлення збою</item>
         <item>Нагадування про резервну копію ключів у чатах</item>
         <item>Вкладка «Головна» з новинами та проєктами CybLight</item>

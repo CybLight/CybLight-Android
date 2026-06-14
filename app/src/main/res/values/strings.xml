@@ -176,6 +176,7 @@
     <string name="home_projects_empty">Проекты недоступны</string>
     <string name="home_load_failed">Не удалось загрузить главную</string>
     <string-array name="home_whats_new_features">
+        <item>Кнопка «Экспорт» снова видна в настройках резервной копии</item>
         <item>Экспорт резервной копии: выбор папки и исправление сбоя</item>
         <item>Напоминание о резервной копии ключей в чатах</item>
         <item>Сквозное шифрование сообщений (Signal Protocol)</item>

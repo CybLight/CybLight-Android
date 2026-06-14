@@ -527,20 +527,17 @@ fun SettingsScreen(
                     },
             )
 
-            Box(
+            SignalBackupSection(
+                accountLogin = accountLogin,
+                onCreateBackup = onCreateSignalBackup,
+                onRestoreBackup = onRestoreSignalBackup,
+                backupErrorMessage = signalBackupErrorMessage,
+                onPickBackupFile = onPickBackupFile,
+                onSaveBackupFile = onSaveBackupFile,
                 modifier = Modifier.onGloballyPositioned { coordinates ->
                     signalBackupScrollY = coordinates.positionInParent().y.toInt()
                 },
-            ) {
-                SignalBackupSection(
-                    accountLogin = accountLogin,
-                    onCreateBackup = onCreateSignalBackup,
-                    onRestoreBackup = onRestoreSignalBackup,
-                    backupErrorMessage = signalBackupErrorMessage,
-                    onPickBackupFile = onPickBackupFile,
-                    onSaveBackupFile = onSaveBackupFile,
-                )
-            }
+            )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 

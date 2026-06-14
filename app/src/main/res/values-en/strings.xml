@@ -146,6 +146,7 @@
     <string name="home_projects_empty">Projects unavailable</string>
     <string name="home_load_failed">Could not load home</string>
     <string-array name="home_whats_new_features">
+        <item>Export button visible again in encryption backup settings</item>
         <item>Backup export: choose save folder and crash fix</item>
         <item>Encryption key backup reminder in chats</item>
         <item>Home tab with CybLight news and projects</item>

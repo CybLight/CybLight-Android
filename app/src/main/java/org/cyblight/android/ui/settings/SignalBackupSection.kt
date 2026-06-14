@@ -37,6 +37,7 @@ fun SignalBackupSection(
     backupErrorMessage: (String) -> String,
     onPickBackupFile: (onPicked: (String) -> Unit) -> Unit,
     onSaveBackupFile: (fileName: String, content: String, onResult: (Boolean?) -> Unit) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -50,59 +51,61 @@ fun SignalBackupSection(
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var statusIsError by remember { mutableStateOf(false) }
 
-    Text(
-        text = stringResource(R.string.settings_signal_backup_section),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-    )
-
-    Text(
-        text = stringResource(R.string.settings_signal_backup_hint),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-    )
-
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.settings_signal_backup_export)) },
-        leadingContent = { Icon(Icons.Outlined.CloudDownload, contentDescription = null) },
-        modifier = Modifier.fillMaxWidth(),
-        trailingContent = {
-            TextButton(onClick = {
-                exportPassword = ""
-                exportPasswordConfirm = ""
-                showExportDialog = true
-            }) {
-                Text(stringResource(R.string.settings_signal_backup_action))
-            }
-        },
-    )
-
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.settings_signal_backup_import)) },
-        leadingContent = { Icon(Icons.Outlined.CloudUpload, contentDescription = null) },
-        modifier = Modifier.fillMaxWidth(),
-        trailingContent = {
-            TextButton(onClick = {
-                onPickBackupFile { content ->
-                    pendingImportContent = content
-                    showImportDialog = true
-                    importPassword = ""
-                }
-            }) {
-                Text(stringResource(R.string.settings_signal_backup_action))
-            }
-        },
-    )
-
-    statusMessage?.let { message ->
+    Column(modifier = modifier.fillMaxWidth()) {
         Text(
-            text = message,
-            color = if (statusIsError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+            text = stringResource(R.string.settings_signal_backup_section),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+
+        Text(
+            text = stringResource(R.string.settings_signal_backup_hint),
             style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
+
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.settings_signal_backup_export)) },
+            leadingContent = { Icon(Icons.Outlined.CloudDownload, contentDescription = null) },
+            modifier = Modifier.fillMaxWidth(),
+            trailingContent = {
+                TextButton(onClick = {
+                    exportPassword = ""
+                    exportPasswordConfirm = ""
+                    showExportDialog = true
+                }) {
+                    Text(stringResource(R.string.settings_signal_backup_action))
+                }
+            },
+        )
+
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.settings_signal_backup_import)) },
+            leadingContent = { Icon(Icons.Outlined.CloudUpload, contentDescription = null) },
+            modifier = Modifier.fillMaxWidth(),
+            trailingContent = {
+                TextButton(onClick = {
+                    onPickBackupFile { content ->
+                        pendingImportContent = content
+                        showImportDialog = true
+                        importPassword = ""
+                    }
+                }) {
+                    Text(stringResource(R.string.settings_signal_backup_action))
+                }
+            },
+        )
+
+        statusMessage?.let { message ->
+            Text(
+                text = message,
+                color = if (statusIsError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
     }
 
     if (showExportDialog) {
