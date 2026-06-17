@@ -206,7 +206,7 @@
     <string name="home_projects_empty">Проєкти недоступні</string>
     <string name="home_load_failed">Не вдалося завантажити головну</string>
     <string-array name="home_whats_new_features">
-        <item>Налаштування у стилі WhatsApp з розділами безпеки та сповіщень</item>
+        <item>Налаштування в новому стилі з розділами безпеки та сповіщень</item>
         <item>Розшифрування превʼю зашифрованих повідомлень у чатах і push</item>
         <item>Резервне копіювання чатів і ключів у Google Drive</item>
         <item>Експорт і імпорт чатів</item>

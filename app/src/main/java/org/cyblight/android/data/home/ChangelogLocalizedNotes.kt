@@ -6,7 +6,7 @@ object ChangelogLocalizedNotes {
             "ru" to """
                 Что нового
 
-                - Настройки в стиле WhatsApp: разделы «Безопасность», «Блокировка и ключи», «Уведомления», «Внешний вид» и др.
+                - Настройки в новом стиле: разделы «Безопасность», «Блокировка и ключи», «Уведомления», «Внешний вид» и др.
                 - Расшифровка превью зашифрованных сообщений в списке чатов и push-уведомлениях
                 - По нажатию на уведомление о входе — переход в раздел «Сессии»
                 - Можно скрыть баннер «Что нового» на главной
@@ -23,7 +23,7 @@ object ChangelogLocalizedNotes {
             "en" to """
                 What's new
 
-                - WhatsApp-style settings: Security, Lock & keys, Notifications, Appearance, and more
+                - Settings in a new style: Security, Lock & keys, Notifications, Appearance, and more
                 - Decrypted previews for encrypted messages in chat list and push notifications
                 - Tap sign-in alert to open Sessions
                 - Hide the "What's new" banner on Home
@@ -40,7 +40,7 @@ object ChangelogLocalizedNotes {
             "uk" to """
                 Що нового
 
-                - Налаштування у стилі WhatsApp: розділи «Безпека», «Блокування та ключі», «Сповіщення», «Зовнішній вигляд» тощо
+                - Налаштування в новому стилі: розділи «Безпека», «Блокування та ключі», «Сповіщення», «Зовнішній вигляд» тощо
                 - Розшифрування превʼю зашифрованих повідомлень у списку чатів і push-сповіщеннях
                 - Натискання на сповіщення про вхід відкриває розділ «Сесії»
                 - Можна приховати банер «Що нового» на головній

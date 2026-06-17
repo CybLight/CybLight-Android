@@ -206,7 +206,7 @@
     <string name="home_projects_empty">Projects unavailable</string>
     <string name="home_load_failed">Could not load home</string>
     <string-array name="home_whats_new_features">
-        <item>WhatsApp-style settings with security and notification sections</item>
+        <item>Settings in a new style with security and notification sections</item>
         <item>Decrypted previews for encrypted messages in chats and push</item>
         <item>Google Drive backup for chats and encryption keys</item>
         <item>Export and import chats</item>
