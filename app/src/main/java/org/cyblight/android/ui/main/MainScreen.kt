@@ -9,7 +9,6 @@ import androidx.compose.material.icons.outlined.Celebration
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,7 +34,6 @@ import org.cyblight.android.data.api.PinnedMessageDto
 import org.cyblight.android.data.api.UserDto
 import org.cyblight.android.data.home.HomeContent
 import org.cyblight.android.data.repository.ConversationPreview
-import org.cyblight.android.data.repository.SecurityOverview
 import org.cyblight.android.ui.components.AppMenu
 import org.cyblight.android.ui.components.CybLightLogo
 import org.cyblight.android.ui.easter.EasterEggsScreen
@@ -45,7 +43,6 @@ import org.cyblight.android.ui.messages.ChatEditTarget
 import org.cyblight.android.ui.messages.ChatReplyTarget
 import org.cyblight.android.ui.messages.ChatScreen
 import org.cyblight.android.ui.messages.MessagesScreen
-import org.cyblight.android.ui.security.SecurityScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,6 +71,8 @@ fun MainScreen(
     chatReplyTarget: ChatReplyTarget?,
     chatEditTarget: ChatEditTarget?,
     chatDraftText: String,
+    chatFormatToolbarHidden: Boolean,
+    localeTag: String,
     isChatLoading: Boolean,
     isSending: Boolean,
     homeContent: HomeContent?,
@@ -115,23 +114,15 @@ fun MainScreen(
     onForwardChatMessage: (String, String) -> Unit,
     onReactChatMessage: (String, String) -> Unit,
     onUpdateChatDraft: (String) -> Unit,
-    securityOverview: SecurityOverview?,
-    isSecurityLoading: Boolean,
-    isSecurityRefreshing: Boolean,
-    onSecurityTabSelected: () -> Unit,
-    onRefreshSecurity: () -> Unit,
-    onOpenSecurityCheck: () -> Unit,
-    onOpenAccountSecurity: () -> Unit,
-    onOpenPasskeys: () -> Unit,
-    onOpenTrustedDevices: () -> Unit,
-    onOpenLoginHistory: () -> Unit,
-    onOpenSessions: () -> Unit,
+    onChatFormatToolbarHiddenChange: (Boolean) -> Unit,
     onEasterTabSelected: () -> Unit,
     onSelectTab: (MainTab) -> Unit,
     onFriendsSubTabChange: (Int) -> Unit,
     onRefreshHome: () -> Unit,
     onOpenUrl: (String) -> Unit,
     onOpenChangelog: () -> Unit,
+    homeWhatsNewBannerHidden: Boolean,
+    onHomeWhatsNewBannerHiddenChange: (Boolean) -> Unit,
     encryptionReminderChatDismissed: Boolean,
     onDismissEncryptionReminderChat: () -> Unit,
     onOpenSecurityBackup: () -> Unit,
@@ -153,6 +144,9 @@ fun MainScreen(
             editTarget = chatEditTarget,
             savedDraft = chatDraftText,
             onDraftSaved = onUpdateChatDraft,
+            localeTag = localeTag,
+            formatToolbarHidden = chatFormatToolbarHidden,
+            onFormatToolbarHiddenChange = onChatFormatToolbarHiddenChange,
             onBack = onCloseChat,
             onOpenProfile = onOpenFriendProfile,
             onSend = onSendMessage,
@@ -176,7 +170,6 @@ fun MainScreen(
     LaunchedEffect(selectedTab) {
         when (selectedTab) {
             MainTab.Home -> onRefreshHome()
-            MainTab.Security -> onSecurityTabSelected()
             MainTab.Easter -> onEasterTabSelected()
             else -> Unit
         }
@@ -237,12 +230,6 @@ fun MainScreen(
                     label = { BottomNavLabel(stringResource(R.string.nav_tab_messages)) },
                 )
                 NavigationBarItem(
-                    selected = selectedTab == MainTab.Security,
-                    onClick = { onSelectTab(MainTab.Security) },
-                    icon = { Icon(Icons.Outlined.Security, contentDescription = null) },
-                    label = { BottomNavLabel(stringResource(R.string.nav_tab_security)) },
-                )
-                NavigationBarItem(
                     selected = selectedTab == MainTab.Easter,
                     onClick = { onSelectTab(MainTab.Easter) },
                     icon = { Icon(Icons.Outlined.Celebration, contentDescription = null) },
@@ -256,6 +243,8 @@ fun MainScreen(
                 content = homeContent,
                 isLoading = isHomeLoading,
                 error = homeError,
+                whatsNewBannerHidden = homeWhatsNewBannerHidden,
+                onDismissWhatsNewBanner = { onHomeWhatsNewBannerHiddenChange(true) },
                 onRefresh = onRefreshHome,
                 onOpenUrl = onOpenUrl,
                 onOpenChangelog = onOpenChangelog,
@@ -291,25 +280,11 @@ fun MainScreen(
                 conversations = conversations,
                 isLoading = conversations.isEmpty() && messagesError == null,
                 error = messagesError,
+                encryptionReminderHidden = encryptionReminderChatDismissed,
                 onRefresh = onRefresh,
                 onOpenChat = onOpenChat,
                 onOpenProfile = onOpenFriendProfile,
-                onOpenSecurityBackup = onOpenSecurityBackup,
-                modifier = Modifier.padding(padding),
-            )
-            MainTab.Security -> SecurityScreen(
-                overview = securityOverview,
-                isLoading = isSecurityLoading,
-                isRefreshing = isSecurityRefreshing,
-                onRefresh = onRefreshSecurity,
-                onOpenSecurityCheck = onOpenSecurityCheck,
-                onOpenEmail = onOpenAccountSecurity,
-                onOpenPassword = onOpenAccountSecurity,
-                onOpenTwoFactor = onOpenAccountSecurity,
-                onOpenPasskeys = onOpenPasskeys,
-                onOpenTrustedDevices = onOpenTrustedDevices,
-                onOpenLoginHistory = onOpenLoginHistory,
-                onOpenSessions = onOpenSessions,
+                onOpenChatBackup = onOpenSecurityBackup,
                 modifier = Modifier.padding(padding),
             )
             MainTab.Easter -> EasterEggsScreen(

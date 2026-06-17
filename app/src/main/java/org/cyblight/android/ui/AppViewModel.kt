@@ -5,9 +5,12 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -36,11 +39,16 @@ import org.cyblight.android.data.preferences.RootBackBehavior
 import org.cyblight.android.data.preferences.SwipeBackEdgeWidth
 import org.cyblight.android.data.preferences.SwipeBackSensitivity
 import org.cyblight.android.data.preferences.ThemeMode
+import org.cyblight.android.data.home.ChangelogLocalizedNotes
 import org.cyblight.android.data.home.ChangelogRelease
 import org.cyblight.android.data.home.HomeContent
 import org.cyblight.android.data.home.HomeContentRepository
 import org.cyblight.android.crypto.SignalCryptoManager
 import org.cyblight.android.crypto.backup.CyblightBackupManager
+import org.cyblight.android.integrations.google_drive.DriveBackupMetadata
+import org.cyblight.android.integrations.google_drive.GoogleDriveBackupService
+import org.cyblight.android.integrations.google_drive.GoogleDriveConfig
+import android.content.Intent
 import org.cyblight.android.data.repository.AuthRepository
 import org.cyblight.android.data.repository.AuthResult
 import org.cyblight.android.data.repository.SessionRefreshResult
@@ -64,8 +72,12 @@ import org.cyblight.android.update.UpdateUiState
 import org.cyblight.android.notifications.LoginNotificationMonitor
 import org.cyblight.android.notifications.MessageNotificationMonitor
 import org.cyblight.android.notifications.PushTokenRegistrar
+import org.cyblight.android.workers.ChatBackupWorker
 import org.cyblight.android.workers.LoginNotificationWorker
 import org.cyblight.android.workers.MessageNotificationWorker
+import org.cyblight.android.R
+import org.cyblight.android.data.preferences.ChatBackupFrequency
+import org.cyblight.android.security.BackupPasswordStore
 import org.cyblight.android.util.SystemSettings
 import org.cyblight.android.ui.messages.ChatEditTarget
 import org.cyblight.android.ui.messages.ChatFormatUtils
@@ -129,6 +141,7 @@ data class AppUiState(
     val chatReplyTarget: ChatReplyTarget? = null,
     val chatEditTarget: ChatEditTarget? = null,
     val chatDraftText: String = "",
+    val chatFormatToolbarHidden: Boolean = false,
     val chatFriendId: String? = null,
     val chatFriendName: String? = null,
     val chatFriendIsOnline: Boolean = false,
@@ -195,7 +208,24 @@ data class AppUiState(
     val swipeBackEdgeWidth: SwipeBackEdgeWidth = SwipeBackEdgeWidth.NORMAL,
     val rootBackBehavior: RootBackBehavior = RootBackBehavior.HOME_THEN_EXIT,
     val encryptionReminderChatDismissed: Boolean = false,
-    val settingsFocusSignalBackup: Boolean = false,
+    val homeWhatsNewBannerHidden: Boolean = false,
+    val settingsFocusChatBackup: Boolean = false,
+    val googleDriveAccountLabel: String? = null,
+    val googleDriveBackupMetadata: org.cyblight.android.integrations.google_drive.DriveBackupMetadata? = null,
+    val chatBackupFrequency: org.cyblight.android.data.preferences.ChatBackupFrequency =
+        org.cyblight.android.data.preferences.ChatBackupFrequency.OFF,
+    val chatBackupOverCellular: Boolean = false,
+    val chatBackupHasStoredPassword: Boolean = false,
+    val driveRestoreConfirmMetadata: org.cyblight.android.integrations.google_drive.DriveBackupMetadata? = null,
+    val driveRestorePasswordOpen: Boolean = false,
+    val driveRestoreBusy: Boolean = false,
+    val driveRestoreProgress: Int = 0,
+    val driveRestoreProgressKey: String? = null,
+    val driveRestoreToast: String? = null,
+    val driveRestoreToastIsError: Boolean = false,
+    val settingsSection: org.cyblight.android.ui.settings.SettingsSection =
+        org.cyblight.android.ui.settings.SettingsSection.Hub,
+    val settingsReturnAfterDetail: Boolean = false,
 )
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -206,7 +236,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val friendsRepository = FriendsRepository(api)
     private val signalCrypto = SignalCryptoManager(application, api)
     private val backupManager = CyblightBackupManager(application)
-    private val messagesRepository = MessagesRepository(api, signalCrypto) {
+    private val googleDriveBackupService = GoogleDriveBackupService.create(application)
+    private val backupPasswordStore = BackupPasswordStore(application)
+    private val messagesRepository = MessagesRepository(application, api, signalCrypto) {
         sessionManager.getUserId()
     }
     private val profileRepository = ProfileRepository(api)
@@ -226,6 +258,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var skipAppLockOnce = false
     private var unlockedThisSession = false
     private var consumedInitialLockCheck = false
+
+    private val _driveRestoreGoogleSignInRequest = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val driveRestoreGoogleSignInRequest: SharedFlow<Unit> = _driveRestoreGoogleSignInRequest.asSharedFlow()
+
+    private var authSetupCompletedForUser: String? = null
+    private var pendingDriveRestoreGoogleSignIn = false
 
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
@@ -261,6 +299,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val swipeBackEdgeWidth = appPreferences.getSwipeBackEdgeWidth()
                 val rootBackBehavior = appPreferences.getRootBackBehavior()
                 val encryptionReminderChatDismissed = appPreferences.getEncryptionReminderChatDismissed()
+                val chatFormatToolbarHidden = appPreferences.getChatFormatToolbarHidden()
+                val homeWhatsNewBannerHidden = appPreferences.getHomeWhatsNewBannerHidden()
+                val chatBackupFrequency = appPreferences.getChatBackupFrequency()
+                val chatBackupOverCellular = appPreferences.getChatBackupOverCellular()
                 LocaleManager.apply(savedLocale)
                 _uiState.value = _uiState.value.copy(
                     locale = savedLocale,
@@ -279,6 +321,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     swipeBackEdgeWidth = swipeBackEdgeWidth,
                     rootBackBehavior = rootBackBehavior,
                     encryptionReminderChatDismissed = encryptionReminderChatDismissed,
+                    chatFormatToolbarHidden = chatFormatToolbarHidden,
+                    homeWhatsNewBannerHidden = homeWhatsNewBannerHidden,
+                    chatBackupFrequency = chatBackupFrequency,
+                    chatBackupOverCellular = chatBackupOverCellular,
+                    chatBackupHasStoredPassword = backupPasswordStore.hasPassword(),
                 )
 
                 val user = authRepository.restoreSession()
@@ -289,18 +336,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 if (user != null) {
-                    runCatching { messagesRepository.ensureSignalKeys(user.id) }
-                        .onFailure { error ->
-                            android.util.Log.e("SignalCrypto", "Key registration failed", error)
-                        }
                     when (authRepository.refreshSession()) {
                         SessionRefreshResult.Expired -> forceLogout()
                         else -> {
-                            refreshSocialData()
-                            refreshHomeContent()
-                            LoginNotificationWorker.schedule(getApplication())
-                            MessageNotificationWorker.schedule(getApplication())
-                            PushTokenRegistrar.registerCurrentToken(getApplication())
+                            val restoreStarted = maybeStartDriveRestoreOnLogin(user.id)
+                            if (!restoreStarted) {
+                                completeAuthSetup(user.id)
+                            } else {
+                                refreshHomeContent()
+                            }
                         }
                     }
                 }
@@ -315,9 +359,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun forceLogout() {
         LoginNotificationWorker.cancel(getApplication())
         MessageNotificationWorker.cancel(getApplication())
+        ChatBackupWorker.cancel(getApplication())
         PushTokenRegistrar.unregisterCurrentToken(getApplication())
+        authSetupCompletedForUser = null
         viewModelScope.launch {
             appPreferences.setActiveChatFriendId(null)
+            appPreferences.clearDriveRestorePromptDismissed()
         }
         _uiState.value = AppUiState(
             screen = AppScreen.Login,
@@ -399,7 +446,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             update = UpdateUiState(
                 visible = true,
                 versionName = info.versionName,
-                releaseNotes = info.releaseNotes,
+                releaseNotes = ChangelogLocalizedNotes.resolve(
+                    version = info.versionName,
+                    locale = _uiState.value.locale,
+                    githubFallback = info.releaseNotes,
+                ),
                 downloadUrl = info.downloadUrl,
                 status = if (alreadyDownloaded) {
                     UpdateStatus.ReadyToInstall
@@ -469,6 +520,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             LocaleManager.apply(locale)
             _uiState.value = _uiState.value.copy(locale = locale)
             refreshHomeContent()
+            if (_uiState.value.detailScreen == DetailScreen.Changelog) {
+                refreshChangelog()
+            }
         }
     }
 
@@ -512,29 +566,97 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun openSettings() {
         _uiState.value = _uiState.value.copy(
             detailScreen = DetailScreen.Settings,
-            settingsFocusSignalBackup = false,
+            settingsSection = org.cyblight.android.ui.settings.SettingsSection.Hub,
+            settingsFocusChatBackup = false,
         )
     }
 
-    fun openSecurityBackup() {
+    fun setSettingsSection(section: org.cyblight.android.ui.settings.SettingsSection) {
+        _uiState.value = _uiState.value.copy(settingsSection = section)
+        if (section == org.cyblight.android.ui.settings.SettingsSection.Security) {
+            refreshSecurityOverview()
+        }
+    }
+
+    fun openChatBackup() {
         if (_uiState.value.chatFriendId != null) {
             closeChat()
         }
         _uiState.value = _uiState.value.copy(
             detailScreen = DetailScreen.Settings,
-            settingsFocusSignalBackup = true,
+            settingsSection = org.cyblight.android.ui.settings.SettingsSection.ChatBackup,
+            settingsFocusChatBackup = false,
         )
     }
 
-    fun clearSettingsFocusSignalBackup() {
-        if (!_uiState.value.settingsFocusSignalBackup) return
-        _uiState.value = _uiState.value.copy(settingsFocusSignalBackup = false)
+    fun clearSettingsFocusChatBackup() {
+        if (!_uiState.value.settingsFocusChatBackup) return
+        _uiState.value = _uiState.value.copy(settingsFocusChatBackup = false)
+    }
+
+    fun setEncryptionReminderChatDismissed(dismissed: Boolean) {
+        viewModelScope.launch {
+            appPreferences.setEncryptionReminderChatDismissed(dismissed)
+            _uiState.value = _uiState.value.copy(encryptionReminderChatDismissed = dismissed)
+        }
     }
 
     fun dismissEncryptionReminderChat() {
+        setEncryptionReminderChatDismissed(true)
+    }
+
+    fun setChatFormatToolbarHidden(hidden: Boolean) {
         viewModelScope.launch {
-            appPreferences.setEncryptionReminderChatDismissed(true)
-            _uiState.value = _uiState.value.copy(encryptionReminderChatDismissed = true)
+            appPreferences.setChatFormatToolbarHidden(hidden)
+            _uiState.value = _uiState.value.copy(chatFormatToolbarHidden = hidden)
+        }
+    }
+
+    fun setHomeWhatsNewBannerHidden(hidden: Boolean) {
+        viewModelScope.launch {
+            appPreferences.setHomeWhatsNewBannerHidden(hidden)
+            _uiState.value = _uiState.value.copy(homeWhatsNewBannerHidden = hidden)
+        }
+    }
+
+    fun exportChats(
+        onReady: (fileName: String, json: String, chatCount: Int, messageCount: Int) -> Unit,
+        onError: () -> Unit,
+    ) {
+        viewModelScope.launch {
+            messagesRepository.exportChatsJson()
+                .onSuccess { json ->
+                    val login = _uiState.value.user?.login.orEmpty().ifBlank { "user" }
+                    val safeLogin = login.replace(Regex("[^\\w.-]+"), "_")
+                    val stamp = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                        .format(java.util.Date())
+                    val fileName = "cyblight-chats-$safeLogin-$stamp.cyblight-chats.json"
+                    val gson = com.google.gson.Gson()
+                    val root = gson.fromJson(json, com.google.gson.JsonObject::class.java)
+                    val exportElement = root.get("export")
+                    val chats = exportElement?.asJsonObject?.getAsJsonArray("chats")
+                    val chatCount = chats?.size() ?: 0
+                    var messageCount = 0
+                    chats?.forEach { chat ->
+                        chat.asJsonObject.getAsJsonArray("messages")?.let { messages ->
+                            messageCount += messages.size()
+                        }
+                    }
+                    onReady(fileName, json, chatCount, messageCount)
+                }
+                .onFailure { onError() }
+        }
+    }
+
+    fun importChats(json: String, onResult: (org.cyblight.android.data.repository.ChatsImportStats?) -> Unit) {
+        viewModelScope.launch {
+            messagesRepository.importChatsJson(json)
+                .onSuccess { stats ->
+                    refreshSocialData()
+                    _uiState.value.chatFriendId?.let { friendId -> reloadChat(friendId) }
+                    onResult(stats)
+                }
+                .onFailure { onResult(null) }
         }
     }
 
@@ -712,28 +834,226 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         openChat(friendId, friendName.ifBlank { friendId })
     }
 
+    fun openSessionsFromNotification() {
+        if (_uiState.value.screen != AppScreen.Main || _uiState.value.user == null) return
+        if (_uiState.value.chatFriendId != null) {
+            closeChat()
+        }
+        openSessions()
+    }
+
     private fun onAuthenticated() {
         skipAppLockOnce = true
         unlockedThisSession = true
         consumedInitialLockCheck = false
         viewModelScope.launch {
-            _uiState.value.user?.id?.let { userId ->
-                runCatching { messagesRepository.ensureSignalKeys(userId) }
-                    .onFailure { error ->
-                        android.util.Log.e("SignalCrypto", "Key registration failed", error)
-                    }
+            val userId = _uiState.value.user?.id ?: return@launch
+            val restoreStarted = maybeStartDriveRestoreOnLogin(userId)
+            if (!restoreStarted) {
+                completeAuthSetup(userId)
+            } else {
+                refreshHomeContent()
             }
-            loginNotificationMonitor.markOwnLoginGracePeriod()
-            messageNotificationMonitor.syncBaselineFromServer()
-            LoginNotificationWorker.schedule(getApplication())
-            MessageNotificationWorker.schedule(getApplication())
-            PushTokenRegistrar.registerCurrentToken(getApplication())
         }
         checkForUpdate(force = true)
     }
 
+    private suspend fun completeAuthSetup(userId: String) {
+        if (authSetupCompletedForUser == userId) return
+        authSetupCompletedForUser = userId
+        runCatching { messagesRepository.ensureSignalKeys(userId) }
+            .onFailure { error ->
+                android.util.Log.e("SignalCrypto", "Key registration failed", error)
+            }
+        loginNotificationMonitor.markOwnLoginGracePeriod()
+        messageNotificationMonitor.syncBaselineFromServer()
+        LoginNotificationWorker.schedule(getApplication())
+        MessageNotificationWorker.schedule(getApplication())
+        syncChatBackupScheduling()
+        PushTokenRegistrar.registerCurrentToken(getApplication())
+        refreshSocialData()
+        refreshHomeContent()
+    }
+
+    private suspend fun maybeStartDriveRestoreOnLogin(userId: String): Boolean {
+        if (!GoogleDriveConfig.isConfigured()) return false
+        if (appPreferences.isDriveRestorePromptDismissed(userId)) return false
+        if (backupManager.hasLocalBackupKeys(userId)) return false
+
+        if (!googleDriveBackupService.hasSession()) {
+            pendingDriveRestoreGoogleSignIn = true
+            _driveRestoreGoogleSignInRequest.tryEmit(Unit)
+            return true
+        }
+        return presentDriveRestorePromptIfNeeded(userId)
+    }
+
+    private suspend fun presentDriveRestorePromptIfNeeded(userId: String): Boolean {
+        val metadata = runCatching { googleDriveBackupService.fetchMetadata(userId) }.getOrNull()
+            ?: return false
+        refreshGoogleDriveStatusSync()
+        _uiState.value = _uiState.value.copy(
+            driveRestoreConfirmMetadata = metadata,
+            driveRestorePasswordOpen = false,
+            driveRestoreBusy = false,
+        )
+        return true
+    }
+
+    private suspend fun continueDriveRestoreAfterGoogleSignIn() {
+        val userId = _uiState.value.user?.id ?: return
+        if (backupManager.hasLocalBackupKeys(userId)) {
+            completeAuthSetup(userId)
+            return
+        }
+        if (!presentDriveRestorePromptIfNeeded(userId)) {
+            completeAuthSetup(userId)
+        }
+    }
+
+    fun onDriveRestoreGoogleSignInCancelled() {
+        viewModelScope.launch {
+            val userId = _uiState.value.user?.id ?: return@launch
+            appPreferences.setDriveRestorePromptDismissed(userId)
+            clearDriveRestoreUi()
+            completeAuthSetup(userId)
+        }
+    }
+
+    fun skipDriveRestore() {
+        viewModelScope.launch {
+            val userId = _uiState.value.user?.id ?: return@launch
+            appPreferences.setDriveRestorePromptDismissed(userId)
+            clearDriveRestoreUi()
+            completeAuthSetup(userId)
+        }
+    }
+
+    fun beginDriveRestore() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(driveRestoreConfirmMetadata = null)
+            val storedPassword = backupPasswordStore.getPassword()
+            if (!storedPassword.isNullOrBlank()) {
+                submitDriveRestorePassword(storedPassword, fromStoredPassword = true)
+                if (_uiState.value.driveRestoreConfirmMetadata == null &&
+                    !_uiState.value.driveRestorePasswordOpen &&
+                    !_uiState.value.driveRestoreBusy
+                ) {
+                    return@launch
+                }
+            }
+            _uiState.value = _uiState.value.copy(driveRestorePasswordOpen = true)
+        }
+    }
+
+    fun dismissDriveRestorePasswordDialog() {
+        if (_uiState.value.driveRestoreBusy) return
+        _uiState.value = _uiState.value.copy(driveRestorePasswordOpen = false)
+    }
+
+    fun submitDriveRestorePassword(
+        password: String,
+        fromStoredPassword: Boolean = false,
+    ) {
+        viewModelScope.launch {
+            if (password.isBlank()) return@launch
+            _uiState.value = _uiState.value.copy(
+                driveRestoreBusy = true,
+                driveRestoreProgress = 0,
+                driveRestorePasswordOpen = true,
+            )
+            restoreGoogleDriveBackup(password) { value, key ->
+                _uiState.value = _uiState.value.copy(
+                    driveRestoreProgress = value,
+                    driveRestoreProgressKey = key,
+                )
+            }.onSuccess { stats ->
+                val userId = _uiState.value.user?.id
+                if (userId != null) {
+                    appPreferences.clearDriveRestorePromptDismissed()
+                    appPreferences.setLastAutoBackupSuccessMs(System.currentTimeMillis())
+                    authSetupCompletedForUser = null
+                }
+                clearDriveRestoreUi()
+                userId?.let { completeAuthSetup(it) }
+                refreshGoogleDriveStatusSync()
+                _uiState.value = _uiState.value.copy(
+                    driveRestoreToast = buildDriveRestoreSuccessMessage(stats),
+                )
+            }.onFailure { error ->
+                if (fromStoredPassword) {
+                    _uiState.value = _uiState.value.copy(
+                        driveRestoreBusy = false,
+                        driveRestoreProgress = 0,
+                        driveRestoreProgressKey = null,
+                        driveRestorePasswordOpen = true,
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        driveRestoreBusy = false,
+                        driveRestoreProgress = 0,
+                        driveRestoreProgressKey = null,
+                        driveRestoreToast = signalBackupErrorMessage(error),
+                        driveRestoreToastIsError = true,
+                    )
+                }
+            }
+        }
+    }
+
+    fun consumeDriveRestoreToast(): Pair<String, Boolean>? {
+        val message = _uiState.value.driveRestoreToast ?: return null
+        val isError = _uiState.value.driveRestoreToastIsError
+        _uiState.value = _uiState.value.copy(
+            driveRestoreToast = null,
+            driveRestoreToastIsError = false,
+        )
+        return message to isError
+    }
+
+    private fun clearDriveRestoreUi() {
+        _uiState.value = _uiState.value.copy(
+            driveRestoreConfirmMetadata = null,
+            driveRestorePasswordOpen = false,
+            driveRestoreBusy = false,
+            driveRestoreProgress = 0,
+            driveRestoreProgressKey = null,
+        )
+    }
+
+    private fun buildDriveRestoreSuccessMessage(
+        stats: org.cyblight.android.crypto.backup.BackupRestoreStats,
+    ): String {
+        val context = getApplication<Application>()
+        val base = context.getString(R.string.settings_google_drive_restore_done)
+        if (stats.chatsImported + stats.chatsSkipped + stats.chatsErrors <= 0) return base
+        return "$base ${context.getString(
+            R.string.settings_google_drive_restore_chats_stats,
+            stats.chatsImported,
+            stats.chatsSkipped,
+        )}"
+    }
+
+    fun driveRestoreProgressLabel(key: String?): String? {
+        if (key.isNullOrBlank()) return null
+        val context = getApplication<Application>()
+        return when (key) {
+            "progress_auth" -> context.getString(R.string.settings_google_drive_progress_auth)
+            "progress_find" -> context.getString(R.string.settings_google_drive_progress_find)
+            "progress_download" -> context.getString(R.string.settings_google_drive_progress_download)
+            "progress_restore" -> context.getString(R.string.settings_google_drive_progress_restore)
+            "progress_chats" -> context.getString(R.string.settings_google_drive_progress_chats)
+            "progress_done" -> context.getString(R.string.settings_google_drive_progress_done)
+            else -> context.getString(R.string.settings_google_drive_progress_restore)
+        }
+    }
+
     fun openSecurityCheck() {
-        _uiState.value = _uiState.value.copy(detailScreen = DetailScreen.SecurityCheck)
+        val returnToSettings = _uiState.value.detailScreen == DetailScreen.Settings
+        _uiState.value = _uiState.value.copy(
+            detailScreen = DetailScreen.SecurityCheck,
+            settingsReturnAfterDetail = returnToSettings,
+        )
         forceRefreshSecurityOverview()
     }
 
@@ -748,8 +1068,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openPasskeys() {
+        val returnToSettings = _uiState.value.detailScreen == DetailScreen.Settings
         _uiState.value = _uiState.value.copy(
             detailScreen = DetailScreen.Passkeys,
+            settingsReturnAfterDetail = returnToSettings,
             passkeysError = null,
             isPasskeysLoading = true,
         )
@@ -757,8 +1079,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openTrustedDevices() {
+        val returnToSettings = _uiState.value.detailScreen == DetailScreen.Settings
         _uiState.value = _uiState.value.copy(
             detailScreen = DetailScreen.TrustedDevices,
+            settingsReturnAfterDetail = returnToSettings,
             trustedDevicesError = null,
             isTrustedDevicesLoading = true,
         )
@@ -766,8 +1090,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openLoginHistory() {
+        val returnToSettings = _uiState.value.detailScreen == DetailScreen.Settings
         _uiState.value = _uiState.value.copy(
             detailScreen = DetailScreen.LoginHistory,
+            settingsReturnAfterDetail = returnToSettings,
             loginHistoryError = null,
             isLoginHistoryLoading = true,
         )
@@ -775,8 +1101,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openSessions() {
+        val returnToSettings = _uiState.value.detailScreen == DetailScreen.Settings
         _uiState.value = _uiState.value.copy(
             detailScreen = DetailScreen.Sessions,
+            settingsReturnAfterDetail = returnToSettings,
             sessionsError = null,
             isSessionsLoading = true,
         )
@@ -918,8 +1246,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
             DetailScreen.Sessions -> {
+                val returnToSettings = _uiState.value.settingsReturnAfterDetail
                 _uiState.value = _uiState.value.copy(
-                    detailScreen = DetailScreen.None,
+                    detailScreen = if (returnToSettings) DetailScreen.Settings else DetailScreen.None,
+                    settingsReturnAfterDetail = false,
+                    settingsSection = if (returnToSettings) {
+                        org.cyblight.android.ui.settings.SettingsSection.Security
+                    } else {
+                        _uiState.value.settingsSection
+                    },
                     sessionsError = null,
                 )
             }
@@ -928,14 +1263,34 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             DetailScreen.TrustedDevices,
             DetailScreen.Passkeys,
             -> {
+                val returnToSettings = _uiState.value.settingsReturnAfterDetail
                 _uiState.value = _uiState.value.copy(
-                    detailScreen = DetailScreen.None,
+                    detailScreen = if (returnToSettings) DetailScreen.Settings else DetailScreen.None,
+                    settingsReturnAfterDetail = false,
+                    settingsSection = if (returnToSettings) {
+                        org.cyblight.android.ui.settings.SettingsSection.Security
+                    } else {
+                        _uiState.value.settingsSection
+                    },
                     passkeysError = null,
                     passkeyRegisterError = null,
                     passkeyDeleteError = null,
                     trustedDevicesError = null,
                     loginHistoryError = null,
                 )
+            }
+            DetailScreen.Settings -> {
+                if (_uiState.value.settingsSection != org.cyblight.android.ui.settings.SettingsSection.Hub) {
+                    _uiState.value = _uiState.value.copy(
+                        settingsSection = org.cyblight.android.ui.settings.SettingsSection.Hub,
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        detailScreen = DetailScreen.None,
+                        settingsSection = org.cyblight.android.ui.settings.SettingsSection.Hub,
+                        settingsFocusChatBackup = false,
+                    )
+                }
             }
             DetailScreen.Help -> {
                 _uiState.value = if (_uiState.value.helpReturnToSettings) {
@@ -972,7 +1327,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(selectedMainTab = tab)
         when (tab) {
             MainTab.Home -> refreshHomeContent()
-            MainTab.Security -> refreshSecurityOverview()
             MainTab.Easter -> refreshEasterFlags()
             else -> Unit
         }
@@ -1015,7 +1369,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshChangelog() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isChangelogLoading = true, changelogError = null)
-            homeContentRepository.loadChangelog()
+            homeContentRepository.loadChangelog(_uiState.value.locale)
                 .onSuccess { releases ->
                     _uiState.value = _uiState.value.copy(
                         changelogReleases = releases,
@@ -1114,16 +1468,187 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     suspend fun createSignalBackup(password: String): Result<String> = runCatching {
         val userId = sessionManager.getUserId().orEmpty()
         if (userId.isBlank()) throw IllegalArgumentException("backup_user_missing")
-        backupManager.createBackupFile(userId, password)
+        val chats = messagesRepository.fetchChatsExportPayload()
+        backupManager.createBackupFile(userId, password, chats)
     }
 
     suspend fun restoreSignalBackup(content: String, password: String): Result<Unit> = runCatching {
         val userId = sessionManager.getUserId().orEmpty()
         if (userId.isBlank()) throw IllegalArgumentException("backup_user_missing")
-        backupManager.importBackupFile(userId, content, password)
+        val payload = backupManager.decryptBackupPayload(content, password)
+        backupManager.restorePayload(userId, payload)
+        if (payload.version == org.cyblight.android.crypto.backup.BACKUP_PAYLOAD_VERSION_V2 && payload.chats != null) {
+            messagesRepository.importChatsPayload(payload.chats).getOrThrow()
+        }
     }
 
     fun signalBackupErrorMessage(code: String): String = backupManager.errorMessage(code)
+
+    fun signalBackupErrorMessage(error: Throwable): String =
+        signalBackupErrorMessage(backupErrorCode(error))
+
+    private fun backupErrorCode(error: Throwable): String {
+        var current: Throwable? = error
+        while (current != null) {
+            val message = current.message?.substringBefore(':')?.trim()
+            if (!message.isNullOrBlank() &&
+                (message.startsWith("google_drive_") || message.startsWith("backup_") || message == "chats_import_failed")
+            ) {
+                return message
+            }
+            current = current.cause
+        }
+        return "backup_failed"
+    }
+
+    fun isGoogleDriveConfigured(): Boolean = googleDriveBackupService.isConfigured()
+
+    fun getGoogleDriveSignInIntent(): Intent = googleDriveBackupService.getSignInIntent()
+
+    fun handleGoogleDriveSignInResult(data: Intent?) {
+        viewModelScope.launch {
+            if (data == null) {
+                if (pendingDriveRestoreGoogleSignIn) {
+                    pendingDriveRestoreGoogleSignIn = false
+                    onDriveRestoreGoogleSignInCancelled()
+                }
+                return@launch
+            }
+
+            val userId = _uiState.value.user?.id
+            val shouldContinueRestore = pendingDriveRestoreGoogleSignIn ||
+                (userId != null &&
+                    !backupManager.hasLocalBackupKeys(userId) &&
+                    !appPreferences.isDriveRestorePromptDismissed(userId))
+
+            googleDriveBackupService.handleSignInResult(data)
+                .onSuccess {
+                    pendingDriveRestoreGoogleSignIn = false
+                    refreshGoogleDriveStatusSync()
+                    syncChatBackupScheduling()
+                    if (shouldContinueRestore) {
+                        continueDriveRestoreAfterGoogleSignIn()
+                    }
+                }
+                .onFailure {
+                    pendingDriveRestoreGoogleSignIn = false
+                    if (shouldContinueRestore) {
+                        onDriveRestoreGoogleSignInCancelled()
+                    }
+                }
+        }
+    }
+
+    fun refreshGoogleDriveStatus() {
+        viewModelScope.launch {
+            refreshGoogleDriveStatusSync()
+        }
+    }
+
+    suspend fun refreshGoogleDriveStatusSync() {
+        val label = if (googleDriveBackupService.hasSession()) {
+            googleDriveBackupService.getAccountLabel()
+        } else {
+            null
+        }
+        val userId = sessionManager.getUserId().orEmpty()
+        val metadata: DriveBackupMetadata? = if (userId.isNotBlank() && label != null) {
+            runCatching { googleDriveBackupService.fetchMetadata(userId) }.getOrNull()
+        } else {
+            null
+        }
+        _uiState.value = _uiState.value.copy(
+            googleDriveAccountLabel = label,
+            googleDriveBackupMetadata = metadata,
+        )
+    }
+
+    suspend fun uploadGoogleDriveBackup(
+        password: String,
+        onProgress: (Int, String) -> Unit,
+    ): Result<Unit> = runCatching {
+        val userId = sessionManager.getUserId().orEmpty()
+        val login = _uiState.value.user?.login.orEmpty().ifBlank { "user" }
+        if (userId.isBlank()) throw IllegalArgumentException("backup_user_missing")
+        googleDriveBackupService.uploadBackup(userId, login, password, onProgress)
+        appPreferences.setLastAutoBackupSuccessMs(System.currentTimeMillis())
+        if (_uiState.value.chatBackupFrequency != ChatBackupFrequency.OFF) {
+            backupPasswordStore.savePassword(password)
+            _uiState.value = _uiState.value.copy(chatBackupHasStoredPassword = true)
+        }
+        Unit
+    }
+
+    fun setChatBackupOverCellular(enabled: Boolean) {
+        viewModelScope.launch {
+            appPreferences.setChatBackupOverCellular(enabled)
+            _uiState.value = _uiState.value.copy(chatBackupOverCellular = enabled)
+            syncChatBackupScheduling()
+        }
+    }
+
+    fun setChatBackupFrequency(frequency: ChatBackupFrequency) {
+        viewModelScope.launch {
+            runCatching { setChatBackupFrequencyInternal(frequency) }
+        }
+    }
+
+    suspend fun enableAutoBackup(frequency: ChatBackupFrequency, password: String): Result<Unit> = runCatching {
+        if (frequency == ChatBackupFrequency.OFF) throw IllegalArgumentException("invalid_frequency")
+        if (password.length < 8) throw IllegalArgumentException("backup_password_short")
+        backupPasswordStore.savePassword(password)
+        setChatBackupFrequencyInternal(frequency)
+    }
+
+    private suspend fun setChatBackupFrequencyInternal(frequency: ChatBackupFrequency) {
+        if (frequency != ChatBackupFrequency.OFF && !backupPasswordStore.hasPassword()) {
+            throw IllegalStateException("backup_password_required")
+        }
+        appPreferences.setChatBackupFrequency(frequency)
+        if (frequency == ChatBackupFrequency.OFF) {
+            backupPasswordStore.clearPassword()
+            ChatBackupWorker.cancel(getApplication())
+        } else {
+            syncChatBackupScheduling(frequency, appPreferences.getChatBackupOverCellular())
+        }
+        _uiState.value = _uiState.value.copy(
+            chatBackupFrequency = frequency,
+            chatBackupHasStoredPassword = backupPasswordStore.hasPassword(),
+        )
+    }
+
+    private suspend fun syncChatBackupScheduling() {
+        val frequency = appPreferences.getChatBackupFrequency()
+        val overCellular = appPreferences.getChatBackupOverCellular()
+        ChatBackupWorker.schedule(getApplication(), frequency, overCellular)
+    }
+
+    private suspend fun syncChatBackupScheduling(frequency: ChatBackupFrequency, overCellular: Boolean) {
+        ChatBackupWorker.schedule(getApplication(), frequency, overCellular)
+    }
+
+    suspend fun restoreGoogleDriveBackup(
+        password: String,
+        onProgress: (Int, String) -> Unit,
+    ): Result<org.cyblight.android.crypto.backup.BackupRestoreStats> = runCatching {
+        val userId = sessionManager.getUserId().orEmpty()
+        if (userId.isBlank()) throw IllegalArgumentException("backup_user_missing")
+        googleDriveBackupService.restoreBackup(userId, password, onProgress)
+    }
+
+    suspend fun deleteGoogleDriveBackup(): Result<Boolean> = runCatching {
+        val userId = sessionManager.getUserId().orEmpty()
+        if (userId.isBlank()) throw IllegalArgumentException("backup_user_missing")
+        googleDriveBackupService.deleteBackup(userId)
+    }
+
+    suspend fun signOutGoogleDrive() {
+        googleDriveBackupService.signOut()
+        _uiState.value = _uiState.value.copy(
+            googleDriveAccountLabel = null,
+            googleDriveBackupMetadata = null,
+        )
+    }
 
     fun refreshSessions() {
         loadSessions()
@@ -1304,6 +1829,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(isEasterLoading = true, easterError = null)
             profileRepository.loadEasterFlags()
                 .onSuccess { flags ->
+                    _uiState.value.user?.login?.let { login ->
+                        EasterLogger.syncLoggedFromServerFlags(appPreferences, login, flags)
+                    }
                     _uiState.value = _uiState.value.copy(
                         easterFlags = flags,
                         isEasterLoading = false,
@@ -1337,7 +1865,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(lightCatcherUnlocking = true)
             profileRepository.unlockLightCatcher()
                 .onSuccess {
-                    _uiState.value.user?.login?.let(EasterLogger::logLightCatcher)
+                    _uiState.value.user?.login?.let { login ->
+                        EasterLogger.logLightCatcher(appPreferences, login)
+                    }
                     _uiState.value = _uiState.value.copy(
                         showLightCatcherGame = false,
                         lightCatcherUnlocking = false,
@@ -1361,8 +1891,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         isSubmitting = false,
                         pending2FAUserId = null,
                     )
-                    refreshSocialData()
-                    refreshHomeContent()
                     onAuthenticated()
                 }
                 is AuthResult.Error -> {
@@ -1387,8 +1915,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         isSubmitting = false,
                         pending2FAUserId = null,
                     )
-                    refreshSocialData()
-                    refreshHomeContent()
                     onAuthenticated()
                 }
                 is AuthResult.Requires2FA -> {
@@ -1420,8 +1946,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         isSubmitting = false,
                         pending2FAUserId = null,
                     )
-                    refreshSocialData()
-                    refreshHomeContent()
                     onAuthenticated()
                 }
                 is AuthResult.Error -> {
@@ -1455,11 +1979,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             skipAppLockOnce = false
             unlockedThisSession = false
             consumedInitialLockCheck = false
+            authSetupCompletedForUser = null
             viewModelScope.launch {
                 appPreferences.clearAppLockBackgroundedAtMs()
+                appPreferences.clearDriveRestorePromptDismissed()
             }
             LoginNotificationWorker.cancel(getApplication())
             MessageNotificationWorker.cancel(getApplication())
+            ChatBackupWorker.cancel(getApplication())
             PushTokenRegistrar.unregisterCurrentToken(getApplication())
         }
     }
@@ -2016,7 +2543,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (elapsed >= requiredMs) {
                     profileRepository.unlockNightGuard()
                         .onSuccess {
-                            _uiState.value.user?.login?.let(EasterLogger::logNightGuard)
+                            _uiState.value.user?.login?.let { login ->
+                                EasterLogger.logNightGuard(appPreferences, login)
+                            }
                             appPreferences.clearNightGuardElapsedMs()
                             refreshEasterFlagsFromServer()
                         }
@@ -2034,7 +2563,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (count >= 100) {
                 profileRepository.unlockTrustedFingerprint()
                     .onSuccess {
-                        _uiState.value.user?.login?.let(EasterLogger::logTrustedFingerprint)
+                        _uiState.value.user?.login?.let { login ->
+                            EasterLogger.logTrustedFingerprint(appPreferences, login)
+                        }
                         refreshEasterFlagsFromServer()
                     }
             }
@@ -2048,7 +2579,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             profileRepository.unlockEcho()
                 .onSuccess {
-                    _uiState.value.user?.login?.let(EasterLogger::logEcho)
+                    _uiState.value.user?.login?.let { login ->
+                        EasterLogger.logEcho(appPreferences, login)
+                    }
                     refreshEasterFlagsFromServer()
                 }
         }
@@ -2071,7 +2604,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (!tracker.isComplete()) return@launch
             profileRepository.unlockArchivist()
                 .onSuccess {
-                    _uiState.value.user?.login?.let(EasterLogger::logArchivist)
+                    _uiState.value.user?.login?.let { login ->
+                        EasterLogger.logArchivist(appPreferences, login)
+                    }
                     refreshEasterFlagsFromServer()
                 }
         }
@@ -2106,8 +2641,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val hadBridge = previous?.bridge == true
             profileRepository.loadEasterFlags()
                 .onSuccess { flags ->
-                    if (previous != null && !hadBridge && flags.bridge) {
-                        _uiState.value.user?.login?.let(EasterLogger::logBridge)
+                    val login = _uiState.value.user?.login
+                    if (previous != null && !hadBridge && flags.bridge && login != null) {
+                        EasterLogger.logBridge(appPreferences, login)
+                    }
+                    if (login != null) {
+                        EasterLogger.syncLoggedFromServerFlags(appPreferences, login, flags)
                     }
                     _uiState.value = _uiState.value.copy(
                         easterFlags = flags,

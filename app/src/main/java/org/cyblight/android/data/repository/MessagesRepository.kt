@@ -1,7 +1,9 @@
 package org.cyblight.android.data.repository
 
+import android.content.Context
 import org.cyblight.android.crypto.SignalCryptoManager
 import org.cyblight.android.data.api.CybLightApi
+import org.cyblight.android.data.api.ChatsExportPayload
 import org.cyblight.android.data.api.EditMessageRequest
 import org.cyblight.android.data.api.FriendDto
 import org.cyblight.android.data.api.MessageDto
@@ -24,6 +26,7 @@ data class ChatThread(
 )
 
 class MessagesRepository(
+    private val appContext: Context,
     private val api: CybLightApi,
     private val signalCrypto: SignalCryptoManager,
     private val userIdProvider: suspend () -> String?,
@@ -35,12 +38,25 @@ class MessagesRepository(
                 return Result.failure(Exception("unread_load_failed"))
             }
 
+            val userId = userIdProvider()?.trim().orEmpty()
+            val enrichedPreviews = if (userId.isNotBlank()) {
+                ConversationPreviewEnricher.enrichPreviews(
+                    context = appContext,
+                    userId = userId,
+                    previews = unread.conversationPreviews,
+                    signalCrypto = signalCrypto,
+                )
+            } else {
+                emptyMap()
+            }
+
             val previews = friends.map { friend ->
                 val conversation = unread.conversationPreviews[friend.id]
                 ConversationPreview(
                     friend = friend,
                     unreadCount = unread.unreadByUser[friend.id] ?: 0,
-                    preview = conversation?.preview?.takeIf { it.isNotBlank() },
+                    preview = enrichedPreviews[friend.id]
+                        ?: conversation?.preview?.takeIf { it.isNotBlank() },
                     latestAt = conversation?.latestAt ?: 0L,
                 )
             }.sortedWith(
@@ -208,4 +224,71 @@ class MessagesRepository(
     suspend fun ensureSignalKeys(userId: String) {
         signalCrypto.ensureRegistered(userId)
     }
+
+    suspend fun exportChatsJson(): Result<String> {
+        return try {
+            val response = api.exportChats()
+            val export = response.export
+            if (!response.ok || export == null) {
+                Result.failure(Exception(response.error ?: "export_failed"))
+            } else {
+                val gson = com.google.gson.Gson()
+                Result.success(gson.toJson(mapOf("export" to export)))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun fetchChatsExportPayload(): ChatsExportPayload? {
+        return try {
+            val response = api.exportChats()
+            val export = response.export
+            if (!response.ok || export == null) null
+            else if (export.format != "cyblight-chats" || export.version != 1) null
+            else export
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    suspend fun importChatsPayload(payload: ChatsExportPayload): Result<ChatsImportStats> {
+        return try {
+            if (payload.format != "cyblight-chats" || payload.version != 1) {
+                return Result.failure(Exception("invalid_export_format"))
+            }
+            val response = api.importChats(org.cyblight.android.data.api.ChatsImportRequest(payload))
+            if (response.ok) {
+                Result.success(
+                    ChatsImportStats(
+                        imported = response.imported,
+                        skipped = response.skipped,
+                        errors = response.errors,
+                    ),
+                )
+            } else {
+                Result.failure(Exception(response.error ?: "import_failed"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun importChatsJson(json: String): Result<ChatsImportStats> {
+        return try {
+            val gson = com.google.gson.Gson()
+            val root = gson.fromJson(json, com.google.gson.JsonObject::class.java)
+            val exportElement = root.get("export") ?: root
+            val payload = gson.fromJson(exportElement, ChatsExportPayload::class.java)
+            importChatsPayload(payload)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }
+
+data class ChatsImportStats(
+    val imported: Int,
+    val skipped: Int,
+    val errors: Int,
+)

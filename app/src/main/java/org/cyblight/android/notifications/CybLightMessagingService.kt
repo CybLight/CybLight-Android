@@ -1,10 +1,10 @@
 package org.cyblight.android.notifications
 
-import android.content.Context
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import org.cyblight.android.data.preferences.AppPreferences
 import kotlinx.coroutines.runBlocking
+import org.cyblight.android.data.preferences.AppPreferences
+import org.cyblight.android.util.SystemSettings
 
 class CybLightMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
@@ -18,16 +18,18 @@ class CybLightMessagingService : FirebaseMessagingService() {
         val friendId = data["friendId"]?.trim().orEmpty()
         if (friendId.isEmpty()) return
 
-        val friendName = data["friendName"]?.trim().orEmpty().ifBlank { friendId }
-        val preview = message.notification?.body
-            ?: data["body"]?.trim().orEmpty()
-            ?: message.notification?.title
-            ?: ""
+        if (!SystemSettings.areNotificationsEnabled(applicationContext)) return
+        if (!runBlocking { AppPreferences(applicationContext).getMessageAlertsEnabled() }) return
 
         val activeChatId = runBlocking {
             AppPreferences(applicationContext).getActiveChatFriendId()
         }
         if (activeChatId == friendId) return
+
+        val friendName = data["friendName"]?.trim().orEmpty().ifBlank { friendId }
+        val preview = runBlocking {
+            PushMessagePreviewResolver.resolvePreview(applicationContext, data)
+        }
 
         NotificationHelper.showNewMessageAlert(
             context = applicationContext,

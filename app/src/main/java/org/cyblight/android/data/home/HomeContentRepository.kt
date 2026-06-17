@@ -36,7 +36,7 @@ class HomeContentRepository(
             }
         }
 
-    suspend fun loadChangelog(): Result<List<ChangelogRelease>> = withContext(Dispatchers.IO) {
+    suspend fun loadChangelog(locale: String): Result<List<ChangelogRelease>> = withContext(Dispatchers.IO) {
         runCatching {
             val request = Request.Builder()
                 .url("https://api.github.com/repos/CybLight/CybLight-Android/releases?per_page=30")
@@ -51,10 +51,11 @@ class HomeContentRepository(
                 releases.mapNotNull { release ->
                     val version = release.tagName?.removePrefix("v")?.trim().orEmpty()
                     if (version.isBlank()) return@mapNotNull null
+                    val githubNotes = formatReleaseNotesForDisplay(release.body?.trim().orEmpty())
                     ChangelogRelease(
                         version = version,
                         publishedAt = release.publishedAt.orEmpty(),
-                        notes = formatReleaseNotesForDisplay(release.body?.trim().orEmpty()),
+                        notes = ChangelogLocalizedNotes.resolve(version, locale, githubNotes),
                     )
                 }
             }

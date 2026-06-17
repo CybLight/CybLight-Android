@@ -32,86 +32,113 @@ fun MessagesScreen(
     conversations: List<ConversationPreview>,
     isLoading: Boolean,
     error: String?,
+    encryptionReminderHidden: Boolean,
     onRefresh: () -> Unit,
     onOpenChat: (friendId: String, username: String) -> Unit,
     onOpenProfile: (username: String) -> Unit,
-    onOpenSecurityBackup: () -> Unit,
+    onOpenChatBackup: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    when {
-        isLoading && conversations.isEmpty() -> {
-            Column(
-                modifier = modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                CircularProgressIndicator()
-                Text(stringResource(R.string.loading), modifier = Modifier.padding(top = 12.dp))
+    Column(modifier = modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "💬 ${stringResource(R.string.nav_tab_messages)}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = stringResource(R.string.messages_tab_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
-        !error.isNullOrBlank() && conversations.isEmpty() -> {
-            Column(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                EncryptionReminderBanner(
-                    compact = false,
-                    onOpenSecurityBackup = onOpenSecurityBackup,
-                )
+
+        when {
+            isLoading && conversations.isEmpty() -> {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    CircularProgressIndicator()
+                    Text(stringResource(R.string.loading), modifier = Modifier.padding(top = 12.dp))
+                }
+            }
+            !error.isNullOrBlank() && conversations.isEmpty() -> {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clickable { onRefresh() },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text(stringResource(R.string.error_load_messages), color = MaterialTheme.colorScheme.error)
+                    if (!encryptionReminderHidden) {
+                        EncryptionReminderBanner(
+                            compact = false,
+                            onOpenSecurityBackup = onOpenChatBackup,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clickable { onRefresh() },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(stringResource(R.string.error_load_messages), color = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
-        }
-        conversations.isEmpty() -> {
-            Column(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                EncryptionReminderBanner(
-                    compact = false,
-                    onOpenSecurityBackup = onOpenSecurityBackup,
-                )
+            conversations.isEmpty() -> {
                 Column(
                     modifier = Modifier
-                        .fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text("💬", style = MaterialTheme.typography.displaySmall)
-                    Text(stringResource(R.string.no_conversations), style = MaterialTheme.typography.titleMedium)
+                    if (!encryptionReminderHidden) {
+                        EncryptionReminderBanner(
+                            compact = false,
+                            onOpenSecurityBackup = onOpenChatBackup,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text("💬", style = MaterialTheme.typography.displaySmall)
+                        Text(stringResource(R.string.no_conversations), style = MaterialTheme.typography.titleMedium)
+                    }
                 }
             }
-        }
-        else -> {
-            LazyColumn(
-                modifier = modifier.fillMaxSize(),
-                contentPadding = PaddingValues(vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                item(key = "encryption-reminder") {
-                    EncryptionReminderBanner(
-                        compact = false,
-                        onOpenSecurityBackup = onOpenSecurityBackup,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    )
-                }
-                items(conversations, key = { it.friend.id }) { preview ->
-                    ConversationCard(
-                        preview = preview,
-                        onOpenChat = onOpenChat,
-                        onOpenProfile = onOpenProfile,
-                    )
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (!encryptionReminderHidden) {
+                        item(key = "encryption-reminder") {
+                            EncryptionReminderBanner(
+                                compact = false,
+                                onOpenSecurityBackup = onOpenChatBackup,
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                            )
+                        }
+                    }
+                    items(conversations, key = { it.friend.id }) { preview ->
+                        ConversationCard(
+                            preview = preview,
+                            onOpenChat = onOpenChat,
+                            onOpenProfile = onOpenProfile,
+                        )
+                    }
                 }
             }
         }

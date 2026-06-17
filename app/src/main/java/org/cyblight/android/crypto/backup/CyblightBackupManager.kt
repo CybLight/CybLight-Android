@@ -6,13 +6,19 @@ import com.google.gson.reflect.TypeToken
 import org.cyblight.android.crypto.DecryptCache
 import org.cyblight.android.crypto.SignalStoreManifest
 import org.cyblight.android.crypto.SignalStorePersistence
+import org.cyblight.android.data.api.ChatsExportPayload
 
 class CyblightBackupManager(context: Context) {
     private val persistence = SignalStorePersistence(context)
     private val decryptCache = DecryptCache(context)
     private val gson = Gson()
 
-    fun collectPayload(userId: String): CyblightBackupPayload? {
+    fun hasLocalBackupKeys(userId: String): Boolean = collectPayload(userId) != null
+
+    fun collectPayload(
+        userId: String,
+        chats: ChatsExportPayload? = null,
+    ): CyblightBackupPayload? {
         val manifest = persistence.readManifest(userId) ?: return null
         val manifestMap = gson.fromJson<Map<String, Any?>>(
             gson.toJson(manifest),
@@ -37,7 +43,7 @@ class CyblightBackupManager(context: Context) {
             persistence.readSessionRecord(userId, sessionKey)?.let { sessions[sessionKey] = it }
         }
 
-        return CyblightBackupPayload(
+        val base = CyblightBackupPayload(
             userId = userId,
             createdAt = System.currentTimeMillis(),
             signal = CyblightBackupSignal(manifest = manifestMap),
@@ -49,6 +55,12 @@ class CyblightBackupManager(context: Context) {
             ),
             decryptCache = decryptCache.readAllForUser(userId),
         )
+
+        return if (chats != null) {
+            base.copy(version = BACKUP_PAYLOAD_VERSION_V2, chats = chats)
+        } else {
+            base.copy(version = BACKUP_PAYLOAD_VERSION_V1)
+        }
     }
 
     fun restorePayload(expectedUserId: String, payload: CyblightBackupPayload) {
@@ -83,16 +95,25 @@ class CyblightBackupManager(context: Context) {
         decryptCache.replaceAllForUser(expectedUserId, payload.decryptCache)
     }
 
-    fun createBackupFile(userId: String, password: String): String {
-        val payload = collectPayload(userId) ?: throw IllegalArgumentException("backup_no_local_keys")
+    fun createBackupFile(
+        userId: String,
+        password: String,
+        chats: ChatsExportPayload? = null,
+    ): String {
+        val payload = collectPayload(userId, chats) ?: throw IllegalArgumentException("backup_no_local_keys")
         val file = BackupCrypto.encryptPayload(payload, password)
         return BackupCrypto.serializeFile(file)
     }
 
-    fun importBackupFile(userId: String, rawFile: String, password: String) {
+    fun decryptBackupPayload(rawFile: String, password: String): CyblightBackupPayload {
         val file = BackupCrypto.parseFile(rawFile)
-        val payload = BackupCrypto.decryptPayload(file, password)
+        return BackupCrypto.decryptPayload(file, password)
+    }
+
+    fun importBackupFile(userId: String, rawFile: String, password: String): BackupRestoreStats {
+        val payload = decryptBackupPayload(rawFile, password)
         restorePayload(userId, payload)
+        return BackupRestoreStats()
     }
 
     fun errorMessage(code: String): String = when (code) {
@@ -102,6 +123,15 @@ class CyblightBackupManager(context: Context) {
         "backup_file_invalid", "backup_payload_invalid", "backup_format_unsupported" ->
             "Некорректный файл резервной копии."
         "backup_share_failed", "backup_save_failed" -> "Не удалось сохранить резервную копию."
+        "chats_import_failed" -> "Не удалось импортировать чаты из резервной копии."
+        "google_drive_not_configured" -> "Google Drive не настроен в приложении."
+        "google_drive_auth_failed", "google_drive_auth_denied" -> "Не удалось войти через Google."
+        "google_drive_no_backup" -> "В Google Drive нет резервной копии для этого аккаунта."
+        "google_drive_upload_failed" -> "Не удалось сохранить резервную копию в Google Drive."
+        "google_drive_list_failed" -> "Не удалось получить доступ к Google Drive."
+        "google_drive_network_failed" -> "Нет подключения к Google Drive. Проверьте интернет."
+        "google_drive_download_failed" -> "Не удалось скачать резервную копию из Google Drive."
+        "google_drive_delete_failed" -> "Не удалось удалить резервную копию из Google Drive."
         else -> "Не удалось обработать резервную копию."
     }
 }

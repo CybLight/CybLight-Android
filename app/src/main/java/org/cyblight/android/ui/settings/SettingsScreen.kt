@@ -1,80 +1,24 @@
 package org.cyblight.android.ui.settings
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.core.content.ContextCompat
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.Chat
-import androidx.compose.material.icons.outlined.BatteryChargingFull
-import androidx.compose.material.icons.outlined.HelpOutline
-import androidx.compose.material.icons.outlined.Fingerprint
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Language
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.Palette
-import androidx.compose.material.icons.outlined.SettingsApplications
-import androidx.compose.material.icons.outlined.Swipe
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import org.cyblight.android.BuildConfig
 import org.cyblight.android.R
-import org.cyblight.android.util.ExternalLinks
 import org.cyblight.android.data.preferences.AppLockTimeout
 import org.cyblight.android.data.preferences.RootBackBehavior
 import org.cyblight.android.data.preferences.SwipeBackEdgeWidth
 import org.cyblight.android.data.preferences.SwipeBackSensitivity
 import org.cyblight.android.data.preferences.ThemeMode
-import org.cyblight.android.i18n.LocaleManager
-import org.cyblight.android.ui.applock.PinSetupDialog
-import org.cyblight.android.util.SystemSettings
+import org.cyblight.android.data.repository.SecurityOverview
+import org.cyblight.android.ui.security.SecurityScreen
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    settingsSection: SettingsSection,
+    onSettingsSectionChange: (SettingsSection) -> Unit,
     locale: String,
     themeMode: ThemeMode,
     notificationsEnabled: Boolean,
@@ -108,591 +52,249 @@ fun SettingsScreen(
     onSwipeBackSensitivitySelected: (SwipeBackSensitivity) -> Unit,
     onSwipeBackEdgeWidthSelected: (SwipeBackEdgeWidth) -> Unit,
     onRootBackBehaviorSelected: (RootBackBehavior) -> Unit,
+    homeWhatsNewBannerHidden: Boolean,
+    onHomeWhatsNewBannerHiddenChange: (Boolean) -> Unit,
     accountLogin: String,
     onCreateSignalBackup: suspend (password: String) -> Result<String>,
     onRestoreSignalBackup: suspend (content: String, password: String) -> Result<Unit>,
     signalBackupErrorMessage: (String) -> String,
     onPickBackupFile: (onPicked: (String) -> Unit) -> Unit,
     onSaveBackupFile: (fileName: String, content: String, onResult: (Boolean?) -> Unit) -> Unit,
-    focusSignalBackup: Boolean = false,
-    onSignalBackupFocused: () -> Unit = {},
+    chatFormatToolbarHidden: Boolean = false,
+    encryptionReminderHidden: Boolean = false,
+    isChatsTransferBusy: Boolean = false,
+    onChatFormatToolbarHiddenChange: (Boolean) -> Unit = {},
+    onEncryptionReminderHiddenChange: (Boolean) -> Unit = {},
+    onExportChats: () -> Unit = {},
+    onImportChats: () -> Unit = {},
+    focusChatBackup: Boolean = false,
+    onChatBackupFocused: () -> Unit = {},
+    isGoogleDriveConfigured: Boolean = false,
+    googleDriveAccountLabel: String? = null,
+    googleDriveBackupMetadata: org.cyblight.android.integrations.google_drive.DriveBackupMetadata? = null,
+    onGoogleDriveSignIn: () -> Unit = {},
+    onRefreshGoogleDriveStatus: suspend () -> Unit = {},
+    onUploadGoogleDriveBackup: suspend (password: String, onProgress: (Int, String) -> Unit) -> Result<Unit> = { _, _ -> Result.success(Unit) },
+    onRestoreGoogleDriveBackup: suspend (password: String, onProgress: (Int, String) -> Unit) -> Result<org.cyblight.android.crypto.backup.BackupRestoreStats> = { _, _ -> Result.success(org.cyblight.android.crypto.backup.BackupRestoreStats()) },
+    onDeleteGoogleDriveBackup: suspend () -> Result<Boolean> = { Result.success(false) },
+    onGoogleDriveSignOut: suspend () -> Unit = {},
+    chatBackupFrequency: org.cyblight.android.data.preferences.ChatBackupFrequency =
+        org.cyblight.android.data.preferences.ChatBackupFrequency.OFF,
+    chatBackupOverCellular: Boolean = false,
+    chatBackupHasStoredPassword: Boolean = false,
+    onChatBackupFrequencySelected: (org.cyblight.android.data.preferences.ChatBackupFrequency) -> Unit = {},
+    onChatBackupOverCellularChange: (Boolean) -> Unit = {},
+    onEnableAutoBackup: suspend (org.cyblight.android.data.preferences.ChatBackupFrequency, String) -> Result<Unit> =
+        { _, _ -> Result.success(Unit) },
+    securityOverview: SecurityOverview? = null,
+    isSecurityLoading: Boolean = false,
+    isSecurityRefreshing: Boolean = false,
+    onRefreshSecurity: () -> Unit = {},
+    onOpenSecurityCheck: () -> Unit = {},
+    onOpenAccountSecurity: () -> Unit = {},
+    onOpenPasskeys: () -> Unit = {},
+    onOpenTrustedDevices: () -> Unit = {},
+    onOpenLoginHistory: () -> Unit = {},
+    onOpenSessions: () -> Unit = {},
 ) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val scope = rememberCoroutineScope()
-    var languageMenuExpanded by remember { mutableStateOf(false) }
-    var themeMenuExpanded by remember { mutableStateOf(false) }
-    var appLockTimeoutMenuExpanded by remember { mutableStateOf(false) }
-    var swipeSensitivityMenuExpanded by remember { mutableStateOf(false) }
-    var swipeEdgeMenuExpanded by remember { mutableStateOf(false) }
-    var rootBackMenuExpanded by remember { mutableStateOf(false) }
-    var systemNotificationsEnabled by remember {
-        mutableStateOf(SystemSettings.areNotificationsEnabled(context))
-    }
-    var versionTapCount by remember { mutableStateOf(0) }
-    var showPinSetup by remember { mutableStateOf(false) }
-    var enableLockAfterPinSetup by remember { mutableStateOf(false) }
-    val scrollState = rememberScrollState()
-    var signalBackupScrollY by remember { mutableStateOf(0) }
-
-    LaunchedEffect(focusSignalBackup, signalBackupScrollY) {
-        if (focusSignalBackup && signalBackupScrollY > 0) {
-            scrollState.animateScrollTo(signalBackupScrollY)
-            onSignalBackupFocused()
+    LaunchedEffect(focusChatBackup) {
+        if (focusChatBackup) {
+            onSettingsSectionChange(SettingsSection.ChatBackup)
         }
     }
 
-    if (showPinSetup) {
-        PinSetupDialog(
-            title = stringResource(
-                if (appLockPinConfigured) {
-                    R.string.app_lock_change_pin
-                } else {
-                    R.string.app_lock_setup_pin
-                },
-            ),
-            onDismiss = { showPinSetup = false },
-            onConfirm = { pin ->
-                onSetupAppLockPin(pin, enableLockAfterPinSetup)
-                showPinSetup = false
-                enableLockAfterPinSetup = false
-            },
-        )
-    }
-
-    LaunchedEffect(versionTapCount) {
-        if (versionTapCount in 1..6) {
-            delay(2500)
-            versionTapCount = 0
+    LaunchedEffect(settingsSection) {
+        if (settingsSection == SettingsSection.Security) {
+            onRefreshSecurity()
+        }
+        if (settingsSection == SettingsSection.ChatBackup || settingsSection == SettingsSection.Chats) {
+            onRefreshGoogleDriveStatus()
         }
     }
 
-    fun syncNotificationState() {
-        val enabled = SystemSettings.areNotificationsEnabled(context)
-        systemNotificationsEnabled = enabled
-        if (notificationsEnabled != enabled) {
-            onNotificationsEnabledChange(enabled)
+    val sectionBack: () -> Unit = {
+        when (settingsSection) {
+            SettingsSection.Hub -> onBack()
+            SettingsSection.ChatBackup -> onSettingsSectionChange(SettingsSection.Chats)
+            else -> onSettingsSectionChange(SettingsSection.Hub)
         }
     }
 
-    LaunchedEffect(Unit, notificationsEnabled) {
-        syncNotificationState()
+    val title = when (settingsSection) {
+        SettingsSection.Hub -> stringResource(R.string.settings_title)
+        SettingsSection.Security -> stringResource(R.string.nav_tab_security)
+        SettingsSection.AppLock -> stringResource(R.string.settings_hub_app_lock_title)
+        SettingsSection.Chats -> stringResource(R.string.settings_section_chats)
+        SettingsSection.ChatBackup -> stringResource(R.string.settings_chats_backup_item)
+        SettingsSection.Notifications -> stringResource(R.string.settings_section_notifications)
+        SettingsSection.Appearance -> stringResource(R.string.settings_section_appearance)
+        SettingsSection.Gestures -> stringResource(R.string.settings_section_gestures)
+        SettingsSection.Background -> stringResource(R.string.settings_section_background)
+        SettingsSection.About -> stringResource(R.string.settings_section_about)
     }
 
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                syncNotificationState()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
-                    }
-                },
-            )
-        },
+    SettingsSectionScaffold(
+        title = title,
+        onBack = sectionBack,
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(scrollState),
-        ) {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.menu_help)) },
-                supportingContent = { Text(stringResource(R.string.help_menu_hint)) },
-                leadingContent = { Icon(Icons.Outlined.HelpOutline, contentDescription = null) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onHelp),
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-            Text(
-                text = stringResource(R.string.settings_section_appearance),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-
-            SettingsDropdownRow(
-                expanded = themeMenuExpanded,
-                onExpandedChange = { themeMenuExpanded = it },
-                headline = stringResource(R.string.settings_theme),
-                supporting = themeModeLabel(themeMode),
-                leadingIcon = { Icon(Icons.Outlined.Palette, contentDescription = null) },
-            ) {
-                ThemeMode.entries.forEach { mode ->
-                    DropdownMenuItem(
-                        text = { Text(themeModeLabel(mode)) },
-                        onClick = {
-                            themeMenuExpanded = false
-                            onThemeModeSelected(mode)
-                        },
-                    )
-                }
+        when (settingsSection) {
+            SettingsSection.Hub -> {
+                SettingsHubScreen(
+                    locale = locale,
+                    themeMode = themeMode,
+                    notificationsEnabled = notificationsEnabled,
+                    appLockEnabled = appLockEnabled,
+                    swipeBackEnabled = swipeBackEnabled,
+                    securityOverview = securityOverview,
+                    onNavigate = onSettingsSectionChange,
+                    onHelp = onHelp,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                )
             }
-
-            SettingsDropdownRow(
-                expanded = languageMenuExpanded,
-                onExpandedChange = { languageMenuExpanded = it },
-                headline = stringResource(R.string.language),
-                supporting = LocaleManager.displayName(locale),
-                leadingIcon = { Icon(Icons.Outlined.Language, contentDescription = null) },
-            ) {
-                LocaleManager.supported.forEach { code ->
-                    DropdownMenuItem(
-                        text = { Text(LocaleManager.displayName(code)) },
-                        onClick = {
-                            languageMenuExpanded = false
-                            onLocaleSelected(code)
-                        },
-                    )
-                }
+            SettingsSection.Security -> {
+                SecurityScreen(
+                    overview = securityOverview,
+                    isLoading = isSecurityLoading,
+                    isRefreshing = isSecurityRefreshing,
+                    onRefresh = onRefreshSecurity,
+                    onOpenSecurityCheck = onOpenSecurityCheck,
+                    onOpenEmail = onOpenAccountSecurity,
+                    onOpenPassword = onOpenAccountSecurity,
+                    onOpenTwoFactor = onOpenAccountSecurity,
+                    onOpenPasskeys = onOpenPasskeys,
+                    onOpenTrustedDevices = onOpenTrustedDevices,
+                    onOpenLoginHistory = onOpenLoginHistory,
+                    onOpenSessions = onOpenSessions,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                )
             }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-            Text(
-                text = stringResource(R.string.settings_section_gestures),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_swipe_back)) },
-                supportingContent = { Text(stringResource(R.string.settings_swipe_back_hint)) },
-                leadingContent = { Icon(Icons.Outlined.Swipe, contentDescription = null) },
-                trailingContent = {
-                    Switch(
-                        checked = swipeBackEnabled,
-                        onCheckedChange = onSwipeBackEnabledChange,
-                    )
-                },
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_system_back)) },
-                supportingContent = { Text(stringResource(R.string.settings_system_back_hint)) },
-                leadingContent = { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null) },
-                trailingContent = {
-                    Switch(
-                        checked = systemBackEnabled,
-                        onCheckedChange = onSystemBackEnabledChange,
-                    )
-                },
-            )
-
-            SettingsDropdownRow(
-                expanded = swipeSensitivityMenuExpanded,
-                onExpandedChange = { swipeSensitivityMenuExpanded = it },
-                headline = stringResource(R.string.settings_swipe_sensitivity),
-                supporting = swipeBackSensitivityLabel(swipeBackSensitivity),
-                leadingIcon = { Icon(Icons.Outlined.Swipe, contentDescription = null) },
-            ) {
-                SwipeBackSensitivity.entries.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(swipeBackSensitivityLabel(option)) },
-                        onClick = {
-                            swipeSensitivityMenuExpanded = false
-                            onSwipeBackSensitivitySelected(option)
-                        },
-                    )
-                }
+            SettingsSection.AppLock -> {
+                SettingsAppLockSection(
+                    appLockEnabled = appLockEnabled,
+                    appLockBiometric = appLockBiometric,
+                    appLockPinConfigured = appLockPinConfigured,
+                    appLockTimeout = appLockTimeout,
+                    biometricAvailable = biometricAvailable,
+                    onAppLockEnabledChange = onAppLockEnabledChange,
+                    onAppLockBiometricChange = onAppLockBiometricChange,
+                    onAppLockTimeoutSelected = onAppLockTimeoutSelected,
+                    onSetupAppLockPin = onSetupAppLockPin,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                )
             }
-
-            SettingsDropdownRow(
-                expanded = swipeEdgeMenuExpanded,
-                onExpandedChange = { swipeEdgeMenuExpanded = it },
-                headline = stringResource(R.string.settings_swipe_edge),
-                supporting = swipeBackEdgeWidthLabel(swipeBackEdgeWidth),
-                leadingIcon = { Icon(Icons.Outlined.Swipe, contentDescription = null) },
-            ) {
-                SwipeBackEdgeWidth.entries.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(swipeBackEdgeWidthLabel(option)) },
-                        onClick = {
-                            swipeEdgeMenuExpanded = false
-                            onSwipeBackEdgeWidthSelected(option)
-                        },
-                    )
-                }
+            SettingsSection.Chats -> {
+                SettingsChatsSection(
+                    chatFormatToolbarHidden = chatFormatToolbarHidden,
+                    encryptionReminderHidden = encryptionReminderHidden,
+                    isChatsTransferBusy = isChatsTransferBusy,
+                    onChatFormatToolbarHiddenChange = onChatFormatToolbarHiddenChange,
+                    onEncryptionReminderHiddenChange = onEncryptionReminderHiddenChange,
+                    onOpenChatBackup = { onSettingsSectionChange(SettingsSection.ChatBackup) },
+                    onExportChats = onExportChats,
+                    onImportChats = onImportChats,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                )
             }
-
-            SettingsDropdownRow(
-                expanded = rootBackMenuExpanded,
-                onExpandedChange = { rootBackMenuExpanded = it },
-                headline = stringResource(R.string.settings_root_back_behavior),
-                supporting = rootBackBehaviorLabel(rootBackBehavior),
-                leadingIcon = { Icon(Icons.Outlined.Swipe, contentDescription = null) },
-            ) {
-                RootBackBehavior.entries.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(rootBackBehaviorLabel(option)) },
-                        onClick = {
-                            rootBackMenuExpanded = false
-                            onRootBackBehaviorSelected(option)
-                        },
-                    )
-                }
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-            Text(
-                text = stringResource(R.string.settings_section_notifications),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_notifications)) },
-                supportingContent = {
-                    Text(
-                        if (systemNotificationsEnabled) {
-                            stringResource(R.string.settings_notifications_enabled)
-                        } else {
-                            stringResource(R.string.settings_notifications_disabled)
-                        },
-                    )
-                },
-                leadingContent = { Icon(Icons.Outlined.Notifications, contentDescription = null) },
-                trailingContent = {
-                    Switch(
-                        checked = systemNotificationsEnabled,
-                        onCheckedChange = { enabled ->
-                            if (enabled) {
-                                val alreadyAllowed = SystemSettings.areNotificationsEnabled(context)
-                                if (alreadyAllowed) {
-                                    onNotificationsEnabledChange(true)
-                                    systemNotificationsEnabled = true
-                                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                    ContextCompat.checkSelfPermission(
-                                        context,
-                                        Manifest.permission.POST_NOTIFICATIONS,
-                                    ) != PackageManager.PERMISSION_GRANTED
-                                ) {
-                                    onRequestNotificationPermission()
-                                } else {
-                                    SystemSettings.openAppNotificationSettings(context)
-                                }
-                            } else {
-                                onNotificationsEnabledChange(false)
-                                systemNotificationsEnabled = false
-                                SystemSettings.openAppNotificationSettings(context)
-                            }
-                        },
-                    )
-                },
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_open_notification_settings)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { SystemSettings.openAppNotificationSettings(context) },
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_login_alerts)) },
-                supportingContent = { Text(stringResource(R.string.settings_login_alerts_hint)) },
-                leadingContent = { Icon(Icons.Outlined.Notifications, contentDescription = null) },
-                trailingContent = {
-                    Switch(
-                        checked = loginAlertsEnabled && systemNotificationsEnabled,
-                        onCheckedChange = { enabled ->
-                            if (enabled && !systemNotificationsEnabled) {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    onRequestNotificationPermission()
-                                } else {
-                                    SystemSettings.openAppNotificationSettings(context)
-                                }
-                            } else {
-                                onLoginAlertsEnabledChange(enabled)
-                            }
-                        },
-                        enabled = systemNotificationsEnabled,
-                    )
-                },
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_message_alerts)) },
-                supportingContent = { Text(stringResource(R.string.settings_message_alerts_hint)) },
-                leadingContent = { Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = null) },
-                trailingContent = {
-                    Switch(
-                        checked = messageAlertsEnabled && systemNotificationsEnabled,
-                        onCheckedChange = { enabled ->
-                            if (enabled && !systemNotificationsEnabled) {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    onRequestNotificationPermission()
-                                } else {
-                                    SystemSettings.openAppNotificationSettings(context)
-                                }
-                            } else {
-                                onMessageAlertsEnabledChange(enabled)
-                            }
-                        },
-                        enabled = systemNotificationsEnabled,
-                    )
-                },
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-            Text(
-                text = stringResource(R.string.settings_section_security),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_app_lock)) },
-                supportingContent = { Text(stringResource(R.string.settings_app_lock_hint)) },
-                leadingContent = { Icon(Icons.Outlined.Lock, contentDescription = null) },
-                trailingContent = {
-                    Switch(
-                        checked = appLockEnabled,
-                        onCheckedChange = { enabled ->
-                            if (enabled) {
-                                if (appLockPinConfigured) {
-                                    onAppLockEnabledChange(true)
-                                } else {
-                                    enableLockAfterPinSetup = true
-                                    showPinSetup = true
-                                }
-                            } else {
-                                onAppLockEnabledChange(false)
-                            }
-                        },
-                    )
-                },
-            )
-
-            if (appLockPinConfigured) {
-                SettingsDropdownRow(
-                    expanded = appLockTimeoutMenuExpanded,
-                    onExpandedChange = { appLockTimeoutMenuExpanded = it },
-                    headline = stringResource(R.string.settings_app_lock_timeout),
-                    supporting = appLockTimeoutLabel(appLockTimeout),
-                    leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null) },
-                ) {
-                    AppLockTimeout.entries.forEach { timeout ->
-                        DropdownMenuItem(
-                            text = { Text(appLockTimeoutLabel(timeout)) },
-                            onClick = {
-                                appLockTimeoutMenuExpanded = false
-                                onAppLockTimeoutSelected(timeout)
-                            },
-                        )
+            SettingsSection.ChatBackup -> {
+                LaunchedEffect(focusChatBackup) {
+                    if (focusChatBackup) {
+                        onChatBackupFocused()
                     }
                 }
-            }
-
-            if (biometricAvailable) {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_app_lock_biometric)) },
-                    leadingContent = { Icon(Icons.Outlined.Fingerprint, contentDescription = null) },
-                    trailingContent = {
-                        Switch(
-                            checked = appLockBiometric,
-                            onCheckedChange = onAppLockBiometricChange,
-                            enabled = appLockPinConfigured,
-                        )
-                    },
+                ChatBackupSettingsScreen(
+                    accountLogin = accountLogin,
+                    isGoogleDriveConfigured = isGoogleDriveConfigured,
+                    googleDriveAccountLabel = googleDriveAccountLabel,
+                    googleDriveBackupMetadata = googleDriveBackupMetadata,
+                    onRefreshGoogleDriveStatus = onRefreshGoogleDriveStatus,
+                    onGoogleDriveSignIn = onGoogleDriveSignIn,
+                    onGoogleDriveSignOut = onGoogleDriveSignOut,
+                    onUploadGoogleDriveBackup = onUploadGoogleDriveBackup,
+                    onRestoreGoogleDriveBackup = onRestoreGoogleDriveBackup,
+                    onDeleteGoogleDriveBackup = onDeleteGoogleDriveBackup,
+                    chatBackupFrequency = chatBackupFrequency,
+                    chatBackupOverCellular = chatBackupOverCellular,
+                    chatBackupHasStoredPassword = chatBackupHasStoredPassword,
+                    onChatBackupFrequencySelected = onChatBackupFrequencySelected,
+                    onChatBackupOverCellularChange = onChatBackupOverCellularChange,
+                    onEnableAutoBackup = onEnableAutoBackup,
+                    onCreateSignalBackup = onCreateSignalBackup,
+                    onRestoreSignalBackup = onRestoreSignalBackup,
+                    signalBackupErrorMessage = signalBackupErrorMessage,
+                    onPickBackupFile = onPickBackupFile,
+                    onSaveBackupFile = onSaveBackupFile,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
                 )
             }
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.app_lock_change_pin)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        enableLockAfterPinSetup = false
-                        showPinSetup = true
-                    },
-            )
-
-            SignalBackupSection(
-                accountLogin = accountLogin,
-                onCreateBackup = onCreateSignalBackup,
-                onRestoreBackup = onRestoreSignalBackup,
-                backupErrorMessage = signalBackupErrorMessage,
-                onPickBackupFile = onPickBackupFile,
-                onSaveBackupFile = onSaveBackupFile,
-                modifier = Modifier.onGloballyPositioned { coordinates ->
-                    signalBackupScrollY = coordinates.positionInParent().y.toInt()
-                },
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-            Text(
-                text = stringResource(R.string.settings_section_background),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_battery_optimization)) },
-                supportingContent = {
-                    Text(
-                        if (SystemSettings.isIgnoringBatteryOptimizations(context)) {
-                            stringResource(R.string.settings_battery_disabled)
-                        } else {
-                            stringResource(R.string.settings_battery_hint)
-                        },
-                    )
-                },
-                leadingContent = { Icon(Icons.Outlined.BatteryChargingFull, contentDescription = null) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { SystemSettings.openBatteryOptimizationSettings(context) },
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_app_permissions)) },
-                supportingContent = { Text(stringResource(R.string.settings_app_permissions_hint)) },
-                leadingContent = { Icon(Icons.Outlined.SettingsApplications, contentDescription = null) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { SystemSettings.openAppDetailsSettings(context) },
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-            Text(
-                text = stringResource(R.string.settings_section_about),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.about_description),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    text = stringResource(
-                        R.string.about_creator,
-                        stringResource(R.string.about_creator_value),
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    text = stringResource(R.string.about_website_link),
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium,
-                    ),
-                    modifier = Modifier.clickable {
-                        ExternalLinks.openUrl(context, BuildConfig.WEBSITE_URL)
-                    },
+            SettingsSection.Notifications -> {
+                SettingsNotificationsSection(
+                    loginAlertsEnabled = loginAlertsEnabled,
+                    messageAlertsEnabled = messageAlertsEnabled,
+                    notificationsEnabled = notificationsEnabled,
+                    onNotificationsEnabledChange = onNotificationsEnabledChange,
+                    onLoginAlertsEnabledChange = onLoginAlertsEnabledChange,
+                    onMessageAlertsEnabledChange = onMessageAlertsEnabledChange,
+                    onRequestNotificationPermission = onRequestNotificationPermission,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
                 )
             }
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_version)) },
-                supportingContent = { Text(BuildConfig.VERSION_NAME) },
-                leadingContent = { Icon(Icons.Outlined.Info, contentDescription = null) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        versionTapCount++
-                        if (versionTapCount >= 7) {
-                            versionTapCount = 0
-                            scope.launch {
-                                delay(200)
-                                onOpenLightCatcherGame()
-                            }
-                        }
-                    },
-            )
+            SettingsSection.Appearance -> {
+                SettingsAppearanceSection(
+                    locale = locale,
+                    themeMode = themeMode,
+                    homeWhatsNewBannerHidden = homeWhatsNewBannerHidden,
+                    onHomeWhatsNewBannerHiddenChange = onHomeWhatsNewBannerHiddenChange,
+                    onLocaleSelected = onLocaleSelected,
+                    onThemeModeSelected = onThemeModeSelected,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                )
+            }
+            SettingsSection.Gestures -> {
+                SettingsGesturesSection(
+                    swipeBackEnabled = swipeBackEnabled,
+                    systemBackEnabled = systemBackEnabled,
+                    swipeBackSensitivity = swipeBackSensitivity,
+                    swipeBackEdgeWidth = swipeBackEdgeWidth,
+                    rootBackBehavior = rootBackBehavior,
+                    onSwipeBackEnabledChange = onSwipeBackEnabledChange,
+                    onSystemBackEnabledChange = onSystemBackEnabledChange,
+                    onSwipeBackSensitivitySelected = onSwipeBackSensitivitySelected,
+                    onSwipeBackEdgeWidthSelected = onSwipeBackEdgeWidthSelected,
+                    onRootBackBehaviorSelected = onRootBackBehaviorSelected,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                )
+            }
+            SettingsSection.Background -> {
+                SettingsBackgroundSection(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                )
+            }
+            SettingsSection.About -> {
+                SettingsAboutSection(
+                    onOpenLightCatcherGame = onOpenLightCatcherGame,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                )
+            }
         }
     }
-}
-
-@Composable
-private fun SettingsDropdownRow(
-    expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    headline: String,
-    supporting: String,
-    leadingIcon: @Composable () -> Unit,
-    menuContent: @Composable () -> Unit,
-) {
-    Box(modifier = Modifier.fillMaxWidth()) {
-        ListItem(
-            headlineContent = { Text(headline) },
-            supportingContent = { Text(supporting) },
-            leadingContent = leadingIcon,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onExpandedChange(true) },
-        )
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { onExpandedChange(false) },
-        ) {
-            menuContent()
-        }
-    }
-}
-
-@Composable
-private fun themeModeLabel(mode: ThemeMode): String = when (mode) {
-    ThemeMode.SYSTEM -> stringResource(R.string.settings_theme_system)
-    ThemeMode.LIGHT -> stringResource(R.string.settings_theme_light)
-    ThemeMode.DARK -> stringResource(R.string.settings_theme_dark)
-}
-
-@Composable
-private fun appLockTimeoutLabel(timeout: AppLockTimeout): String = when (timeout) {
-    AppLockTimeout.IMMEDIATE -> stringResource(R.string.settings_app_lock_timeout_immediate)
-    AppLockTimeout.SEC_30 -> stringResource(R.string.settings_app_lock_timeout_30s)
-    AppLockTimeout.MIN_1 -> stringResource(R.string.settings_app_lock_timeout_1m)
-    AppLockTimeout.MIN_5 -> stringResource(R.string.settings_app_lock_timeout_5m)
-    AppLockTimeout.MIN_15 -> stringResource(R.string.settings_app_lock_timeout_15m)
-}
-
-@Composable
-private fun swipeBackSensitivityLabel(option: SwipeBackSensitivity): String = when (option) {
-    SwipeBackSensitivity.LOW -> stringResource(R.string.settings_swipe_sensitivity_low)
-    SwipeBackSensitivity.NORMAL -> stringResource(R.string.settings_swipe_sensitivity_normal)
-    SwipeBackSensitivity.HIGH -> stringResource(R.string.settings_swipe_sensitivity_high)
-}
-
-@Composable
-private fun swipeBackEdgeWidthLabel(option: SwipeBackEdgeWidth): String = when (option) {
-    SwipeBackEdgeWidth.NARROW -> stringResource(R.string.settings_swipe_edge_narrow)
-    SwipeBackEdgeWidth.NORMAL -> stringResource(R.string.settings_swipe_edge_normal)
-    SwipeBackEdgeWidth.WIDE -> stringResource(R.string.settings_swipe_edge_wide)
-}
-
-@Composable
-private fun rootBackBehaviorLabel(option: RootBackBehavior): String = when (option) {
-    RootBackBehavior.HOME_THEN_EXIT -> stringResource(R.string.settings_root_back_home_then_exit)
-    RootBackBehavior.EXIT_IMMEDIATELY -> stringResource(R.string.settings_root_back_exit)
-    RootBackBehavior.MINIMIZE -> stringResource(R.string.settings_root_back_minimize)
 }

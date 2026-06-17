@@ -370,10 +370,21 @@ data class FriendPresenceResponse(
     val error: String? = null,
 )
 
+data class LastMessageDto(
+    val id: String = "",
+    val content: String = "",
+    @SerializedName("senderId") val senderId: String = "",
+    val encryption: String = "",
+    @SerializedName("signalType") val signalType: Int? = null,
+    @SerializedName("registrationId") val registrationId: Int? = null,
+    @SerializedName("createdAt") val createdAt: Long = 0L,
+)
+
 data class ConversationPreviewDto(
     val preview: String = "",
     @SerializedName("latestAt") val latestAt: Long = 0L,
     val kind: String = "message",
+    @SerializedName("lastMessage") val lastMessage: LastMessageDto? = null,
 )
 
 data class UnreadDetailDto(
@@ -473,6 +484,38 @@ data class UnpinMessageRequest(
 
 data class MessageActionResponse(
     val ok: Boolean = false,
+    val error: String? = null,
+)
+
+data class ChatsExportChat(
+    @SerializedName("friendId") val friendId: String = "",
+    @SerializedName("friendUsername") val friendUsername: String = "",
+    val messages: List<Map<String, Any?>> = emptyList(),
+)
+
+data class ChatsExportPayload(
+    val format: String = "",
+    val version: Int = 0,
+    @SerializedName("exportedAt") val exportedAt: Long = 0L,
+    @SerializedName("ownerUserId") val ownerUserId: String = "",
+    val chats: List<ChatsExportChat> = emptyList(),
+)
+
+data class ChatsExportResponse(
+    val ok: Boolean = false,
+    val export: ChatsExportPayload? = null,
+    val error: String? = null,
+)
+
+data class ChatsImportRequest(
+    val export: ChatsExportPayload,
+)
+
+data class ChatsImportResponse(
+    val ok: Boolean = false,
+    val imported: Int = 0,
+    val skipped: Int = 0,
+    val errors: Int = 0,
     val error: String? = null,
 )
 

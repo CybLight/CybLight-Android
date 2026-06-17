@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -48,6 +49,13 @@ class AppPreferences(private val context: Context) {
     private val swipeBackEdgeWidthKey = stringPreferencesKey("swipe_back_edge_width")
     private val rootBackBehaviorKey = stringPreferencesKey("root_back_behavior")
     private val encryptionReminderChatDismissedKey = booleanPreferencesKey("encryption_reminder_chat_dismissed")
+    private val chatFormatToolbarHiddenKey = booleanPreferencesKey("chat_format_toolbar_hidden")
+    private val homeWhatsNewBannerHiddenKey = booleanPreferencesKey("home_whats_new_banner_hidden")
+    private val chatBackupFrequencyKey = stringPreferencesKey("chat_backup_frequency")
+    private val chatBackupOverCellularKey = booleanPreferencesKey("chat_backup_over_cellular")
+    private val lastAutoBackupSuccessMsKey = longPreferencesKey("last_auto_backup_success_ms")
+    private val driveRestoreDismissedUserKey = stringPreferencesKey("drive_restore_dismissed_user")
+    private val easterTelegramLoggedKey = stringSetPreferencesKey("easter_telegram_logged")
 
     private fun chatDraftKey(friendId: String) = stringPreferencesKey("chat_draft_$friendId")
 
@@ -367,6 +375,92 @@ class AppPreferences(private val context: Context) {
             prefs[encryptionReminderChatDismissedKey] = dismissed
         }
     }
+
+    suspend fun getChatFormatToolbarHidden(): Boolean =
+        context.appPreferencesStore.data.first()[chatFormatToolbarHiddenKey] ?: false
+
+    suspend fun setChatFormatToolbarHidden(hidden: Boolean) {
+        context.appPreferencesStore.edit { prefs ->
+            prefs[chatFormatToolbarHiddenKey] = hidden
+        }
+    }
+
+    suspend fun getHomeWhatsNewBannerHidden(): Boolean =
+        context.appPreferencesStore.data.first()[homeWhatsNewBannerHiddenKey] ?: false
+
+    suspend fun setHomeWhatsNewBannerHidden(hidden: Boolean) {
+        context.appPreferencesStore.edit { prefs ->
+            prefs[homeWhatsNewBannerHiddenKey] = hidden
+        }
+    }
+
+    suspend fun getChatBackupFrequency(): ChatBackupFrequency {
+        val name = context.appPreferencesStore.data.first()[chatBackupFrequencyKey]
+        return ChatBackupFrequency.fromName(name)
+    }
+
+    suspend fun setChatBackupFrequency(frequency: ChatBackupFrequency) {
+        context.appPreferencesStore.edit { prefs ->
+            if (frequency == ChatBackupFrequency.OFF) {
+                prefs.remove(chatBackupFrequencyKey)
+            } else {
+                prefs[chatBackupFrequencyKey] = frequency.name
+            }
+        }
+    }
+
+    suspend fun getChatBackupOverCellular(): Boolean =
+        context.appPreferencesStore.data.first()[chatBackupOverCellularKey] ?: false
+
+    suspend fun setChatBackupOverCellular(enabled: Boolean) {
+        context.appPreferencesStore.edit { prefs ->
+            prefs[chatBackupOverCellularKey] = enabled
+        }
+    }
+
+    suspend fun getLastAutoBackupSuccessMs(): Long =
+        context.appPreferencesStore.data.first()[lastAutoBackupSuccessMsKey] ?: 0L
+
+    suspend fun setLastAutoBackupSuccessMs(timestampMs: Long) {
+        context.appPreferencesStore.edit { prefs ->
+            if (timestampMs <= 0L) {
+                prefs.remove(lastAutoBackupSuccessMsKey)
+            } else {
+                prefs[lastAutoBackupSuccessMsKey] = timestampMs
+            }
+        }
+    }
+
+    suspend fun isDriveRestorePromptDismissed(userId: String): Boolean =
+        context.appPreferencesStore.data.first()[driveRestoreDismissedUserKey] == userId
+
+    suspend fun setDriveRestorePromptDismissed(userId: String) {
+        context.appPreferencesStore.edit { prefs ->
+            prefs[driveRestoreDismissedUserKey] = userId
+        }
+    }
+
+    suspend fun clearDriveRestorePromptDismissed() {
+        context.appPreferencesStore.edit { prefs ->
+            prefs.remove(driveRestoreDismissedUserKey)
+        }
+    }
+
+    suspend fun isEasterTelegramLogged(userName: String, eggKey: String): Boolean {
+        val entry = easterTelegramEntryKey(userName, eggKey)
+        return context.appPreferencesStore.data.first()[easterTelegramLoggedKey]?.contains(entry) == true
+    }
+
+    suspend fun markEasterTelegramLogged(userName: String, eggKey: String) {
+        val entry = easterTelegramEntryKey(userName, eggKey)
+        context.appPreferencesStore.edit { prefs ->
+            val current = prefs[easterTelegramLoggedKey] ?: emptySet()
+            prefs[easterTelegramLoggedKey] = current + entry
+        }
+    }
+
+    private fun easterTelegramEntryKey(userName: String, eggKey: String): String =
+        "${userName.trim().lowercase()}:$eggKey"
 }
 
 data class ArchivistProgressSnapshot(

@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -87,6 +89,9 @@ fun ChatScreen(
     editTarget: ChatEditTarget?,
     savedDraft: String,
     onDraftSaved: (String) -> Unit,
+    localeTag: String,
+    formatToolbarHidden: Boolean,
+    onFormatToolbarHiddenChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onOpenProfile: (username: String) -> Unit,
     onSend: (String) -> Unit,
@@ -106,6 +111,7 @@ fun ChatScreen(
 ) {
     var draft by remember(friendId) { mutableStateOf(TextFieldValue(savedDraft)) }
     var suppressedPreviewUrl by remember { mutableStateOf<String?>(null) }
+    val timeline = remember(messages, localeTag) { ChatDateUtils.buildTimeline(messages, localeTag) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
@@ -117,6 +123,27 @@ fun ChatScreen(
     var forwardContent by remember { mutableStateOf<String?>(null) }
     var pendingDeleteIds by remember { mutableStateOf<List<String>?>(null) }
     var pendingUnpinMessage by remember { mutableStateOf<MessageDto?>(null) }
+    var highlightMessageId by remember { mutableStateOf<String?>(null) }
+
+    fun scrollToMessageId(messageId: String) {
+        val index = timeline.indexOfFirst { item ->
+            item is ChatTimelineItem.MessageItem && item.message.id == messageId
+        }
+        if (index < 0) {
+            Toast.makeText(
+                context,
+                context.getString(R.string.chat_reply_target_missing),
+                Toast.LENGTH_SHORT,
+            ).show()
+            return
+        }
+        scope.launch {
+            runCatching { listState.animateScrollToItem(index) }
+            highlightMessageId = messageId
+            delay(780)
+            highlightMessageId = null
+        }
+    }
 
     LaunchedEffect(friendId, editTarget?.messageId) {
         draft = if (editTarget != null) {
@@ -130,11 +157,11 @@ fun ChatScreen(
         }
     }
 
-    LaunchedEffect(messages.size, isLoading) {
-        if (isLoading || messages.isEmpty() || selectionMode) return@LaunchedEffect
+    LaunchedEffect(timeline.size, isLoading) {
+        if (isLoading || timeline.isEmpty() || selectionMode) return@LaunchedEffect
         delay(50)
         runCatching {
-            listState.animateScrollToItem(messages.lastIndex)
+            listState.animateScrollToItem(timeline.lastIndex)
         }
     }
 
@@ -355,13 +382,11 @@ fun ChatScreen(
                             pinnedMessage?.let { pinned ->
                                 PinnedMessageBar(
                                     pinned = pinned,
-                                    onScrollToMessage = {
-                                        val index = messages.indexOfFirst { it.id == pinned.messageId }
-                                        if (index >= 0) {
-                                            scope.launch {
-                                                runCatching { listState.animateScrollToItem(index) }
-                                            }
-                                        }
+                                    onScrollToMessage = { scrollToMessageId(pinned.messageId) },
+                                    onUnpin = {
+                                        val message = messages.find { it.id == pinned.messageId }
+                                            ?: MessageDto(id = pinned.messageId, content = pinned.content)
+                                        pendingUnpinMessage = message
                                     },
                                 )
                             }
@@ -375,47 +400,62 @@ fun ChatScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             itemsIndexed(
-                                items = messages,
-                                key = { index, message -> "${message.id}-$index" },
-                            ) { _, message ->
-                                val isMine = message.senderId == currentUserId
-                                val isSelected = selectedIds.contains(message.id)
-                                MessageBubble(
-                                    message = message,
-                                    isMine = isMine,
-                                    isSelectionMode = selectionMode,
-                                    isSelected = isSelected,
-                                    onReact = { emoji -> onReactMessage(message.id, emoji) },
-                                    onTap = {
-                                        if (selectionMode) {
-                                            selectedIds = if (isSelected) {
-                                                selectedIds - message.id
-                                            } else {
-                                                selectedIds + message.id
-                                            }
-                                        } else {
-                                            menuState = MessageMenuState(
-                                                message = message,
-                                                isMine = isMine,
-                                                isPinned = pinnedMessage?.messageId == message.id,
-                                                canEdit = isMine && canEditMessage(message),
-                                                hasLink = ChatFormatUtils.extractFirstUrl(message.content) != null,
-                                            )
-                                        }
-                                    },
-                                    onLongPress = {
-                                        if (!selectionMode) {
-                                            selectionMode = true
-                                            selectedIds = setOf(message.id)
-                                        } else {
-                                            selectedIds = if (isSelected) {
-                                                selectedIds - message.id
-                                            } else {
-                                                selectedIds + message.id
-                                            }
-                                        }
-                                    },
-                                )
+                                items = timeline,
+                                key = { index, item ->
+                                    when (item) {
+                                        is ChatTimelineItem.DateSeparator -> "date-$index-${item.label}"
+                                        is ChatTimelineItem.MessageItem -> item.message.id
+                                    }
+                                },
+                            ) { _, item ->
+                                when (item) {
+                                    is ChatTimelineItem.DateSeparator -> {
+                                        ChatDateSeparator(label = item.label)
+                                    }
+                                    is ChatTimelineItem.MessageItem -> {
+                                        val message = item.message
+                                        val isMine = message.senderId == currentUserId
+                                        val isSelected = selectedIds.contains(message.id)
+                                        MessageBubble(
+                                            message = message,
+                                            isMine = isMine,
+                                            isSelectionMode = selectionMode,
+                                            isSelected = isSelected,
+                                            isHighlighted = highlightMessageId == message.id,
+                                            onReplyJump = { targetId -> scrollToMessageId(targetId) },
+                                            onReact = { emoji -> onReactMessage(message.id, emoji) },
+                                            onTap = {
+                                                if (selectionMode) {
+                                                    selectedIds = if (isSelected) {
+                                                        selectedIds - message.id
+                                                    } else {
+                                                        selectedIds + message.id
+                                                    }
+                                                } else {
+                                                    menuState = MessageMenuState(
+                                                        message = message,
+                                                        isMine = isMine,
+                                                        isPinned = pinnedMessage?.messageId == message.id,
+                                                        canEdit = isMine && canEditMessage(message),
+                                                        hasLink = ChatFormatUtils.extractFirstUrl(message.content) != null,
+                                                    )
+                                                }
+                                            },
+                                            onLongPress = {
+                                                if (!selectionMode) {
+                                                    selectionMode = true
+                                                    selectedIds = setOf(message.id)
+                                                } else {
+                                                    selectedIds = if (isSelected) {
+                                                        selectedIds - message.id
+                                                    } else {
+                                                        selectedIds + message.id
+                                                    }
+                                                }
+                                            },
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -496,6 +536,8 @@ fun ChatScreen(
                         onClearEdit()
                         draft = TextFieldValue(savedDraft)
                     },
+                    formatToolbarHidden = formatToolbarHidden,
+                    onFormatToolbarHiddenChange = onFormatToolbarHiddenChange,
                     isSending = isSending,
                     onSend = { content ->
                         val wasEditing = editTarget != null
@@ -530,9 +572,30 @@ private fun canEditMessage(message: MessageDto): Boolean {
 }
 
 @Composable
+private fun ChatDateSeparator(label: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+        )
+    }
+}
+
+@Composable
 private fun PinnedMessageBar(
     pinned: PinnedMessageDto,
     onScrollToMessage: () -> Unit,
+    onUnpin: () -> Unit,
 ) {
     val previewText = remember(pinned.content) {
         ChatFormatUtils.stripMetadataTokens(pinned.content).lineSequence().firstOrNull().orEmpty()
@@ -541,29 +604,42 @@ private fun PinnedMessageBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onScrollToMessage)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(start = 16.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = Icons.Filled.PushPin,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(18.dp),
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.chat_pinned_label),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(onClick = onScrollToMessage),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.PushPin,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
             )
-            Text(
-                text = previewText.ifBlank { stringResource(R.string.chat_pinned_fallback) },
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.chat_pinned_label),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = previewText.ifBlank { stringResource(R.string.chat_pinned_fallback) },
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        IconButton(onClick = onUnpin) {
+            Icon(
+                imageVector = Icons.Filled.Close,
+                contentDescription = stringResource(R.string.chat_action_unpin),
             )
         }
     }
@@ -576,6 +652,8 @@ private fun MessageBubble(
     isMine: Boolean,
     isSelectionMode: Boolean,
     isSelected: Boolean,
+    isHighlighted: Boolean,
+    onReplyJump: (String) -> Unit,
     onReact: (String) -> Unit,
     onTap: () -> Unit,
     onLongPress: () -> Unit,
@@ -623,6 +701,17 @@ private fun MessageBubble(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(16.dp))
+                    .then(
+                        if (isHighlighted) {
+                            Modifier.border(
+                                2.dp,
+                                Color(0xFF60A5FA).copy(alpha = 0.45f),
+                                RoundedCornerShape(16.dp),
+                            )
+                        } else {
+                            Modifier
+                        },
+                    )
                     .background(bg)
                     .combinedClickable(
                         onClick = onTap,
@@ -639,6 +728,7 @@ private fun MessageBubble(
                             author = meta.author,
                             text = meta.text.ifBlank { stringResource(R.string.chat_reply_message) },
                             isOutgoing = isMine,
+                            onClick = { onReplyJump(meta.messageId) },
                         )
                     }
                     ChatMessageContent(

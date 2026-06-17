@@ -108,6 +108,12 @@ interface CybLightApi {
         @Body body: UnpinMessageRequest,
     ): MessageActionResponse
 
+    @GET("messages/export")
+    suspend fun exportChats(): ChatsExportResponse
+
+    @POST("messages/import")
+    suspend fun importChats(@Body body: ChatsImportRequest): ChatsImportResponse
+
     @GET("crypto/keys/status")
     suspend fun signalKeyStatus(): SignalKeyStatusResponse
 

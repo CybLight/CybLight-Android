@@ -19,6 +19,7 @@ object NotificationHelper {
 
     const val EXTRA_CHAT_FRIEND_ID = "extra_chat_friend_id"
     const val EXTRA_CHAT_FRIEND_NAME = "extra_chat_friend_name"
+    const val EXTRA_OPEN_SESSIONS = "extra_open_sessions"
 
     fun ensureChannels(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -52,10 +53,11 @@ object NotificationHelper {
         ensureChannels(context)
         val launchIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_OPEN_SESSIONS, true)
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
-            0,
+            NOTIFICATION_LOGIN,
             launchIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

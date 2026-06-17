@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.EmojiEmotions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,6 +59,8 @@ fun ChatInputSection(
     editTarget: ChatEditTarget? = null,
     onClearReply: () -> Unit = {},
     onClearEdit: () -> Unit = {},
+    formatToolbarHidden: Boolean = false,
+    onFormatToolbarHiddenChange: (Boolean) -> Unit = {},
     isSending: Boolean,
     onSend: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -117,19 +120,40 @@ fun ChatInputSection(
             )
         }
 
-        ChatFormattingToolbar(
-            onBold = { wrapSelection(draft, onDraftChange, "**", "**") },
-            onItalic = { wrapSelection(draft, onDraftChange, "_", "_") },
-            onMono = { wrapSelection(draft, onDraftChange, "`", "`") },
-            onStrike = { wrapSelection(draft, onDraftChange, "~~", "~~") },
-            onSpoiler = { wrapSelection(draft, onDraftChange, "||", "||") },
-            onLink = { showLinkDialog = true },
-            onCode = {
-                val selected = draft.text.substring(draft.selection.min, draft.selection.max)
-                val block = "```\n${selected.ifBlank { "код" }}\n```"
-                insertAtSelection(draft, onDraftChange, block)
-            },
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            FilledTonalIconButton(
+                onClick = { onFormatToolbarHiddenChange(!formatToolbarHidden) },
+            ) {
+                Text(
+                    text = "Aa",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (formatToolbarHidden) FontWeight.Normal else FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 2.dp),
+                )
+            }
+            if (!formatToolbarHidden) {
+                ChatFormattingToolbar(
+                    modifier = Modifier.weight(1f),
+                    onBold = { wrapSelection(draft, onDraftChange, "**", "**") },
+                    onItalic = { wrapSelection(draft, onDraftChange, "_", "_") },
+                    onMono = { wrapSelection(draft, onDraftChange, "`", "`") },
+                    onStrike = { wrapSelection(draft, onDraftChange, "~~", "~~") },
+                    onSpoiler = { wrapSelection(draft, onDraftChange, "||", "||") },
+                    onLink = { showLinkDialog = true },
+                    onCode = {
+                        val selected = draft.text.substring(draft.selection.min, draft.selection.max)
+                        val block = "```\n${selected.ifBlank { "код" }}\n```"
+                        insertAtSelection(draft, onDraftChange, block)
+                    },
+                )
+            }
+        }
 
         ComposeLinkPreview(
             draft = draft.text,
@@ -213,6 +237,7 @@ private fun ChatComposeBanner(
 
 @Composable
 private fun ChatFormattingToolbar(
+    modifier: Modifier = Modifier,
     onBold: () -> Unit,
     onItalic: () -> Unit,
     onMono: () -> Unit,
@@ -222,10 +247,8 @@ private fun ChatFormattingToolbar(
     onCode: () -> Unit,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+        modifier = modifier
+            .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         FormatButton("B", fontWeight = FontWeight.Bold, onClick = onBold)

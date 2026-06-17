@@ -10,9 +10,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import org.cyblight.android.ui.components.CybOutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -114,22 +116,27 @@ fun SignalBackupSection(
             title = { Text(stringResource(R.string.settings_signal_backup_export)) },
             text = {
                 Column {
-                    OutlinedTextField(
+                    CybOutlinedTextField(
                         value = exportPassword,
                         onValueChange = { exportPassword = it },
-                        label = { Text(stringResource(R.string.settings_signal_backup_password)) },
-                        supportingText = {
-                            Text(stringResource(R.string.settings_signal_backup_password_export_hint))
-                        },
+                        label = stringResource(R.string.settings_signal_backup_password),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        showPasswordToggle = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    OutlinedTextField(
+                    Text(
+                        text = stringResource(R.string.settings_signal_backup_password_export_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp),
+                    )
+                    CybOutlinedTextField(
                         value = exportPasswordConfirm,
                         onValueChange = { exportPasswordConfirm = it },
-                        label = { Text(stringResource(R.string.settings_signal_backup_password_confirm)) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
+                        label = stringResource(R.string.settings_signal_backup_password_confirm),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        showPasswordToggle = true,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             },
@@ -191,15 +198,22 @@ fun SignalBackupSection(
             onDismissRequest = { if (!busy) showImportDialog = false },
             title = { Text(stringResource(R.string.settings_signal_backup_import)) },
             text = {
-                OutlinedTextField(
-                    value = importPassword,
-                    onValueChange = { importPassword = it },
-                    label = { Text(stringResource(R.string.settings_signal_backup_password)) },
-                    supportingText = {
-                        Text(stringResource(R.string.settings_signal_backup_password_import_hint))
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                Column {
+                    CybOutlinedTextField(
+                        value = importPassword,
+                        onValueChange = { importPassword = it },
+                        label = stringResource(R.string.settings_signal_backup_password),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        showPasswordToggle = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_signal_backup_password_import_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp),
+                    )
+                }
             },
             confirmButton = {
                 TextButton(

@@ -103,6 +103,22 @@
     <string name="chat_insert_link">Вставить ссылку</string>
     <string name="chat_insert_link_url">URL</string>
     <string name="chat_insert_link_label">Текст ссылки</string>
+    <string name="chat_reply_target_missing">Исходное сообщение вне текущего диапазона чата</string>
+    <string name="chat_preview_you">Вы: %1$s</string>
+    <string name="message_preview_fallback">Новое сообщение</string>
+    <string name="message_preview_encrypted">🔒 Новое сообщение</string>
+    <string name="message_preview_decrypt_failed">🔒 Не удалось расшифровать сообщение</string>
+    <string name="messages_tab_hint">Выберите друга, чтобы начать переписку</string>
+    <string name="messages_settings_title">Настройки сообщений</string>
+    <string name="messages_format_toolbar_hidden">Скрывать панель форматирования по умолчанию</string>
+    <string name="messages_export_import_title">Экспорт и импорт чатов</string>
+    <string name="messages_export_import_hint">Сохраните переписку в файл или восстановите её из резервной копии этого аккаунта (ключи шифрования сохраняются через вкладку Безопасность).</string>
+    <string name="messages_export_chats">Экспорт чатов</string>
+    <string name="messages_import_chats">Импорт чатов</string>
+    <string name="messages_export_failed">Не удалось экспортировать чаты.</string>
+    <string name="messages_import_failed">Не удалось импортировать чаты.</string>
+    <string name="messages_export_success">Экспортировано чатов: %1$d, сообщений: %2$d</string>
+    <string name="messages_import_success">Импорт завершён: добавлено %1$d, пропущено %2$d, ошибок %3$d</string>
     <string name="send">Отправить</string>
     <string name="loading">Загрузка…</string>
     <string name="logout">Выйти</string>
@@ -146,6 +162,48 @@
     <string name="update_check_error">Не удалось проверить обновления</string>
     <string name="error_open_link">Не удалось открыть ссылку</string>
     <string name="menu_settings">Настройки</string>
+    <string name="settings_hub_app_lock_title">Блокировка приложения</string>
+    <string name="settings_hub_app_lock_enabled">PIN или биометрия</string>
+    <string name="settings_hub_app_lock_disabled">Блокировка выключена</string>
+    <string name="settings_section_chats">Чаты</string>
+    <string name="settings_hub_chats_subtitle">Резервная копия, форматирование, экспорт</string>
+    <string name="settings_chats_section_chat_settings">Настройки чата</string>
+    <string name="settings_chats_format_toolbar_hint">Не показывать панель форматирования при открытии чата</string>
+    <string name="settings_chats_hide_backup_reminder">Скрыть напоминание о резервной копии</string>
+    <string name="settings_chats_hide_backup_reminder_hint">Не показывать баннер о резервном копировании в списке чатов</string>
+    <string name="settings_chats_section_backup">Резервное копирование</string>
+    <string name="settings_chats_backup_item">Резервная копия чатов</string>
+    <string name="settings_chats_backup_item_hint">Google Drive и локальный файл ключей и сообщений</string>
+    <string name="settings_chat_backup_section_title">Настройки резервного копирования</string>
+    <string name="settings_chat_backup_intro">Создавайте резервные копии чатов и ключей шифрования в облаке, чтобы не потерять их при переходе на новый телефон.</string>
+    <string name="settings_chat_backup_last_with_size">Последнее резервное копирование: %1$s · %2$s</string>
+    <string name="settings_chat_backup_encrypted_badge">Защищено паролем</string>
+    <string name="settings_chat_backup_create_now">Создать резервную копию</string>
+    <string name="settings_chat_backup_auto">Автоматическое резервное копирование</string>
+    <string name="settings_chat_backup_auto_off">Выключено</string>
+    <string name="settings_chat_backup_auto_daily">Ежедневно</string>
+    <string name="settings_chat_backup_auto_weekly">Еженедельно</string>
+    <string name="settings_chat_backup_auto_monthly">Ежемесячно</string>
+    <string name="settings_chat_backup_auto_manual">Пока только вручную</string>
+    <string name="settings_chat_backup_over_cellular">Резервное копирование через мобильный Интернет</string>
+    <string name="settings_chat_backup_over_cellular_hint">Разрешить автоматическую копию без Wi‑Fi</string>
+    <string name="settings_chat_backup_auto_password_title">Пароль для автоматической копии</string>
+    <string name="settings_chat_backup_auto_enabled">Автоматическое резервное копирование: %1$s</string>
+    <string name="settings_chat_backup_e2e_title">Сквозное шифрование</string>
+    <string name="settings_chat_backup_e2e_hint">Для дополнительной безопасности резервная копия защищена паролем, который знаете только вы.</string>
+    <string name="settings_chat_backup_e2e_item">Резервное копирование с паролем</string>
+    <string name="settings_chat_backup_e2e_on">Вкл.</string>
+    <string name="settings_chat_backup_progress_creating">Создаётся резервная копия (%1$d%%)</string>
+    <string name="drive_restore_confirm_title">Резервная копия в Google Drive</string>
+    <string name="drive_restore_confirm_message">Найдена копия ключей и сообщений в Google Drive (%1$s). Восстановить на этом устройстве?</string>
+    <string name="drive_restore_restore">Восстановить</string>
+    <string name="drive_restore_skip">Пропустить</string>
+    <string name="drive_restore_password_title">Введите пароль резервной копии</string>
+    <string name="settings_hub_appearance_subtitle">%1$s, %2$s</string>
+    <string name="settings_hub_gestures_enabled">Свайп назад включён</string>
+    <string name="settings_hub_gestures_disabled">Свайп назад выключен</string>
+    <string name="settings_hub_background_subtitle">Батарея и разрешения приложения</string>
+    <string name="settings_hub_about_subtitle">Версия, сайт, пасхалки</string>
     <string name="settings_title">Настройки</string>
     <string name="settings_section_appearance">Внешний вид</string>
     <string name="settings_section_gestures">Жесты и навигация</string>
@@ -166,6 +224,8 @@
     <string name="settings_root_back_exit">Сразу выходить</string>
     <string name="settings_root_back_minimize">Сворачивать приложение</string>
     <string name="home_whats_new_title">Что нового в приложении</string>
+    <string name="settings_home_whats_new_banner">Баннер «Что нового»</string>
+    <string name="settings_home_whats_new_banner_hint">Показывать блок с новыми функциями на вкладке «Главная»</string>
     <string name="home_previous_versions">Что было в предыдущих версиях</string>
     <string name="home_site_news">Новости с сайта</string>
     <string name="home_projects">Проекты CybLight</string>
@@ -176,15 +236,13 @@
     <string name="home_projects_empty">Проекты недоступны</string>
     <string name="home_load_failed">Не удалось загрузить главную</string>
     <string-array name="home_whats_new_features">
-        <item>Исправлена блокировка приложения по PIN и биометрии</item>
-        <item>Подсказки к паролю резервной копии шифрования</item>
-        <item>Кнопка «Экспорт» снова видна в настройках резервной копии</item>
-        <item>Сквозное шифрование сообщений (Signal Protocol)</item>
-        <item>Кнопка регистрации на экране входа</item>
-        <item>Вставка логина и пароля из буфера обмена</item>
-        <item>Ответы на сообщения с цитатой, как на сайте</item>
-        <item>Больше эмодзи в чате — набор как в Telegram</item>
-        <item>Превью последних сообщений в списке чатов</item>
+        <item>Настройки в стиле WhatsApp с разделами безопасности и уведомлений</item>
+        <item>Расшифровка превью зашифрованных сообщений в чатах и push</item>
+        <item>Резервное копирование чатов и ключей в Google Drive</item>
+        <item>Экспорт и импорт чатов</item>
+        <item>Разделители дат и переход к цитируемому сообщению</item>
+        <item>Уведомление о входе открывает раздел «Сессии»</item>
+        <item>Можно скрыть баннер «Что нового» на главной</item>
     </string-array>
     <string name="home_fallback_news_title">Сайт CybLight</string>
     <string name="home_project_site_title">Сайт CybLight</string>
@@ -234,6 +292,33 @@
     <string name="settings_signal_backup_password_required">Введите пароль резервной копии.</string>
     <string name="settings_signal_backup_export_done">Резервная копия создана.</string>
     <string name="settings_signal_backup_import_done">Ключи шифрования восстановлены.</string>
+
+    <string name="settings_google_drive_section">Google Drive</string>
+    <string name="settings_google_drive_hint">Сохранение ключей шифрования и чатов в Google Drive. Тот же пароль и файл, что в браузере login.cyblight.org.</string>
+    <string name="settings_google_drive_not_configured">Google Drive не настроен в этой сборке приложения.</string>
+    <string name="settings_google_drive_account">Аккаунт Google</string>
+    <string name="settings_google_drive_not_signed_in">Не выполнен вход</string>
+    <string name="settings_google_drive_sign_in_hint">Войдите через Google, чтобы сохранить или восстановить копию.</string>
+    <string name="settings_google_drive_no_backup">В Google Drive пока нет резервной копии.</string>
+    <string name="settings_google_drive_last_backup">Последнее сохранение: %1$s</string>
+    <string name="settings_google_drive_last_backup_size">Последнее сохранение: %1$s · %2$s</string>
+    <string name="settings_google_drive_sign_in">Войти через Google</string>
+    <string name="settings_google_drive_upload">Сохранить в Google Drive</string>
+    <string name="settings_google_drive_restore">Восстановить из Google Drive</string>
+    <string name="settings_google_drive_delete">Удалить из Drive</string>
+    <string name="settings_google_drive_sign_out">Выйти из Google</string>
+    <string name="settings_google_drive_upload_done">Резервная копия сохранена в Google Drive.</string>
+    <string name="settings_google_drive_restore_done">Ключи и чаты восстановлены из Google Drive.</string>
+    <string name="settings_google_drive_restore_chats_stats">Чаты: добавлено %1$d, пропущено %2$d.</string>
+    <string name="settings_google_drive_delete_done">Резервная копия удалена из Google Drive.</string>
+    <string name="settings_google_drive_progress_auth">Вход в Google…</string>
+    <string name="settings_google_drive_progress_create">Создание резервной копии…</string>
+    <string name="settings_google_drive_progress_upload">Сохранение в Google Drive…</string>
+    <string name="settings_google_drive_progress_find">Поиск копии в Drive…</string>
+    <string name="settings_google_drive_progress_download">Скачивание из Drive…</string>
+    <string name="settings_google_drive_progress_restore">Восстановление ключей…</string>
+    <string name="settings_google_drive_progress_chats">Импорт чатов…</string>
+    <string name="settings_google_drive_progress_done">Готово</string>
     <string name="settings_app_lock">Блокировка приложения</string>
     <string name="settings_app_lock_hint">PIN или биометрия при запуске и возврате в CybLight</string>
     <string name="settings_app_lock_timeout">Блокировать через</string>

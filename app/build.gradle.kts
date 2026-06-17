@@ -21,8 +21,8 @@ android {
         applicationId = "org.cyblight.android"
         minSdk = 26
         targetSdk = 34
-        versionCode = 35
-        versionName = "0.7.0"
+        versionCode = 36
+        versionName = "0.8.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -39,6 +39,17 @@ android {
             "String",
             "GITHUB_RELEASES_URL",
             "\"https://api.github.com/repos/CybLight/CybLight-Android/releases/latest\"",
+        )
+
+        buildConfigField(
+            "String",
+            "GOOGLE_DRIVE_WEB_CLIENT_ID",
+            "\"813119340240-fpigjen9501h6cfvliknogddbapcbg0d.apps.googleusercontent.com\"",
+        )
+        buildConfigField(
+            "String",
+            "GOOGLE_DRIVE_ANDROID_CLIENT_ID",
+            "\"813119340240-ftq74epgnskmsi3pmcigrjltttklm9q3.apps.googleusercontent.com\"",
         )
 
         ndk {
@@ -118,8 +129,11 @@ dependencies {
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
+
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-messaging")

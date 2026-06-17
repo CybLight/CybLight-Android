@@ -1,6 +1,8 @@
 package org.cyblight.android
 
+import android.app.Activity
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.autofill.AutofillManager
@@ -49,6 +51,8 @@ import org.cyblight.android.ui.main.MainScreen
 import org.cyblight.android.ui.navigation.SwipeBackContainer
 import org.cyblight.android.ui.components.AboutDialog
 import org.cyblight.android.ui.help.HelpScreen
+import org.cyblight.android.ui.settings.DriveRestoreConfirmDialog
+import org.cyblight.android.ui.settings.DriveRestorePasswordDialog
 import org.cyblight.android.ui.settings.SettingsScreen
 import org.cyblight.android.ui.theme.CybLightTheme
 import org.cyblight.android.ui.update.UpdateCheckDialog
@@ -66,6 +70,12 @@ import org.cyblight.android.util.BugReport
 
 class MainActivity : AppCompatActivity() {
     private val viewModel: AppViewModel by viewModels()
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        dispatchNotificationIntent(intent)
+    }
 
     override fun onResume() {
         super.onResume()
@@ -101,13 +111,7 @@ class MainActivity : AppCompatActivity() {
 
             LaunchedEffect(uiState.screen) {
                 if (uiState.screen != AppScreen.Main) return@LaunchedEffect
-                val friendId = intent?.getStringExtra(NotificationHelper.EXTRA_CHAT_FRIEND_ID)?.trim().orEmpty()
-                if (friendId.isEmpty()) return@LaunchedEffect
-                val friendName = intent?.getStringExtra(NotificationHelper.EXTRA_CHAT_FRIEND_NAME)?.trim()
-                    .orEmpty()
-                viewModel.openChatFromNotification(friendId, friendName)
-                intent?.removeExtra(NotificationHelper.EXTRA_CHAT_FRIEND_ID)
-                intent?.removeExtra(NotificationHelper.EXTRA_CHAT_FRIEND_NAME)
+                dispatchNotificationIntent(intent)
             }
 
             DisposableEffect(lifecycleOwner, uiState.appLockEnabled, uiState.screen, uiState.appLockSettingsLoaded) {
@@ -211,6 +215,75 @@ class MainActivity : AppCompatActivity() {
                 backupSaveLauncher.launch(fileName)
             }
 
+            val googleDriveSignInLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.StartActivityForResult(),
+            ) { result ->
+                if (result.resultCode == Activity.RESULT_OK) {
+                    viewModel.handleGoogleDriveSignInResult(result.data)
+                } else {
+                    viewModel.handleGoogleDriveSignInResult(null)
+                }
+            }
+
+            LaunchedEffect(Unit) {
+                viewModel.driveRestoreGoogleSignInRequest.collect {
+                    googleDriveSignInLauncher.launch(viewModel.getGoogleDriveSignInIntent())
+                }
+            }
+
+            var driveRestorePassword by remember { mutableStateOf("") }
+            LaunchedEffect(uiState.driveRestoreToast) {
+                val toast = viewModel.consumeDriveRestoreToast() ?: return@LaunchedEffect
+                Toast.makeText(context, toast.first, Toast.LENGTH_LONG).show()
+            }
+
+            var chatsImportConsumer by remember { mutableStateOf<((String) -> Unit)?>(null) }
+            val chatsImportLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument(),
+            ) { uri ->
+                val consumer = chatsImportConsumer
+                chatsImportConsumer = null
+                if (uri == null || consumer == null) return@rememberLauncherForActivityResult
+                runCatching {
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        consumer(stream.bufferedReader().readText())
+                    }
+                }
+            }
+            val pickChatsFile: (onPicked: (String) -> Unit) -> Unit = { onPicked ->
+                chatsImportConsumer = onPicked
+                chatsImportLauncher.launch(arrayOf("application/json", "*/*"))
+            }
+
+            var chatsExportPayload by remember { mutableStateOf<Pair<String, String>?>(null) }
+            var chatsExportResult by remember { mutableStateOf<((Boolean?) -> Unit)?>(null) }
+            val chatsSaveLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.CreateDocument("application/json"),
+            ) { uri ->
+                val payload = chatsExportPayload
+                val onResult = chatsExportResult
+                chatsExportPayload = null
+                chatsExportResult = null
+                if (payload == null || onResult == null) return@rememberLauncherForActivityResult
+                if (uri == null) {
+                    onResult(null)
+                    return@rememberLauncherForActivityResult
+                }
+                val saved = runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { stream ->
+                        stream.write(payload.second.toByteArray(Charsets.UTF_8))
+                    } ?: error("chats_save_stream_missing")
+                }.isSuccess
+                onResult(saved)
+            }
+            val saveChatsFile: (String, String, (Boolean?) -> Unit) -> Unit = { fileName, content, onResult ->
+                chatsExportPayload = fileName to content
+                chatsExportResult = onResult
+                chatsSaveLauncher.launch(fileName)
+            }
+
+            var chatsTransferBusy by remember { mutableStateOf(false) }
+
             LaunchedEffect(uiState.screen) {
                 if (uiState.screen == AppScreen.Login || uiState.screen == AppScreen.TwoFactor) {
                     pendingAutofillCommit = true
@@ -273,6 +346,8 @@ class MainActivity : AppCompatActivity() {
                     when (uiState.detailScreen) {
                         DetailScreen.Settings -> {
                             SettingsScreen(
+                                settingsSection = uiState.settingsSection,
+                                onSettingsSectionChange = viewModel::setSettingsSection,
                                 locale = uiState.locale,
                                 themeMode = uiState.themeMode,
                                 notificationsEnabled = uiState.notificationsEnabled,
@@ -312,14 +387,100 @@ class MainActivity : AppCompatActivity() {
                                 onSwipeBackSensitivitySelected = viewModel::setSwipeBackSensitivity,
                                 onSwipeBackEdgeWidthSelected = viewModel::setSwipeBackEdgeWidth,
                                 onRootBackBehaviorSelected = viewModel::setRootBackBehavior,
+                                homeWhatsNewBannerHidden = uiState.homeWhatsNewBannerHidden,
+                                onHomeWhatsNewBannerHiddenChange = viewModel::setHomeWhatsNewBannerHidden,
                                 accountLogin = uiState.user?.login.orEmpty().ifBlank { "user" },
                                 onCreateSignalBackup = viewModel::createSignalBackup,
                                 onRestoreSignalBackup = viewModel::restoreSignalBackup,
                                 signalBackupErrorMessage = viewModel::signalBackupErrorMessage,
                                 onPickBackupFile = pickBackupFile,
                                 onSaveBackupFile = saveBackupFile,
-                                focusSignalBackup = uiState.settingsFocusSignalBackup,
-                                onSignalBackupFocused = viewModel::clearSettingsFocusSignalBackup,
+                                focusChatBackup = uiState.settingsFocusChatBackup,
+                                onChatBackupFocused = viewModel::clearSettingsFocusChatBackup,
+                                chatFormatToolbarHidden = uiState.chatFormatToolbarHidden,
+                                encryptionReminderHidden = uiState.encryptionReminderChatDismissed,
+                                isChatsTransferBusy = chatsTransferBusy,
+                                onChatFormatToolbarHiddenChange = viewModel::setChatFormatToolbarHidden,
+                                onEncryptionReminderHiddenChange = viewModel::setEncryptionReminderChatDismissed,
+                                onExportChats = {
+                                    if (!chatsTransferBusy) {
+                                        chatsTransferBusy = true
+                                        viewModel.exportChats(
+                                            onReady = { fileName, json, chatCount, messageCount ->
+                                                saveChatsFile(fileName, json) { saved ->
+                                                    chatsTransferBusy = false
+                                                    val message = when (saved) {
+                                                        true -> context.getString(
+                                                            R.string.messages_export_success,
+                                                            chatCount,
+                                                            messageCount,
+                                                        )
+                                                        false -> context.getString(R.string.messages_export_failed)
+                                                        null -> return@saveChatsFile
+                                                    }
+                                                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                                }
+                                            },
+                                            onError = {
+                                                chatsTransferBusy = false
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(R.string.messages_export_failed),
+                                                    Toast.LENGTH_LONG,
+                                                ).show()
+                                            },
+                                        )
+                                    }
+                                },
+                                onImportChats = {
+                                    if (!chatsTransferBusy) {
+                                        pickChatsFile { json ->
+                                            chatsTransferBusy = true
+                                            viewModel.importChats(json) { stats ->
+                                                chatsTransferBusy = false
+                                                val message = if (stats != null) {
+                                                    context.getString(
+                                                        R.string.messages_import_success,
+                                                        stats.imported,
+                                                        stats.skipped,
+                                                        stats.errors,
+                                                    )
+                                                } else {
+                                                    context.getString(R.string.messages_import_failed)
+                                                }
+                                                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                            }
+                                        }
+                                    }
+                                },
+                                isGoogleDriveConfigured = viewModel.isGoogleDriveConfigured(),
+                                googleDriveAccountLabel = uiState.googleDriveAccountLabel,
+                                googleDriveBackupMetadata = uiState.googleDriveBackupMetadata,
+                                onGoogleDriveSignIn = {
+                                    googleDriveSignInLauncher.launch(viewModel.getGoogleDriveSignInIntent())
+                                },
+                                onRefreshGoogleDriveStatus = viewModel::refreshGoogleDriveStatusSync,
+                                onUploadGoogleDriveBackup = viewModel::uploadGoogleDriveBackup,
+                                onRestoreGoogleDriveBackup = viewModel::restoreGoogleDriveBackup,
+                                onDeleteGoogleDriveBackup = viewModel::deleteGoogleDriveBackup,
+                                onGoogleDriveSignOut = viewModel::signOutGoogleDrive,
+                                chatBackupFrequency = uiState.chatBackupFrequency,
+                                chatBackupOverCellular = uiState.chatBackupOverCellular,
+                                chatBackupHasStoredPassword = uiState.chatBackupHasStoredPassword,
+                                onChatBackupFrequencySelected = viewModel::setChatBackupFrequency,
+                                onChatBackupOverCellularChange = viewModel::setChatBackupOverCellular,
+                                onEnableAutoBackup = viewModel::enableAutoBackup,
+                                securityOverview = uiState.securityOverview,
+                                isSecurityLoading = uiState.isSecurityLoading,
+                                isSecurityRefreshing = uiState.isSecurityLoading &&
+                                    uiState.securityOverview != null,
+                                onRefreshSecurity = viewModel::forceRefreshSecurityOverview,
+                                onOpenSecurityCheck = viewModel::openSecurityCheck,
+                                onOpenAccountSecurity = { viewModel.openAccountSecurity(context) },
+                                onOpenPasskeys = viewModel::openPasskeys,
+                                onOpenTrustedDevices = viewModel::openTrustedDevices,
+                                onOpenLoginHistory = viewModel::openLoginHistory,
+                                onOpenSessions = viewModel::openSessions,
                             )
                         }
                         DetailScreen.Help -> {
@@ -522,6 +683,8 @@ class MainActivity : AppCompatActivity() {
                                     chatReplyTarget = uiState.chatReplyTarget,
                                     chatEditTarget = uiState.chatEditTarget,
                                     chatDraftText = uiState.chatDraftText,
+                                    chatFormatToolbarHidden = uiState.chatFormatToolbarHidden,
+                                    localeTag = uiState.locale,
                                     isChatLoading = uiState.isChatLoading,
                                     isSending = uiState.isSending,
                                     homeContent = uiState.homeContent,
@@ -564,6 +727,7 @@ class MainActivity : AppCompatActivity() {
                                     onForwardChatMessage = viewModel::forwardChatMessage,
                                     onReactChatMessage = viewModel::reactToChatMessage,
                                     onUpdateChatDraft = viewModel::updateChatDraft,
+                                    onChatFormatToolbarHiddenChange = viewModel::setChatFormatToolbarHidden,
                                     easterFlags = uiState.easterFlags,
                                     easterProgress = uiState.easterProgress,
                                     isEasterLoading = uiState.isEasterLoading,
@@ -573,32 +737,49 @@ class MainActivity : AppCompatActivity() {
                                             else -> code
                                         }
                                     },
-                                    securityOverview = uiState.securityOverview,
-                                    isSecurityLoading = uiState.isSecurityLoading,
-                                    isSecurityRefreshing = uiState.isSecurityLoading &&
-                                        uiState.securityOverview != null,
-                                    onSecurityTabSelected = viewModel::refreshSecurityOverview,
-                                    onRefreshSecurity = viewModel::forceRefreshSecurityOverview,
-                                    onOpenSecurityCheck = viewModel::openSecurityCheck,
-                                    onOpenAccountSecurity = { viewModel.openAccountSecurity(context) },
-                                    onOpenPasskeys = viewModel::openPasskeys,
-                                    onOpenTrustedDevices = viewModel::openTrustedDevices,
-                                    onOpenLoginHistory = viewModel::openLoginHistory,
-                                    onOpenSessions = viewModel::openSessions,
                                     onEasterTabSelected = viewModel::refreshEasterFlags,
                                     onSelectTab = viewModel::selectMainTab,
                                     onFriendsSubTabChange = viewModel::setFriendsSubTab,
                                     onRefreshHome = viewModel::refreshHomeContent,
                                     onOpenUrl = { url -> viewModel.openWebsiteUrl(context, url) },
                                     onOpenChangelog = viewModel::openChangelog,
+                                    homeWhatsNewBannerHidden = uiState.homeWhatsNewBannerHidden,
+                                    onHomeWhatsNewBannerHiddenChange = viewModel::setHomeWhatsNewBannerHidden,
                                     encryptionReminderChatDismissed = uiState.encryptionReminderChatDismissed,
                                     onDismissEncryptionReminderChat = viewModel::dismissEncryptionReminderChat,
-                                    onOpenSecurityBackup = viewModel::openSecurityBackup,
+                                    onOpenSecurityBackup = viewModel::openChatBackup,
                                 )
                             }
                         }
                         }
                     }
+                    }
+
+                    uiState.driveRestoreConfirmMetadata?.let { metadata ->
+                        if (!uiState.driveRestorePasswordOpen) {
+                            DriveRestoreConfirmDialog(
+                                metadata = metadata,
+                                onRestore = {
+                                    driveRestorePassword = ""
+                                    viewModel.beginDriveRestore()
+                                },
+                                onSkip = viewModel::skipDriveRestore,
+                            )
+                        }
+                    }
+
+                    if (uiState.driveRestorePasswordOpen) {
+                        DriveRestorePasswordDialog(
+                            password = driveRestorePassword,
+                            onPasswordChange = { driveRestorePassword = it },
+                            busy = uiState.driveRestoreBusy,
+                            progress = uiState.driveRestoreProgress,
+                            progressLabel = viewModel.driveRestoreProgressLabel(uiState.driveRestoreProgressKey),
+                            onDismiss = viewModel::dismissDriveRestorePasswordDialog,
+                            onConfirm = {
+                                viewModel.submitDriveRestorePassword(driveRestorePassword)
+                            },
+                        )
                     }
 
                     if (showAbout) {
@@ -685,5 +866,20 @@ class MainActivity : AppCompatActivity() {
         }
 
         ApkInstaller.install(this, apkFile)
+    }
+
+    private fun dispatchNotificationIntent(intent: Intent?) {
+        val data = intent ?: return
+        if (data.getBooleanExtra(NotificationHelper.EXTRA_OPEN_SESSIONS, false)) {
+            data.removeExtra(NotificationHelper.EXTRA_OPEN_SESSIONS)
+            viewModel.openSessionsFromNotification()
+            return
+        }
+        val friendId = data.getStringExtra(NotificationHelper.EXTRA_CHAT_FRIEND_ID)?.trim().orEmpty()
+        if (friendId.isEmpty()) return
+        val friendName = data.getStringExtra(NotificationHelper.EXTRA_CHAT_FRIEND_NAME)?.trim().orEmpty()
+        data.removeExtra(NotificationHelper.EXTRA_CHAT_FRIEND_ID)
+        data.removeExtra(NotificationHelper.EXTRA_CHAT_FRIEND_NAME)
+        viewModel.openChatFromNotification(friendId, friendName)
     }
 }

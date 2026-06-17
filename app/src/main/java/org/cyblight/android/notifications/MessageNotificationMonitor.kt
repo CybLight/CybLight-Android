@@ -1,8 +1,9 @@
 package org.cyblight.android.notifications
 
 import android.content.Context
+import org.cyblight.android.crypto.SignalCryptoManager
 import org.cyblight.android.data.ApiClient
-import org.cyblight.android.data.api.UnreadDetailDto
+import org.cyblight.android.data.repository.ConversationPreviewEnricher
 import org.cyblight.android.data.preferences.AppPreferences
 import org.cyblight.android.data.session.SessionManager
 import org.cyblight.android.util.SystemSettings
@@ -22,6 +23,18 @@ class MessageNotificationMonitor(
         val response = runCatching { api.unreadSummary() }.getOrNull() ?: return
         if (!response.ok) return
 
+        val userId = sessionManager.getUserId()?.trim().orEmpty()
+        val enrichedPreviews = if (userId.isNotBlank()) {
+            ConversationPreviewEnricher.enrichPreviews(
+                context = context,
+                userId = userId,
+                previews = response.conversationPreviews,
+                signalCrypto = SignalCryptoManager(context, api),
+            )
+        } else {
+            emptyMap()
+        }
+
         val activeChatId = appPreferences.getActiveChatFriendId()
         val previous = appPreferences.getLastNotifiedUnreadCounts()
         val next = mutableMapOf<String, Int>()
@@ -37,11 +50,14 @@ class MessageNotificationMonitor(
             val previousCount = previous[senderId] ?: 0
             if (unreadCount <= previousCount) return@forEach
 
+            val preview = enrichedPreviews[senderId]
+                ?: detail.preview.takeIf { it.isNotBlank() }
+
             NotificationHelper.showNewMessageAlert(
                 context = context,
                 friendId = senderId,
                 friendName = detail.senderLogin,
-                preview = detail.preview,
+                preview = preview.orEmpty(),
                 unreadCount = unreadCount,
             )
         }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,6 +21,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.NewReleases
@@ -54,6 +56,8 @@ fun HomeScreen(
     content: HomeContent?,
     isLoading: Boolean,
     error: String?,
+    whatsNewBannerHidden: Boolean,
+    onDismissWhatsNewBanner: () -> Unit,
     onRefresh: () -> Unit,
     onOpenUrl: (String) -> Unit,
     onOpenChangelog: () -> Unit,
@@ -74,11 +78,14 @@ fun HomeScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                item {
-                    WhatsNewBanner(
-                        content = content,
-                        onOpenChangelog = onOpenChangelog,
-                    )
+                if (!whatsNewBannerHidden) {
+                    item {
+                        WhatsNewBanner(
+                            content = content,
+                            onOpenChangelog = onOpenChangelog,
+                            onDismiss = onDismissWhatsNewBanner,
+                        )
+                    }
                 }
 
                 if (!content?.siteNotice.isNullOrBlank()) {
@@ -140,6 +147,7 @@ private fun SectionTitle(text: String) {
 private fun WhatsNewBanner(
     content: HomeContent?,
     onOpenChangelog: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     val whatsNew = content?.whatsNew
     Card(
@@ -148,8 +156,25 @@ private fun WhatsNewBanner(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
         ),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Box {
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.align(Alignment.TopEnd),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.close),
+                )
+            }
+            Column(
+                modifier = Modifier.padding(
+                    start = 16.dp,
+                    end = 40.dp,
+                    top = 16.dp,
+                    bottom = 16.dp,
+                ),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Outlined.NewReleases,
                     contentDescription = null,
@@ -189,6 +214,7 @@ private fun WhatsNewBanner(
                         .padding(start = 4.dp)
                         .size(16.dp),
                 )
+            }
             }
         }
     }
