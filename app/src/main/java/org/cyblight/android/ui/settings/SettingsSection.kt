@@ -5,6 +5,8 @@ enum class SettingsSection {
     Security,
     AppLock,
     Chats,
+    ChatTheme,
+    ChatFontSize,
     ChatBackup,
     Notifications,
     Appearance,

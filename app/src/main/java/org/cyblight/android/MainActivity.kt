@@ -49,10 +49,10 @@ import org.cyblight.android.ui.login.TwoFactorScreen
 import org.cyblight.android.ui.home.ChangelogScreen
 import org.cyblight.android.ui.main.MainScreen
 import org.cyblight.android.ui.navigation.SwipeBackContainer
-import org.cyblight.android.ui.components.AboutDialog
 import org.cyblight.android.ui.help.HelpScreen
 import org.cyblight.android.ui.settings.DriveRestoreConfirmDialog
 import org.cyblight.android.ui.settings.DriveRestorePasswordDialog
+import org.cyblight.android.ui.settings.DriveRestoreProgressDialog
 import org.cyblight.android.ui.settings.SettingsScreen
 import org.cyblight.android.ui.theme.CybLightTheme
 import org.cyblight.android.ui.update.UpdateCheckDialog
@@ -80,6 +80,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.onAppResumed()
+        dispatchNotificationIntent(intent)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,7 +90,6 @@ class MainActivity : AppCompatActivity() {
             val uiState by viewModel.uiState.collectAsState()
             val context = LocalContext.current
             var pendingAutofillCommit by remember { mutableStateOf(false) }
-            var showAbout by remember { mutableStateOf(false) }
             var isAppLocked by remember { mutableStateOf(false) }
             var appLockError by remember { mutableStateOf<String?>(null) }
             var appLockSession by remember { mutableIntStateOf(0) }
@@ -398,9 +398,15 @@ class MainActivity : AppCompatActivity() {
                                 focusChatBackup = uiState.settingsFocusChatBackup,
                                 onChatBackupFocused = viewModel::clearSettingsFocusChatBackup,
                                 chatFormatToolbarHidden = uiState.chatFormatToolbarHidden,
+                                chatDefaultTheme = uiState.chatDefaultTheme,
+                                chatSendWithEnter = uiState.chatSendWithEnter,
+                                chatFontSize = uiState.chatFontSize,
                                 encryptionReminderHidden = uiState.encryptionReminderChatDismissed,
                                 isChatsTransferBusy = chatsTransferBusy,
                                 onChatFormatToolbarHiddenChange = viewModel::setChatFormatToolbarHidden,
+                                onChatDefaultThemeSelected = viewModel::setChatDefaultTheme,
+                                onChatSendWithEnterChange = viewModel::setChatSendWithEnter,
+                                onChatFontSizeSelected = viewModel::setChatFontSize,
                                 onEncryptionReminderHiddenChange = viewModel::setEncryptionReminderChatDismissed,
                                 onExportChats = {
                                     if (!chatsTransferBusy) {
@@ -455,9 +461,27 @@ class MainActivity : AppCompatActivity() {
                                 },
                                 isGoogleDriveConfigured = viewModel.isGoogleDriveConfigured(),
                                 googleDriveAccountLabel = uiState.googleDriveAccountLabel,
+                                googleDriveAccountEmail = uiState.googleDriveAccountEmail,
+                                googleDriveAccountEmails = uiState.googleDriveAccountEmails,
                                 googleDriveBackupMetadata = uiState.googleDriveBackupMetadata,
+                                googleDriveStorageQuota = uiState.googleDriveStorageQuota,
+                                onOpenGoogleStorage = { viewModel.openGoogleStorageManagement(context) },
                                 onGoogleDriveSignIn = {
-                                    googleDriveSignInLauncher.launch(viewModel.getGoogleDriveSignInIntent())
+                                    coroutineScope.launch {
+                                        googleDriveSignInLauncher.launch(
+                                            viewModel.prepareGoogleDriveSignInIntent(),
+                                        )
+                                    }
+                                },
+                                onGoogleDriveAccountSelected = { email ->
+                                    coroutineScope.launch {
+                                        googleDriveSignInLauncher.launch(
+                                            viewModel.prepareGoogleDriveSignInIntent(
+                                                preferredEmail = email,
+                                                forceAccountPicker = email == null,
+                                            ),
+                                        )
+                                    }
                                 },
                                 onRefreshGoogleDriveStatus = viewModel::refreshGoogleDriveStatusSync,
                                 onUploadGoogleDriveBackup = viewModel::uploadGoogleDriveBackup,
@@ -470,6 +494,10 @@ class MainActivity : AppCompatActivity() {
                                 onChatBackupFrequencySelected = viewModel::setChatBackupFrequency,
                                 onChatBackupOverCellularChange = viewModel::setChatBackupOverCellular,
                                 onEnableAutoBackup = viewModel::enableAutoBackup,
+                                onSaveBackupPassword = viewModel::saveBackupPassword,
+                                onChangeBackupPassword = viewModel::changeBackupPassword,
+                                onDisableBackupPassword = viewModel::disableBackupPassword,
+                                onClearStoredBackupPassword = viewModel::clearStoredBackupPassword,
                                 securityOverview = uiState.securityOverview,
                                 isSecurityLoading = uiState.isSecurityLoading,
                                 isSecurityRefreshing = uiState.isSecurityLoading &&
@@ -630,8 +658,6 @@ class MainActivity : AppCompatActivity() {
                                 isSubmitting = uiState.isSubmitting,
                                 errorCode = uiState.loginError,
                                 onSettings = viewModel::openSettings,
-                                onHelp = viewModel::openHelp,
-                                onAbout = { showAbout = true },
                                 onCheckUpdates = viewModel::checkForUpdatesManual,
                                 onReportBug = { BugReport.open(context) },
                                 onDonate = { viewModel.openDonate(context) },
@@ -647,8 +673,6 @@ class MainActivity : AppCompatActivity() {
                                 isSubmitting = uiState.isSubmitting,
                                 errorCode = uiState.loginError,
                                 onSettings = viewModel::openSettings,
-                                onHelp = viewModel::openHelp,
-                                onAbout = { showAbout = true },
                                 onCheckUpdates = viewModel::checkForUpdatesManual,
                                 onReportBug = { BugReport.open(context) },
                                 onDonate = { viewModel.openDonate(context) },
@@ -672,6 +696,7 @@ class MainActivity : AppCompatActivity() {
                                     friendsActionMessage = uiState.friendsActionMessage,
                                     friendsActionError = uiState.friendsActionError,
                                     conversations = uiState.conversations,
+                                    chatDrafts = uiState.chatDrafts,
                                     friendsError = uiState.friendsError,
                                     messagesError = uiState.messagesError,
                                     chatFriendId = uiState.chatFriendId,
@@ -684,6 +709,9 @@ class MainActivity : AppCompatActivity() {
                                     chatEditTarget = uiState.chatEditTarget,
                                     chatDraftText = uiState.chatDraftText,
                                     chatFormatToolbarHidden = uiState.chatFormatToolbarHidden,
+                                    chatDefaultTheme = uiState.chatDefaultTheme,
+                                    chatSendWithEnter = uiState.chatSendWithEnter,
+                                    chatFontSize = uiState.chatFontSize,
                                     localeTag = uiState.locale,
                                     isChatLoading = uiState.isChatLoading,
                                     isSending = uiState.isSending,
@@ -696,8 +724,6 @@ class MainActivity : AppCompatActivity() {
                                         }
                                     },
                                     onSettings = viewModel::openSettings,
-                                    onHelp = viewModel::openHelp,
-                                    onAbout = { showAbout = true },
                                     onCheckUpdates = viewModel::checkForUpdatesManual,
                                     onReportBug = { BugReport.open(context) },
                                     onDonate = { viewModel.openDonate(context) },
@@ -782,8 +808,11 @@ class MainActivity : AppCompatActivity() {
                         )
                     }
 
-                    if (showAbout) {
-                        AboutDialog(onDismiss = { showAbout = false })
+                    if (uiState.driveRestoreBusy && !uiState.driveRestorePasswordOpen) {
+                        DriveRestoreProgressDialog(
+                            progress = uiState.driveRestoreProgress,
+                            progressLabel = viewModel.driveRestoreProgressLabel(uiState.driveRestoreProgressKey),
+                        )
                     }
 
                     if (uiState.showLightCatcherGame) {

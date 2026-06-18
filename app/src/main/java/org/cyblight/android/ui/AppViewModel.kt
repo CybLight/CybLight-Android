@@ -19,6 +19,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.cyblight.android.auth.PasskeyAuthException
 import org.cyblight.android.data.ApiClient
+import org.cyblight.android.data.realtime.ChatWebSocketClient
+import org.cyblight.android.data.realtime.ChatWsEvent
 import android.content.Context
 import org.cyblight.android.BuildConfig
 import org.cyblight.android.data.api.EasterFlagsDto
@@ -38,6 +40,8 @@ import org.cyblight.android.data.preferences.AppLockTimeout
 import org.cyblight.android.data.preferences.RootBackBehavior
 import org.cyblight.android.data.preferences.SwipeBackEdgeWidth
 import org.cyblight.android.data.preferences.SwipeBackSensitivity
+import org.cyblight.android.data.preferences.ChatDefaultTheme
+import org.cyblight.android.data.preferences.ChatFontSize
 import org.cyblight.android.data.preferences.ThemeMode
 import org.cyblight.android.data.home.ChangelogLocalizedNotes
 import org.cyblight.android.data.home.ChangelogRelease
@@ -46,6 +50,7 @@ import org.cyblight.android.data.home.HomeContentRepository
 import org.cyblight.android.crypto.SignalCryptoManager
 import org.cyblight.android.crypto.backup.CyblightBackupManager
 import org.cyblight.android.integrations.google_drive.DriveBackupMetadata
+import org.cyblight.android.integrations.google_drive.GoogleDriveStorageQuota
 import org.cyblight.android.integrations.google_drive.GoogleDriveBackupService
 import org.cyblight.android.integrations.google_drive.GoogleDriveConfig
 import android.content.Intent
@@ -134,6 +139,7 @@ data class AppUiState(
     val friendsActionMessage: String? = null,
     val friendsActionError: String? = null,
     val conversations: List<ConversationPreview> = emptyList(),
+    val chatDrafts: Map<String, String> = emptyMap(),
     val friendsError: String? = null,
     val messagesError: String? = null,
     val chatMessages: List<MessageDto> = emptyList(),
@@ -142,6 +148,9 @@ data class AppUiState(
     val chatEditTarget: ChatEditTarget? = null,
     val chatDraftText: String = "",
     val chatFormatToolbarHidden: Boolean = false,
+    val chatDefaultTheme: ChatDefaultTheme = ChatDefaultTheme.SYSTEM,
+    val chatSendWithEnter: Boolean = false,
+    val chatFontSize: ChatFontSize = ChatFontSize.MEDIUM,
     val chatFriendId: String? = null,
     val chatFriendName: String? = null,
     val chatFriendIsOnline: Boolean = false,
@@ -211,7 +220,10 @@ data class AppUiState(
     val homeWhatsNewBannerHidden: Boolean = false,
     val settingsFocusChatBackup: Boolean = false,
     val googleDriveAccountLabel: String? = null,
+    val googleDriveAccountEmail: String? = null,
+    val googleDriveAccountEmails: List<String> = emptyList(),
     val googleDriveBackupMetadata: org.cyblight.android.integrations.google_drive.DriveBackupMetadata? = null,
+    val googleDriveStorageQuota: org.cyblight.android.integrations.google_drive.GoogleDriveStorageQuota? = null,
     val chatBackupFrequency: org.cyblight.android.data.preferences.ChatBackupFrequency =
         org.cyblight.android.data.preferences.ChatBackupFrequency.OFF,
     val chatBackupOverCellular: Boolean = false,
@@ -253,6 +265,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var chatPresenceJob: Job? = null
     private var chatRefreshJob: Job? = null
     private var nightGuardJob: Job? = null
+    private var chatWebSocketConnected = false
+    private val chatWebSocketClient = ChatWebSocketClient(
+        sessionManager = sessionManager,
+        onEvent = { event -> handleChatWebSocketEvent(event) },
+        onConnectionChanged = { connected -> chatWebSocketConnected = connected },
+    )
     private var archivistTracker: ArchivistTracker? = null
     private var appLockBackgroundedAtMs: Long? = null
     private var skipAppLockOnce = false
@@ -300,6 +318,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val rootBackBehavior = appPreferences.getRootBackBehavior()
                 val encryptionReminderChatDismissed = appPreferences.getEncryptionReminderChatDismissed()
                 val chatFormatToolbarHidden = appPreferences.getChatFormatToolbarHidden()
+                val chatDefaultTheme = appPreferences.getChatDefaultTheme()
+                val chatSendWithEnter = appPreferences.getChatSendWithEnter()
+                val chatFontSize = appPreferences.getChatFontSize()
                 val homeWhatsNewBannerHidden = appPreferences.getHomeWhatsNewBannerHidden()
                 val chatBackupFrequency = appPreferences.getChatBackupFrequency()
                 val chatBackupOverCellular = appPreferences.getChatBackupOverCellular()
@@ -322,6 +343,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     rootBackBehavior = rootBackBehavior,
                     encryptionReminderChatDismissed = encryptionReminderChatDismissed,
                     chatFormatToolbarHidden = chatFormatToolbarHidden,
+                    chatDefaultTheme = chatDefaultTheme,
+                    chatSendWithEnter = chatSendWithEnter,
+                    chatFontSize = chatFontSize,
                     homeWhatsNewBannerHidden = homeWhatsNewBannerHidden,
                     chatBackupFrequency = chatBackupFrequency,
                     chatBackupOverCellular = chatBackupOverCellular,
@@ -344,6 +368,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                                 completeAuthSetup(user.id)
                             } else {
                                 refreshHomeContent()
+                                startChatWebSocket()
                             }
                         }
                     }
@@ -357,6 +382,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun forceLogout() {
+        stopChatWebSocket()
         LoginNotificationWorker.cancel(getApplication())
         MessageNotificationWorker.cancel(getApplication())
         ChatBackupWorker.cancel(getApplication())
@@ -612,6 +638,27 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setChatDefaultTheme(theme: ChatDefaultTheme) {
+        viewModelScope.launch {
+            appPreferences.setChatDefaultTheme(theme)
+            _uiState.value = _uiState.value.copy(chatDefaultTheme = theme)
+        }
+    }
+
+    fun setChatSendWithEnter(enabled: Boolean) {
+        viewModelScope.launch {
+            appPreferences.setChatSendWithEnter(enabled)
+            _uiState.value = _uiState.value.copy(chatSendWithEnter = enabled)
+        }
+    }
+
+    fun setChatFontSize(size: ChatFontSize) {
+        viewModelScope.launch {
+            appPreferences.setChatFontSize(size)
+            _uiState.value = _uiState.value.copy(chatFontSize = size)
+        }
+    }
+
     fun setHomeWhatsNewBannerHidden(hidden: Boolean) {
         viewModelScope.launch {
             appPreferences.setHomeWhatsNewBannerHidden(hidden)
@@ -831,6 +878,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openChatFromNotification(friendId: String, friendName: String) {
         if (friendId.isBlank()) return
+        if (_uiState.value.screen != AppScreen.Main || _uiState.value.user == null) return
         openChat(friendId, friendName.ifBlank { friendId })
     }
 
@@ -839,7 +887,23 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (_uiState.value.chatFriendId != null) {
             closeChat()
         }
+        clearOverlayNavigation()
         openSessions()
+    }
+
+    private fun clearOverlayNavigation() {
+        _uiState.value = _uiState.value.copy(
+            detailScreen = DetailScreen.None,
+            settingsSection = org.cyblight.android.ui.settings.SettingsSection.Hub,
+            settingsReturnAfterDetail = false,
+            settingsFocusChatBackup = false,
+            helpReturnToSettings = false,
+            profileUsername = null,
+            profile = null,
+            profileError = null,
+            isProfileLoading = false,
+            showLightCatcherGame = false,
+        )
     }
 
     private fun onAuthenticated() {
@@ -871,8 +935,33 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         MessageNotificationWorker.schedule(getApplication())
         syncChatBackupScheduling()
         PushTokenRegistrar.registerCurrentToken(getApplication())
+        startChatWebSocket()
         refreshSocialData()
         refreshHomeContent()
+    }
+
+    private fun startChatWebSocket() {
+        chatWebSocketClient.start(viewModelScope)
+    }
+
+    private fun stopChatWebSocket() {
+        chatWebSocketClient.stop()
+        chatWebSocketConnected = false
+    }
+
+    private fun handleChatWebSocketEvent(event: ChatWsEvent) {
+        if (event.type != "message.new") return
+        val openChatId = _uiState.value.chatFriendId ?: run {
+            refreshConversationsOnly()
+            return
+        }
+        if (event.peerId != openChatId && event.senderId != openChatId) {
+            refreshConversationsOnly()
+            return
+        }
+        viewModelScope.launch {
+            reloadChat(openChatId)
+        }
     }
 
     private suspend fun maybeStartDriveRestoreOnLogin(userId: String): Boolean {
@@ -960,7 +1049,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(
                 driveRestoreBusy = true,
                 driveRestoreProgress = 0,
-                driveRestorePasswordOpen = true,
+                driveRestorePasswordOpen = false,
             )
             restoreGoogleDriveBackup(password) { value, key ->
                 _uiState.value = _uiState.value.copy(
@@ -1505,6 +1594,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getGoogleDriveSignInIntent(): Intent = googleDriveBackupService.getSignInIntent()
 
+    suspend fun prepareGoogleDriveSignInIntent(
+        preferredEmail: String? = null,
+        forceAccountPicker: Boolean = false,
+    ): Intent {
+        val email = preferredEmail?.trim()?.takeIf { it.isNotEmpty() }
+        when {
+            forceAccountPicker -> googleDriveBackupService.signOut()
+            email != null -> googleDriveBackupService.signOutIfCurrentNot(email)
+        }
+        return googleDriveBackupService.getSignInIntent(email)
+    }
+
+    fun getGoogleDriveAccountEmails(): List<String> = googleDriveBackupService.getDeviceGoogleAccountEmails()
+
     fun handleGoogleDriveSignInResult(data: Intent?) {
         viewModelScope.launch {
             if (data == null) {
@@ -1551,31 +1654,46 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             null
         }
+        val accountEmail = googleDriveBackupService.getAccountEmail()
+        val accountEmails = googleDriveBackupService.getDeviceGoogleAccountEmails()
         val userId = sessionManager.getUserId().orEmpty()
         val metadata: DriveBackupMetadata? = if (userId.isNotBlank() && label != null) {
             runCatching { googleDriveBackupService.fetchMetadata(userId) }.getOrNull()
         } else {
             null
         }
+        val storageQuota: GoogleDriveStorageQuota? = if (label != null) {
+            googleDriveBackupService.fetchStorageQuota()
+        } else {
+            null
+        }
         _uiState.value = _uiState.value.copy(
             googleDriveAccountLabel = label,
+            googleDriveAccountEmail = accountEmail,
+            googleDriveAccountEmails = accountEmails,
             googleDriveBackupMetadata = metadata,
+            googleDriveStorageQuota = storageQuota,
         )
     }
 
+    fun openGoogleStorageManagement(context: Context) {
+        ExternalLinks.openUrl(context, GoogleDriveConfig.GOOGLE_STORAGE_MANAGEMENT_URL)
+    }
+
     suspend fun uploadGoogleDriveBackup(
-        password: String,
+        password: String? = null,
         onProgress: (Int, String) -> Unit,
     ): Result<Unit> = runCatching {
         val userId = sessionManager.getUserId().orEmpty()
         val login = _uiState.value.user?.login.orEmpty().ifBlank { "user" }
         if (userId.isBlank()) throw IllegalArgumentException("backup_user_missing")
-        googleDriveBackupService.uploadBackup(userId, login, password, onProgress)
+        val resolvedPassword = password?.trim()?.takeIf { it.isNotEmpty() }
+            ?: backupPasswordStore.getPassword()
+            ?: throw IllegalArgumentException("backup_password_required")
+        googleDriveBackupService.uploadBackup(userId, login, resolvedPassword, onProgress)
         appPreferences.setLastAutoBackupSuccessMs(System.currentTimeMillis())
-        if (_uiState.value.chatBackupFrequency != ChatBackupFrequency.OFF) {
-            backupPasswordStore.savePassword(password)
-            _uiState.value = _uiState.value.copy(chatBackupHasStoredPassword = true)
-        }
+        backupPasswordStore.savePassword(resolvedPassword)
+        _uiState.value = _uiState.value.copy(chatBackupHasStoredPassword = true)
         Unit
     }
 
@@ -1606,7 +1724,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
         appPreferences.setChatBackupFrequency(frequency)
         if (frequency == ChatBackupFrequency.OFF) {
-            backupPasswordStore.clearPassword()
             ChatBackupWorker.cancel(getApplication())
         } else {
             syncChatBackupScheduling(frequency, appPreferences.getChatBackupOverCellular())
@@ -1628,12 +1745,55 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     suspend fun restoreGoogleDriveBackup(
-        password: String,
+        password: String? = null,
         onProgress: (Int, String) -> Unit,
     ): Result<org.cyblight.android.crypto.backup.BackupRestoreStats> = runCatching {
         val userId = sessionManager.getUserId().orEmpty()
         if (userId.isBlank()) throw IllegalArgumentException("backup_user_missing")
-        googleDriveBackupService.restoreBackup(userId, password, onProgress)
+        val resolvedPassword = password?.trim()?.takeIf { it.isNotEmpty() }
+            ?: backupPasswordStore.getPassword()
+            ?: throw IllegalArgumentException("backup_password_required")
+        val stats = googleDriveBackupService.restoreBackup(userId, resolvedPassword, onProgress)
+        backupPasswordStore.savePassword(resolvedPassword)
+        _uiState.value = _uiState.value.copy(chatBackupHasStoredPassword = true)
+        stats
+    }
+
+    suspend fun changeBackupPassword(currentPassword: String, newPassword: String): Result<Unit> = runCatching {
+        val stored = backupPasswordStore.getPassword()
+            ?: throw IllegalArgumentException("backup_password_required")
+        if (!stored.contentEquals(currentPassword)) {
+            throw IllegalArgumentException("backup_password_current_invalid")
+        }
+        if (newPassword.length < 8) throw IllegalArgumentException("backup_password_short")
+        if (newPassword.contentEquals(stored)) {
+            throw IllegalArgumentException("backup_password_unchanged")
+        }
+        backupPasswordStore.savePassword(newPassword)
+        _uiState.value = _uiState.value.copy(chatBackupHasStoredPassword = true)
+    }
+
+    suspend fun saveBackupPassword(password: String): Result<Unit> = runCatching {
+        if (password.length < 8) throw IllegalArgumentException("backup_password_short")
+        backupPasswordStore.savePassword(password)
+        _uiState.value = _uiState.value.copy(chatBackupHasStoredPassword = true)
+    }
+
+    suspend fun clearStoredBackupPassword(): Result<Unit> = runCatching {
+        backupPasswordStore.clearPassword()
+        _uiState.value = _uiState.value.copy(chatBackupHasStoredPassword = false)
+    }
+
+    suspend fun disableBackupPassword(): Result<Unit> = runCatching {
+        if (_uiState.value.chatBackupFrequency != ChatBackupFrequency.OFF) {
+            appPreferences.setChatBackupFrequency(ChatBackupFrequency.OFF)
+            ChatBackupWorker.cancel(getApplication())
+        }
+        backupPasswordStore.clearPassword()
+        _uiState.value = _uiState.value.copy(
+            chatBackupFrequency = ChatBackupFrequency.OFF,
+            chatBackupHasStoredPassword = false,
+        )
     }
 
     suspend fun deleteGoogleDriveBackup(): Result<Boolean> = runCatching {
@@ -1647,6 +1807,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(
             googleDriveAccountLabel = null,
             googleDriveBackupMetadata = null,
+            googleDriveStorageQuota = null,
         )
     }
 
@@ -1960,6 +2121,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun logout() {
+        stopChatWebSocket()
+        chatPresenceJob?.cancel()
+        chatPresenceJob = null
+        chatRefreshJob?.cancel()
+        chatRefreshJob = null
         viewModelScope.launch {
             authRepository.logout()
             _uiState.value = AppUiState(
@@ -1994,6 +2160,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun onAppResumed() {
         checkForUpdate()
         if (_uiState.value.screen != AppScreen.Main || _uiState.value.user == null) return
+        startChatWebSocket()
         viewModelScope.launch {
             _uiState.value.chatFriendId?.let { appPreferences.setActiveChatFriendId(it) }
         }
@@ -2019,10 +2186,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val friendsDeferred = async { friendsRepository.loadFriends() }
             val pendingDeferred = async { friendsRepository.loadPendingRequests() }
             val sentDeferred = async { friendsRepository.loadSentRequests() }
+            val draftsDeferred = async { appPreferences.getAllChatDrafts() }
 
             val friendsResult = friendsDeferred.await()
             val pendingResult = pendingDeferred.await()
             val sentResult = sentDeferred.await()
+            val drafts = draftsDeferred.await()
 
             friendsResult
                 .onSuccess { friends ->
@@ -2034,7 +2203,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     messagesRepository.loadConversations(friends)
                         .onSuccess { conversations ->
-                            _uiState.value = _uiState.value.copy(conversations = conversations)
+                            _uiState.value = _uiState.value.copy(
+                                conversations = conversations,
+                                chatDrafts = drafts,
+                            )
                         }
                         .onFailure {
                             _uiState.value = _uiState.value.copy(messagesError = "unread_load_failed")
@@ -2168,6 +2340,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openChat(friendId: String, friendName: String) {
+        clearOverlayNavigation()
         chatPresenceJob?.cancel()
         chatRefreshJob?.cancel()
         val cachedFriend = _uiState.value.friends.find { it.id == friendId }
@@ -2211,8 +2384,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             chatRefreshJob = viewModelScope.launch {
                 while (isActive) {
-                    delay(8_000)
-                    reloadChat(friendId)
+                    val fallbackDelayMs = if (chatWebSocketClient.isConnected) 60_000L else 30_000L
+                    delay(fallbackDelayMs)
+                    if (!chatWebSocketClient.isConnected) {
+                        reloadChat(friendId)
+                    }
                 }
             }
 
@@ -2267,8 +2443,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (_uiState.value.chatEditTarget != null) return
         viewModelScope.launch {
             appPreferences.setChatDraft(friendId, text)
-            _uiState.value = _uiState.value.copy(chatDraftText = text)
+            _uiState.value = _uiState.value.copy(
+                chatDraftText = text,
+                chatDrafts = chatDraftsWith(friendId, text),
+            )
         }
+    }
+
+    private fun chatDraftsWith(friendId: String, text: String): Map<String, String> {
+        val next = _uiState.value.chatDrafts.toMutableMap()
+        if (text.isBlank()) {
+            next.remove(friendId)
+        } else {
+            next[friendId] = text
+        }
+        return next
     }
 
     fun clearChatReply() {
@@ -2403,7 +2592,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun reloadChat(friendId: String) {
+    private suspend fun reloadChat(friendId: String, refreshSocial: Boolean = true) {
         messagesRepository.loadMessages(friendId)
             .onSuccess { thread ->
                 if (_uiState.value.chatFriendId != friendId) return
@@ -2412,8 +2601,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     chatPinnedMessage = thread.pinned,
                     messagesError = null,
                 )
-                refreshSocialData()
+                if (refreshSocial) {
+                    refreshSocialData()
+                }
             }
+    }
+
+    private fun refreshConversationsOnly() {
+        viewModelScope.launch {
+            val friends = _uiState.value.friends
+            if (friends.isEmpty()) return@launch
+            messagesRepository.loadConversations(friends)
+                .onSuccess { conversations ->
+                    _uiState.value = _uiState.value.copy(conversations = conversations)
+                }
+        }
     }
 
     private fun refreshChatFriendPresence(friendId: String) {
@@ -2482,15 +2684,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         _uiState.value = _uiState.value.copy(
                             chatMessages = _uiState.value.chatMessages + optimisticMessage,
                         )
+                    } else {
+                        viewModelScope.launch { reloadChat(friendId, refreshSocial = false) }
                     }
-                    reloadChat(friendId)
                     maybeUnlockEchoEaster()
                     _uiState.value = _uiState.value.copy(
                         isSending = false,
                         chatReplyTarget = null,
                         chatEditTarget = null,
                         chatDraftText = "",
+                        chatDrafts = chatDraftsWith(friendId, ""),
                     )
+                    refreshConversationsOnly()
                 }
                 .onFailure {
                     _uiState.value = _uiState.value.copy(

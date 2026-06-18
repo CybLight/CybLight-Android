@@ -18,6 +18,7 @@ data class SignalStoreManifest(
     val signedPreKeyIds: List<Int> = emptyList(),
     val kyberPreKeyIds: List<Int> = emptyList(),
     val sessionKeys: List<String> = emptyList(),
+    val preKeyHandshakePeers: List<String> = emptyList(),
     val latestSignedPreKeyId: Int? = null,
     val latestKyberPreKeyId: Int? = null,
 )
@@ -35,6 +36,7 @@ class MutableSignalStoreManifest(
     val signedPreKeyIds: MutableSet<Int> = mutableSetOf(),
     val kyberPreKeyIds: MutableSet<Int> = mutableSetOf(),
     val sessionKeys: MutableSet<String> = mutableSetOf(),
+    val preKeyHandshakePeers: MutableSet<String> = mutableSetOf(),
     var latestSignedPreKeyId: Int? = null,
     var latestKyberPreKeyId: Int? = null,
 ) {
@@ -45,6 +47,7 @@ class MutableSignalStoreManifest(
         signedPreKeyIds = signedPreKeyIds.sorted(),
         kyberPreKeyIds = kyberPreKeyIds.sorted(),
         sessionKeys = sessionKeys.sorted(),
+        preKeyHandshakePeers = preKeyHandshakePeers.sorted(),
         latestSignedPreKeyId = latestSignedPreKeyId,
         latestKyberPreKeyId = latestKyberPreKeyId,
     )
@@ -58,6 +61,7 @@ class MutableSignalStoreManifest(
                 signedPreKeyIds = snapshot.signedPreKeyIds.toMutableSet(),
                 kyberPreKeyIds = snapshot.kyberPreKeyIds.toMutableSet(),
                 sessionKeys = snapshot.sessionKeys.toMutableSet(),
+                preKeyHandshakePeers = snapshot.preKeyHandshakePeers.toMutableSet(),
                 latestSignedPreKeyId = snapshot.latestSignedPreKeyId,
                 latestKyberPreKeyId = snapshot.latestKyberPreKeyId,
             )
@@ -155,6 +159,20 @@ class SignalStorePersistence(context: Context) {
         }
 
         editor.putString(manifestKey(userId), gson.toJson(manifest.toSnapshot()))
+        editor.apply()
+    }
+
+    fun persistSessionUpdate(ctx: SignalStoreContext, address: SignalProtocolAddress) {
+        val editor = prefs.edit()
+        val userId = ctx.userId
+        val sessionId = sessionAddressKey(address)
+        if (ctx.store.containsSession(address)) {
+            editor.putString(
+                sessionKey(userId, sessionId),
+                base64Encode(ctx.store.loadSession(address).serialize()),
+            )
+        }
+        editor.putString(manifestKey(userId), gson.toJson(ctx.manifest.toSnapshot()))
         editor.apply()
     }
 

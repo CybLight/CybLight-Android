@@ -29,7 +29,13 @@ class GoogleDriveBackupService(
 
     fun getAccountLabel(): String? = authManager.getAccountLabel()
 
-    fun getSignInIntent(): Intent = authManager.getSignInIntent()
+    fun getAccountEmail(): String? = authManager.getAccountEmail()
+
+    fun getDeviceGoogleAccountEmails(): List<String> = authManager.getDeviceGoogleAccountEmails()
+
+    fun getSignInIntent(preferredEmail: String? = null): Intent = authManager.getSignInIntent(preferredEmail)
+
+    suspend fun signOutIfCurrentNot(email: String) = authManager.signOutIfCurrentNot(email)
 
     suspend fun handleSignInResult(data: Intent?): Result<Unit> = authManager.handleSignInResult(data)
 
@@ -42,6 +48,13 @@ class GoogleDriveBackupService(
         val accessToken = authManager.getAccessToken()
         val file = driveClient.findBackupFile(accessToken, userId) ?: return@withContext null
         DriveBackupMetadata(file = file)
+    }
+
+    suspend fun fetchStorageQuota(): GoogleDriveStorageQuota? = withContext(Dispatchers.IO) {
+        if (!hasSession()) return@withContext null
+        runCatching {
+            driveClient.fetchStorageQuota(authManager.getAccessToken())
+        }.getOrNull()
     }
 
     suspend fun uploadBackup(

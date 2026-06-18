@@ -31,6 +31,7 @@ data class CyblightBackupPayload(
     val signal: CyblightBackupSignal,
     val records: CyblightBackupRecords,
     val decryptCache: Map<String, String> = emptyMap(),
+    @SerializedName("plaintextSyncKey") val plaintextSyncKey: String? = null,
     val chats: ChatsExportPayload? = null,
 )
 

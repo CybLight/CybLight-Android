@@ -114,6 +114,12 @@ interface CybLightApi {
     @POST("messages/import")
     suspend fun importChats(@Body body: ChatsImportRequest): ChatsImportResponse
 
+    @POST("messages/sync-plaintext")
+    suspend fun pushPlaintextSync(@Body body: PushPlaintextSyncRequest): PushPlaintextSyncResponse
+
+    @POST("messages/sync-plaintext/fetch")
+    suspend fun fetchPlaintextSync(@Body body: FetchPlaintextSyncRequest): FetchPlaintextSyncResponse
+
     @GET("crypto/keys/status")
     suspend fun signalKeyStatus(): SignalKeyStatusResponse
 

@@ -3,11 +3,9 @@ package org.cyblight.android.ui.components
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.BugReport
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Favorite
-import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -27,8 +25,6 @@ import org.cyblight.android.R
 @Composable
 fun AppMenu(
     onSettings: () -> Unit,
-    onHelp: () -> Unit,
-    onAbout: () -> Unit,
     onCheckUpdates: () -> Unit,
     onReportBug: () -> Unit,
     onDonate: (() -> Unit)? = null,
@@ -50,22 +46,6 @@ fun AppMenu(
             onClick = {
                 expanded = false
                 onSettings()
-            },
-        )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.menu_help)) },
-            leadingIcon = { Icon(Icons.Outlined.HelpOutline, contentDescription = null) },
-            onClick = {
-                expanded = false
-                onHelp()
-            },
-        )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.menu_about)) },
-            leadingIcon = { Icon(Icons.Outlined.Info, contentDescription = null) },
-            onClick = {
-                expanded = false
-                onAbout()
             },
         )
         DropdownMenuItem(

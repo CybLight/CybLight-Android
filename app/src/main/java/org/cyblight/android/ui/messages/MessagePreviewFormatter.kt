@@ -33,6 +33,7 @@ object MessagePreviewFormatter {
             .replace(Regex("""\[reply:[^\]]+]""", RegexOption.IGNORE_CASE), "")
             .replace(Regex("""\*\*(.+?)\*\*"""), "$1")
             .replace(Regex("""__(.+?)__"""), "$1")
+            .replace(Regex("""_(.+?)_"""), "$1")
             .replace(Regex("""~~(.+?)~~"""), "$1")
             .replace(Regex("""`(.+?)`"""), "$1")
             .replace(Regex("""(?m)^>\s?"""), "")

@@ -17,6 +17,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -30,6 +35,7 @@ import org.cyblight.android.ui.components.PresenceLabel
 @Composable
 fun MessagesScreen(
     conversations: List<ConversationPreview>,
+    chatDrafts: Map<String, String> = emptyMap(),
     isLoading: Boolean,
     error: String?,
     encryptionReminderHidden: Boolean,
@@ -135,6 +141,7 @@ fun MessagesScreen(
                     items(conversations, key = { it.friend.id }) { preview ->
                         ConversationCard(
                             preview = preview,
+                            draftText = chatDrafts[preview.friend.id],
                             onOpenChat = onOpenChat,
                             onOpenProfile = onOpenProfile,
                         )
@@ -145,9 +152,12 @@ fun MessagesScreen(
     }
 }
 
+private val ChatDraftLabelColor = Color(0xFFFF9800)
+
 @Composable
 private fun ConversationCard(
     preview: ConversationPreview,
+    draftText: String?,
     onOpenChat: (friendId: String, username: String) -> Unit,
     onOpenProfile: (username: String) -> Unit,
 ) {
@@ -169,19 +179,26 @@ private fun ConversationCard(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.clickable { onOpenProfile(preview.friend.username) },
                 )
-                if (!preview.preview.isNullOrBlank()) {
-                    Text(
-                        text = preview.preview,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                } else {
-                    PresenceLabel(
-                        isOnline = preview.friend.isOnline,
-                        lastSeenAt = preview.friend.lastSeenAt,
-                    )
+                val trimmedDraft = draftText?.trim().orEmpty()
+                when {
+                    trimmedDraft.isNotEmpty() -> {
+                        DraftPreviewText(draftText = trimmedDraft)
+                    }
+                    !preview.preview.isNullOrBlank() -> {
+                        Text(
+                            text = preview.preview,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    else -> {
+                        PresenceLabel(
+                            isOnline = preview.friend.isOnline,
+                            lastSeenAt = preview.friend.lastSeenAt,
+                        )
+                    }
                 }
             }
             if (preview.unreadCount > 0) {
@@ -191,4 +208,27 @@ private fun ConversationCard(
             }
         }
     }
+}
+
+@Composable
+private fun DraftPreviewText(draftText: String) {
+    val label = stringResource(R.string.chat_list_draft_label)
+    val preview = remember(draftText) {
+        MessagePreviewFormatter.truncatePreviewText(draftText, "")
+    }
+    if (preview.isBlank()) return
+
+    Text(
+        text = buildAnnotatedString {
+            withStyle(SpanStyle(color = ChatDraftLabelColor, fontWeight = FontWeight.Medium)) {
+                append(label)
+            }
+            append(": ")
+            append(preview)
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }

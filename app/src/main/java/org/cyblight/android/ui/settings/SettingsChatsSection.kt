@@ -10,6 +10,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -22,12 +24,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.cyblight.android.R
+import org.cyblight.android.data.preferences.ChatDefaultTheme
+import org.cyblight.android.data.preferences.ChatFontSize
 
 @Composable
 internal fun SettingsChatsSection(
+    chatDefaultTheme: ChatDefaultTheme,
+    chatSendWithEnter: Boolean,
+    chatFontSize: ChatFontSize,
     chatFormatToolbarHidden: Boolean,
     encryptionReminderHidden: Boolean,
     isChatsTransferBusy: Boolean,
+    onOpenChatTheme: () -> Unit,
+    onChatSendWithEnterChange: (Boolean) -> Unit,
+    onOpenChatFontSize: () -> Unit,
     onChatFormatToolbarHiddenChange: (Boolean) -> Unit,
     onEncryptionReminderHiddenChange: (Boolean) -> Unit,
     onOpenChatBackup: () -> Unit,
@@ -40,7 +50,42 @@ internal fun SettingsChatsSection(
             .fillMaxWidth()
             .verticalScroll(rememberScrollState()),
     ) {
+        SettingsSectionHeader(stringResource(R.string.settings_chats_section_screen))
+
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.settings_chats_default_theme)) },
+            supportingContent = { Text(chatThemeLabel(chatDefaultTheme)) },
+            leadingContent = { Icon(Icons.Outlined.Palette, contentDescription = null) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onOpenChatTheme),
+        )
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
         SettingsSectionHeader(stringResource(R.string.settings_chats_section_chat_settings))
+
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.settings_chats_send_with_enter)) },
+            supportingContent = {
+                Text(stringResource(R.string.settings_chats_send_with_enter_hint))
+            },
+            trailingContent = {
+                Switch(
+                    checked = chatSendWithEnter,
+                    onCheckedChange = onChatSendWithEnterChange,
+                )
+            },
+        )
+
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.settings_chats_font_size)) },
+            supportingContent = { Text(chatFontSizeLabel(chatFontSize)) },
+            leadingContent = { Icon(Icons.Outlined.TextFields, contentDescription = null) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onOpenChatFontSize),
+        )
 
         ListItem(
             headlineContent = { Text(stringResource(R.string.messages_format_toolbar_hidden)) },

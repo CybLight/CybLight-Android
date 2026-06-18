@@ -3,11 +3,16 @@ package org.cyblight.android.ui.messages
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -44,6 +50,7 @@ fun ChatMessageContent(
     messageId: String,
     modifier: Modifier = Modifier,
     enableLinkPreview: Boolean = true,
+    fontScale: Float = 1f,
 ) {
     val parsed = remember(rawContent, linkColor) {
         ChatMessageParser.parseWithSpoilers(rawContent, linkColor)
@@ -52,52 +59,13 @@ fun ChatMessageContent(
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         parsed.parts.forEach { part ->
-            when (part) {
-                is ChatMessagePart.Text -> {
-                    if (part.content.text.isNotBlank()) {
-                        Text(
-                            text = part.content,
-                            style = MaterialTheme.typography.bodyMedium.copy(color = textColor),
-                        )
-                    }
-                }
-                is ChatMessagePart.CodeBlock -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.35f))
-                            .padding(8.dp),
-                    ) {
-                        if (part.language.isNotBlank()) {
-                            Text(
-                                part.language,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = textColor.copy(alpha = 0.7f),
-                            )
-                        }
-                        Text(
-                            part.code,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = FontFamily.Monospace,
-                                color = textColor,
-                            ),
-                        )
-                    }
-                }
-                is ChatMessagePart.Spoiler -> {
-                    val key = "$messageId-spoiler-${part.id}"
-                    val revealed = revealedSpoilers[key] == true
-                    Text(
-                        text = if (revealed) part.text else "▒".repeat(part.text.length.coerceIn(3, 16)),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = if (revealed) FontFamily.Default else FontFamily.Monospace,
-                            color = textColor,
-                        ),
-                        modifier = Modifier.clickable { revealedSpoilers[key] = true },
-                    )
-                }
-            }
+            RenderChatMessagePart(
+                part = part,
+                textColor = textColor,
+                messageId = messageId,
+                revealedSpoilers = revealedSpoilers,
+                fontScale = fontScale,
+            )
         }
 
         if (enableLinkPreview) {
@@ -106,6 +74,93 @@ fun ChatMessageContent(
                     url = url,
                     textColor = textColor,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenderChatMessagePart(
+    part: ChatMessagePart,
+    textColor: Color,
+    messageId: String,
+    revealedSpoilers: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Boolean>,
+    fontScale: Float,
+) {
+    when (part) {
+        is ChatMessagePart.Text -> {
+            if (part.content.text.isNotBlank()) {
+                Text(
+                    text = part.content,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = textColor,
+                        fontSize = MaterialTheme.typography.bodyMedium.fontSize * fontScale,
+                    ),
+                )
+            }
+        }
+        is ChatMessagePart.CodeBlock -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.35f))
+                    .padding(8.dp),
+            ) {
+                if (part.language.isNotBlank()) {
+                    Text(
+                        part.language,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = textColor.copy(alpha = 0.7f),
+                    )
+                }
+                Text(
+                    part.code,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        color = textColor,
+                        fontSize = MaterialTheme.typography.bodySmall.fontSize * fontScale,
+                    ),
+                )
+            }
+        }
+        is ChatMessagePart.Spoiler -> {
+            val key = "$messageId-spoiler-${part.id}"
+            val revealed = revealedSpoilers[key] == true
+            SpoilerText(
+                text = part.text,
+                revealed = revealed,
+                onReveal = { revealedSpoilers[key] = true },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    color = textColor,
+                    fontSize = MaterialTheme.typography.bodyMedium.fontSize * fontScale,
+                ),
+            )
+        }
+        is ChatMessagePart.Quote -> {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(3.dp)
+                        .fillMaxHeight()
+                        .padding(end = 8.dp)
+                        .background(textColor.copy(alpha = 0.4f), RoundedCornerShape(2.dp)),
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    part.parts.forEach { inner ->
+                        RenderChatMessagePart(
+                            part = inner,
+                            textColor = textColor.copy(alpha = 0.88f),
+                            messageId = messageId,
+                            revealedSpoilers = revealedSpoilers,
+                            fontScale = fontScale,
+                        )
+                    }
+                }
             }
         }
     }

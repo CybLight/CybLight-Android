@@ -43,8 +43,6 @@ fun LoginScreen(
     isSubmitting: Boolean,
     errorCode: String?,
     onSettings: () -> Unit,
-    onHelp: () -> Unit,
-    onAbout: () -> Unit,
     onCheckUpdates: () -> Unit,
     onReportBug: () -> Unit,
     onDonate: () -> Unit,
@@ -71,8 +69,6 @@ fun LoginScreen(
         ) {
             AppMenu(
                 onSettings = onSettings,
-                onHelp = onHelp,
-                onAbout = onAbout,
                 onCheckUpdates = onCheckUpdates,
                 onReportBug = onReportBug,
                 onDonate = onDonate,
@@ -189,8 +185,6 @@ fun TwoFactorScreen(
     isSubmitting: Boolean,
     errorCode: String?,
     onSettings: () -> Unit,
-    onHelp: () -> Unit,
-    onAbout: () -> Unit,
     onCheckUpdates: () -> Unit,
     onReportBug: () -> Unit,
     onDonate: () -> Unit,
@@ -213,8 +207,6 @@ fun TwoFactorScreen(
         ) {
             AppMenu(
                 onSettings = onSettings,
-                onHelp = onHelp,
-                onAbout = onAbout,
                 onCheckUpdates = onCheckUpdates,
                 onReportBug = onReportBug,
                 onDonate = onDonate,

@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import org.cyblight.android.crypto.DecryptCache
+import org.cyblight.android.crypto.PlaintextSyncKey
 import org.cyblight.android.crypto.SignalStoreManifest
 import org.cyblight.android.crypto.SignalStorePersistence
 import org.cyblight.android.data.api.ChatsExportPayload
@@ -11,6 +12,7 @@ import org.cyblight.android.data.api.ChatsExportPayload
 class CyblightBackupManager(context: Context) {
     private val persistence = SignalStorePersistence(context)
     private val decryptCache = DecryptCache(context)
+    private val plaintextSyncKey = PlaintextSyncKey(context)
     private val gson = Gson()
 
     fun hasLocalBackupKeys(userId: String): Boolean = collectPayload(userId) != null
@@ -54,6 +56,7 @@ class CyblightBackupManager(context: Context) {
                 sessions = sessions,
             ),
             decryptCache = decryptCache.readAllForUser(userId),
+            plaintextSyncKey = plaintextSyncKey.exportForBackup(userId),
         )
 
         return if (chats != null) {
@@ -78,6 +81,7 @@ class CyblightBackupManager(context: Context) {
 
         persistence.clearUser(expectedUserId)
         decryptCache.clearUser(expectedUserId)
+        plaintextSyncKey.clearUser(expectedUserId)
 
         persistence.writeManifest(expectedUserId, manifest)
         payload.records.preKeys.forEach { (keyId, value) ->
@@ -93,6 +97,7 @@ class CyblightBackupManager(context: Context) {
             persistence.writeSessionRecord(expectedUserId, sessionKey, value)
         }
         decryptCache.replaceAllForUser(expectedUserId, payload.decryptCache)
+        plaintextSyncKey.restoreFromBackup(expectedUserId, payload.plaintextSyncKey)
     }
 
     fun createBackupFile(
@@ -119,6 +124,8 @@ class CyblightBackupManager(context: Context) {
     fun errorMessage(code: String): String = when (code) {
         "backup_no_local_keys" -> "Нет локальных ключей шифрования для резервной копии."
         "backup_password_invalid" -> "Неверный пароль резервной копии."
+        "backup_password_current_invalid" -> "Неверный текущий пароль."
+        "backup_password_unchanged" -> "Новый пароль не может совпадать с текущим."
         "backup_user_mismatch" -> "Эта копия создана для другого аккаунта."
         "backup_file_invalid", "backup_payload_invalid", "backup_format_unsupported" ->
             "Некорректный файл резервной копии."

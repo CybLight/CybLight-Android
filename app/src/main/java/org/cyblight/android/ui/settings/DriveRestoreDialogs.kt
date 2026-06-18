@@ -47,6 +47,33 @@ fun DriveRestoreConfirmDialog(
 }
 
 @Composable
+fun DriveRestoreProgressDialog(
+    progress: Int,
+    progressLabel: String?,
+) {
+    AlertDialog(
+        onDismissRequest = {},
+        title = { Text(stringResource(R.string.settings_google_drive_restore)) },
+        text = {
+            Column {
+                Text(
+                    text = progressLabel ?: stringResource(R.string.settings_google_drive_progress_restore),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                LinearProgressIndicator(
+                    progress = { progress / 100f },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
+                )
+            }
+        },
+        confirmButton = {},
+    )
+}
+
+@Composable
 fun DriveRestorePasswordDialog(
     password: String,
     onPasswordChange: (String) -> Unit,

@@ -1,6 +1,7 @@
 package org.cyblight.android.crypto
 
 import android.content.Context
+import android.util.Log
 import org.cyblight.android.data.api.CybLightApi
 import org.cyblight.android.data.api.MessageDto
 import org.cyblight.android.data.api.SignalKeyBundleDto
@@ -44,10 +45,13 @@ class SignalCryptoManager(
 ) {
     private val persistence = SignalStorePersistence(context)
     private val decryptCache = DecryptCache(context)
+    private val plaintextSync = MessagePlaintextSyncService(context, api)
     private val lock = ReentrantLock()
     private val ensureMutex = Mutex()
     private var nextPreKeyId = (System.currentTimeMillis() / 1000L).toInt()
     private var prekeysAlignedForUser: String? = null
+    private var lastEnsureAtMs: Long = 0L
+    private var lastEnsureUserId: String? = null
 
     suspend fun ensureRegistered(userId: String) {
         ensureMutex.withLock {
@@ -57,6 +61,7 @@ class SignalCryptoManager(
 
     suspend fun cacheSentPlaintext(userId: String, messageId: String, plaintext: String) {
         decryptCache.write(userId, messageId, plaintext)
+        plaintextSync.push(userId, messageId, plaintext)
     }
 
     suspend fun encryptMessage(userId: String, recipientId: String, plaintext: String): EncryptedPayload {
@@ -64,19 +69,19 @@ class SignalCryptoManager(
         val ctx = requireContext(userId)
         val address = SignalProtocolAddress(recipientId, DEVICE_ID)
 
-        if (!ctx.store.containsSession(address)) {
-            val bundleResponse = api.signalKeyBundle(recipientId)
-            if (!bundleResponse.ok || bundleResponse.bundle == null) {
-                throw IllegalStateException(bundleResponse.error ?: "key_bundle_failed")
-            }
-            SessionBuilder(ctx.store, address).process(bundleResponse.bundle.toPreKeyBundle())
-            persistence.trackSession(ctx, address)
+        var ciphertext = encryptForPeer(ctx, address, recipientId, plaintext)
+
+        if (
+            ciphertext.type == CiphertextMessage.WHISPER_TYPE &&
+            !ctx.manifest.preKeyHandshakePeers.contains(recipientId)
+        ) {
+            resetPeerSession(ctx, address, recipientId)
+            establishSession(ctx, address, recipientId)
+            ciphertext = encryptForPeer(ctx, address, recipientId, plaintext)
         }
 
-        val cipher = SessionCipher(ctx.store, address)
-        val ciphertext = cipher.encrypt(plaintext.toByteArray(Charsets.UTF_8))
         persistence.trackSession(ctx, address)
-        persistence.persistContext(ctx)
+        persistence.persistSessionUpdate(ctx, address)
 
         return EncryptedPayload(
             content = SignalStorePersistence.base64Encode(ciphertext.serialize()),
@@ -85,9 +90,49 @@ class SignalCryptoManager(
         )
     }
 
+    private suspend fun encryptForPeer(
+        ctx: SignalStoreContext,
+        address: SignalProtocolAddress,
+        recipientId: String,
+        plaintext: String,
+    ): CiphertextMessage {
+        if (!ctx.store.containsSession(address)) {
+            establishSession(ctx, address, recipientId)
+        }
+        return SessionCipher(ctx.store, address).encrypt(plaintext.toByteArray(Charsets.UTF_8))
+    }
+
+    private suspend fun establishSession(
+        ctx: SignalStoreContext,
+        address: SignalProtocolAddress,
+        recipientId: String,
+    ) {
+        val bundleResponse = api.signalKeyBundle(recipientId)
+        if (!bundleResponse.ok || bundleResponse.bundle == null) {
+            throw IllegalStateException(bundleResponse.error ?: "key_bundle_failed")
+        }
+        SessionBuilder(ctx.store, address).process(bundleResponse.bundle.toPreKeyBundle())
+        persistence.trackSession(ctx, address)
+    }
+
+    private fun resetPeerSession(
+        ctx: SignalStoreContext,
+        address: SignalProtocolAddress,
+        recipientId: String,
+    ) {
+        if (ctx.store.containsSession(address)) {
+            ctx.store.deleteSession(address)
+        }
+        ctx.manifest.sessionKeys.remove(SignalStorePersistence.sessionAddressKey(address))
+        ctx.manifest.preKeyHandshakePeers.remove(recipientId)
+    }
+
     suspend fun decryptMessage(userId: String, message: MessageDto): String {
         ensureRegistered(userId)
         val ctx = requireContext(userId)
+        if (message.id.isNotBlank()) {
+            prefetchPlaintextSync(userId, listOf(message.id))
+        }
         return decryptIncomingMessage(userId, message, ctx)
     }
 
@@ -98,11 +143,27 @@ class SignalCryptoManager(
         val decryptOrder = messages.sortedBy { messageSortKey(it) }
         val decryptedByKey = LinkedHashMap<String, String>()
 
+        val syncCandidateIds = decryptOrder.mapNotNull { message ->
+            message.id.takeIf {
+                it.isNotBlank() &&
+                    message.encryption == "signal_v1" &&
+                    decryptCache.read(userId, it) == null
+            }
+        }
+        prefetchPlaintextSync(userId, syncCandidateIds)
+
         for (message in decryptOrder) {
             val key = messageKey(message)
             if (decryptedByKey.containsKey(key)) continue
             val content = runCatching { decryptIncomingMessage(userId, message, ctx) }
-                .getOrElse { "🔒 Не удалось расшифровать сообщение" }
+                .getOrElse { failed ->
+                    if (message.id.isNotBlank()) {
+                        prefetchPlaintextSync(userId, listOf(message.id))
+                        decryptCache.read(userId, message.id)
+                    } else {
+                        null
+                    } ?: "🔒 Не удалось расшифровать сообщение"
+                }
             decryptedByKey[key] = content
         }
 
@@ -136,24 +197,57 @@ class SignalCryptoManager(
         val raw = SignalStorePersistence.base64Decode(message.content)
         val signalType = message.signalType ?: throw IllegalStateException("unsupported_signal_type")
 
-        val plaintext = when (signalType) {
-            CiphertextMessage.PREKEY_TYPE -> cipher.decrypt(PreKeySignalMessage(raw))
-            CiphertextMessage.WHISPER_TYPE -> cipher.decrypt(SignalMessage(raw))
-            else -> throw IllegalStateException("unsupported_signal_type")
+        val plaintext = try {
+            when (signalType) {
+                CiphertextMessage.PREKEY_TYPE -> cipher.decrypt(PreKeySignalMessage(raw))
+                CiphertextMessage.WHISPER_TYPE -> cipher.decrypt(SignalMessage(raw))
+                else -> throw IllegalStateException("unsupported_signal_type")
+            }
+        } catch (error: Exception) {
+            if (
+                signalType == CiphertextMessage.WHISPER_TYPE &&
+                ctx.store.containsSession(address)
+            ) {
+                resetPeerSession(ctx, address, message.senderId)
+                persistence.persistSessionUpdate(ctx, address)
+            }
+            throw error
         }
 
         persistence.trackSession(ctx, address)
-        persistence.persistContext(ctx)
+        ctx.manifest.preKeyHandshakePeers.add(message.senderId)
+        persistence.persistSessionUpdate(ctx, address)
 
         val text = String(plaintext, Charsets.UTF_8)
         if (message.id.isNotBlank()) {
             decryptCache.write(userId, message.id, text)
+            plaintextSync.push(userId, message.id, text)
         }
         return text
     }
 
+    private suspend fun prefetchPlaintextSync(userId: String, messageIds: List<String>) {
+        val missing = messageIds.filter { decryptCache.read(userId, it) == null }
+        if (missing.isEmpty()) return
+        val remote = plaintextSync.fetchBatch(userId, missing)
+        remote.forEach { (messageId, plaintext) ->
+            decryptCache.write(userId, messageId, plaintext)
+        }
+    }
+
     private suspend fun ensureRegisteredInner(userId: String) {
+        val now = System.currentTimeMillis()
+        if (prekeysAlignedForUser == userId &&
+            lastEnsureUserId == userId &&
+            now - lastEnsureAtMs < ENSURE_STATUS_TTL_MS &&
+            lock.withLock { persistence.loadContext(userId) } != null
+        ) {
+            return
+        }
+
         val status = api.signalKeyStatus()
+        lastEnsureAtMs = now
+        lastEnsureUserId = userId
         var ctx = lock.withLock { persistence.loadContext(userId) }
 
         if (ctx == null) {
@@ -184,24 +278,31 @@ class SignalCryptoManager(
             return
         }
 
-        if (prekeysAlignedForUser != userId) {
-            replenishOneTimePreKeys(ctx)
-            prekeysAlignedForUser = userId
-            return
-        }
-
         val unused = status.unusedOneTimePreKeys
         val oldestMissingLocally = status.oldestUnusedPreKeyId?.let { keyId ->
             !persistence.hasLocalPreKey(ctx, keyId)
         } == true
         val serverHasUnknownPrekeys = serverHasPrekeysOutsideLocal(ctx, status)
 
-        if (unused < REPLENISH_THRESHOLD || serverHasUnknownPrekeys || oldestMissingLocally) {
+        if (oldestMissingLocally || serverHasUnknownPrekeys) {
+            Log.w(TAG, "Server prekeys not all present locally; skipping replenish")
+        } else if (unused < REPLENISH_THRESHOLD) {
             replenishOneTimePreKeys(ctx)
         }
+        prekeysAlignedForUser = userId
     }
 
     private suspend fun publishRegistrationKeys(ctx: SignalStoreContext) {
+        ctx.manifest.sessionKeys.forEach { sessionKey ->
+            SignalStorePersistence.parseSessionAddress(sessionKey)?.let { address ->
+                if (ctx.store.containsSession(address)) {
+                    ctx.store.deleteSession(address)
+                }
+            }
+        }
+        ctx.manifest.sessionKeys.clear()
+        ctx.manifest.preKeyHandshakePeers.clear()
+
         val signedPreKeyId = nextKeyId()
         val signedPreKey = generateSignedPreKey(ctx.store.identityKeyPair, signedPreKeyId)
         val kyberPreKeyId = nextKeyId()
@@ -344,8 +445,10 @@ class SignalCryptoManager(
         if (message.id.isNotBlank()) message.id else "${message.senderId}:${message.content}"
 
     companion object {
+        private const val TAG = "SignalCryptoManager"
         private const val DEVICE_ID = 1
         private const val ONE_TIME_PREKEY_BATCH = 100
         private const val REPLENISH_THRESHOLD = 20
+        private const val ENSURE_STATUS_TTL_MS = 60_000L
     }
 }

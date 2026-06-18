@@ -60,6 +60,7 @@ fun MainScreen(
     friendsActionMessage: String?,
     friendsActionError: String?,
     conversations: List<ConversationPreview>,
+    chatDrafts: Map<String, String> = emptyMap(),
     friendsError: String?,
     messagesError: String?,
     chatFriendId: String?,
@@ -72,6 +73,9 @@ fun MainScreen(
     chatEditTarget: ChatEditTarget?,
     chatDraftText: String,
     chatFormatToolbarHidden: Boolean,
+    chatDefaultTheme: org.cyblight.android.data.preferences.ChatDefaultTheme,
+    chatSendWithEnter: Boolean,
+    chatFontSize: org.cyblight.android.data.preferences.ChatFontSize,
     localeTag: String,
     isChatLoading: Boolean,
     isSending: Boolean,
@@ -83,8 +87,6 @@ fun MainScreen(
     isEasterLoading: Boolean,
     easterError: String?,
     onSettings: () -> Unit,
-    onHelp: () -> Unit,
-    onAbout: () -> Unit,
     onCheckUpdates: () -> Unit,
     onReportBug: () -> Unit,
     onDonate: () -> Unit,
@@ -146,6 +148,9 @@ fun MainScreen(
             onDraftSaved = onUpdateChatDraft,
             localeTag = localeTag,
             formatToolbarHidden = chatFormatToolbarHidden,
+            chatDefaultTheme = chatDefaultTheme,
+            chatSendWithEnter = chatSendWithEnter,
+            chatFontSize = chatFontSize,
             onFormatToolbarHiddenChange = onChatFormatToolbarHiddenChange,
             onBack = onCloseChat,
             onOpenProfile = onOpenFriendProfile,
@@ -199,8 +204,6 @@ fun MainScreen(
                 actions = {
                     AppMenu(
                         onSettings = onSettings,
-                        onHelp = onHelp,
-                        onAbout = onAbout,
                         onCheckUpdates = onCheckUpdates,
                         onReportBug = onReportBug,
                         onDonate = onDonate,
@@ -278,6 +281,7 @@ fun MainScreen(
             )
             MainTab.Messages -> MessagesScreen(
                 conversations = conversations,
+                chatDrafts = chatDrafts,
                 isLoading = conversations.isEmpty() && messagesError == null,
                 error = messagesError,
                 encryptionReminderHidden = encryptionReminderChatDismissed,

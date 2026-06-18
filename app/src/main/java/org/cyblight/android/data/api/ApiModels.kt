@@ -537,3 +537,27 @@ data class SentMessageDto(
     val id: String = "",
     @SerializedName("created_at") val createdAt: Long? = null,
 )
+
+data class PlaintextSyncEntryDto(
+    @SerializedName("messageId") val messageId: String,
+    val iv: String,
+    val ciphertext: String,
+)
+
+data class PushPlaintextSyncRequest(
+    val entries: List<PlaintextSyncEntryDto>,
+)
+
+data class PushPlaintextSyncResponse(
+    val ok: Boolean = false,
+    val saved: Int = 0,
+)
+
+data class FetchPlaintextSyncRequest(
+    @SerializedName("messageIds") val messageIds: List<String>,
+)
+
+data class FetchPlaintextSyncResponse(
+    val ok: Boolean = false,
+    val entries: List<PlaintextSyncEntryDto> = emptyList(),
+)

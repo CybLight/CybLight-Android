@@ -2,6 +2,62 @@ package org.cyblight.android.data.home
 
 object ChangelogLocalizedNotes {
     private val notes: Map<String, Map<String, String>> = mapOf(
+        "0.9.0" to mapOf(
+            "ru" to """
+                Что нового
+
+                - Форматирование текста в чате: цитата, скрытый текст, жирный, курсив, моно, зачёркнутый, подчёркнутый, ссылка и код
+                - Меню при выделении текста: копирование, вставка, вырезание и панель форматирования с прокруткой
+                - Предпросмотр форматирования прямо в поле ввода — без символов разметки
+                - Анимация скрытого текста в сообщениях
+                - Настройки чатов: тема по умолчанию, размер шрифта, отправка по Enter
+                - По нажатию на push-уведомление о сообщении — сразу открывается нужный чат
+                - Автопрокрутка карусели проектов на главной
+                - Переводы вкладок и поиска в разделе «Друзья»
+                - Улучшения резервного копирования в Google Drive
+                - Сообщения в чате приходят в реальном времени
+
+                Установка
+
+                Скачайте APK ниже или на сайте: https://cyblight.org/ru/downloads/
+            """.trimIndent(),
+            "en" to """
+                What's new
+
+                - Text formatting in chat: quote, spoiler, bold, italic, mono, strikethrough, underline, link, and code
+                - Text selection menu: copy, paste, cut, and a scrollable formatting panel
+                - Live formatting preview in the message input — no markup symbols
+                - Spoiler animation in messages
+                - Chat settings: default theme, font size, send with Enter
+                - Tap a message push notification to open the chat directly
+                - Auto-scrolling projects carousel on Home
+                - Friends tab and search fully translated
+                - Google Drive backup improvements
+                - Real-time chat messages
+
+                Installation
+
+                Download the APK below or at: https://cyblight.org/en/downloads/
+            """.trimIndent(),
+            "uk" to """
+                Що нового
+
+                - Форматування тексту в чаті: цитата, прихований текст, жирний, курсив, моно, закреслений, підкреслений, посилання та код
+                - Меню при виділенні тексту: копіювання, вставка, вирізання та панель форматування з прокруткою
+                - Попередній перегляд форматування прямо в полі вводу — без символів розмітки
+                - Анімація прихованого тексту в повідомленнях
+                - Налаштування чатів: тема за замовчуванням, розмір шрифту, надсилання по Enter
+                - Натискання на push-сповіщення про повідомлення одразу відкриває потрібний чат
+                - Автопрокрутка каруселі проєктів на головній
+                - Переклади вкладок і пошуку в розділі «Друзі»
+                - Покращення резервного копіювання в Google Drive
+                - Повідомлення в чаті надходять у реальному часі
+
+                Встановлення
+
+                Завантажте APK нижче або на сайті: https://cyblight.org/uk/downloads/
+            """.trimIndent(),
+        ),
         "0.8.0" to mapOf(
             "ru" to """
                 Что нового

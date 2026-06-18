@@ -65,6 +65,10 @@ import org.cyblight.android.R
 import org.cyblight.android.data.api.FriendDto
 import org.cyblight.android.data.api.MessageDto
 import org.cyblight.android.data.api.PinnedMessageDto
+import org.cyblight.android.data.preferences.ChatDefaultTheme
+import org.cyblight.android.data.preferences.ChatFontSize
+import org.cyblight.android.data.preferences.ChatThemePalette
+import org.cyblight.android.data.preferences.resolveChatThemePalette
 import org.cyblight.android.ui.components.PresenceLabel
 import java.text.DateFormat
 import java.util.Date
@@ -91,6 +95,9 @@ fun ChatScreen(
     onDraftSaved: (String) -> Unit,
     localeTag: String,
     formatToolbarHidden: Boolean,
+    chatDefaultTheme: ChatDefaultTheme = ChatDefaultTheme.SYSTEM,
+    chatSendWithEnter: Boolean = false,
+    chatFontSize: ChatFontSize = ChatFontSize.MEDIUM,
     onFormatToolbarHiddenChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onOpenProfile: (username: String) -> Unit,
@@ -116,6 +123,8 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
+    val chatPalette = resolveChatThemePalette(chatDefaultTheme)
+    val chatFontScale = chatFontSize.scale
 
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
@@ -343,6 +352,7 @@ fun ChatScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(chatPalette.wallpaper)
                 .padding(padding),
         ) {
             when {
@@ -422,6 +432,8 @@ fun ChatScreen(
                                             isSelectionMode = selectionMode,
                                             isSelected = isSelected,
                                             isHighlighted = highlightMessageId == message.id,
+                                            chatPalette = chatPalette,
+                                            fontScale = chatFontScale,
                                             onReplyJump = { targetId -> scrollToMessageId(targetId) },
                                             onReact = { emoji -> onReactMessage(message.id, emoji) },
                                             onTap = {
@@ -538,6 +550,7 @@ fun ChatScreen(
                     },
                     formatToolbarHidden = formatToolbarHidden,
                     onFormatToolbarHiddenChange = onFormatToolbarHiddenChange,
+                    sendWithEnter = chatSendWithEnter,
                     isSending = isSending,
                     onSend = { content ->
                         val wasEditing = editTarget != null
@@ -653,24 +666,18 @@ private fun MessageBubble(
     isSelectionMode: Boolean,
     isSelected: Boolean,
     isHighlighted: Boolean,
+    chatPalette: ChatThemePalette,
+    fontScale: Float,
     onReplyJump: (String) -> Unit,
     onReact: (String) -> Unit,
     onTap: () -> Unit,
     onLongPress: () -> Unit,
 ) {
     val alignment = if (isMine) Alignment.End else Alignment.Start
-    val bg = if (isMine) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    val fg = if (isMine) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val bg = if (isMine) chatPalette.outgoingBubble else chatPalette.incomingBubble
+    val fg = if (isMine) chatPalette.outgoingText else chatPalette.incomingText
     val bubbleLinkColor = if (isMine) {
-        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.95f)
+        fg.copy(alpha = 0.95f)
     } else {
         MaterialTheme.colorScheme.primary
     }
@@ -736,6 +743,7 @@ private fun MessageBubble(
                         textColor = fg,
                         linkColor = bubbleLinkColor,
                         messageId = message.id,
+                        fontScale = fontScale,
                     )
                 }
             }

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -45,6 +46,7 @@ import org.cyblight.android.R
 import org.cyblight.android.crypto.backup.BackupRestoreStats
 import org.cyblight.android.data.preferences.ChatBackupFrequency
 import org.cyblight.android.integrations.google_drive.DriveBackupMetadata
+import org.cyblight.android.integrations.google_drive.GoogleDriveStorageQuota
 import org.cyblight.android.ui.components.CybOutlinedTextField
 import java.text.DateFormat
 import java.util.Locale
@@ -54,12 +56,17 @@ fun ChatBackupSettingsScreen(
     accountLogin: String,
     isGoogleDriveConfigured: Boolean,
     googleDriveAccountLabel: String?,
+    googleDriveAccountEmail: String?,
+    googleDriveAccountEmails: List<String>,
     googleDriveBackupMetadata: DriveBackupMetadata?,
+    googleDriveStorageQuota: GoogleDriveStorageQuota? = null,
+    onOpenGoogleStorage: () -> Unit = {},
     onRefreshGoogleDriveStatus: suspend () -> Unit,
     onGoogleDriveSignIn: () -> Unit,
+    onGoogleDriveAccountSelected: (String?) -> Unit,
     onGoogleDriveSignOut: suspend () -> Unit,
-    onUploadGoogleDriveBackup: suspend (password: String, onProgress: (Int, String) -> Unit) -> Result<Unit>,
-    onRestoreGoogleDriveBackup: suspend (password: String, onProgress: (Int, String) -> Unit) -> Result<BackupRestoreStats>,
+    onUploadGoogleDriveBackup: suspend (password: String?, onProgress: (Int, String) -> Unit) -> Result<Unit>,
+    onRestoreGoogleDriveBackup: suspend (password: String?, onProgress: (Int, String) -> Unit) -> Result<BackupRestoreStats>,
     onDeleteGoogleDriveBackup: suspend () -> Result<Boolean>,
     chatBackupFrequency: ChatBackupFrequency = ChatBackupFrequency.OFF,
     chatBackupOverCellular: Boolean = false,
@@ -67,6 +74,10 @@ fun ChatBackupSettingsScreen(
     onChatBackupFrequencySelected: (ChatBackupFrequency) -> Unit = {},
     onChatBackupOverCellularChange: (Boolean) -> Unit = {},
     onEnableAutoBackup: suspend (ChatBackupFrequency, String) -> Result<Unit> = { _, _ -> Result.success(Unit) },
+    onSaveBackupPassword: suspend (String) -> Result<Unit> = { Result.success(Unit) },
+    onChangeBackupPassword: suspend (String, String) -> Result<Unit> = { _, _ -> Result.success(Unit) },
+    onDisableBackupPassword: suspend () -> Result<Unit> = { Result.success(Unit) },
+    onClearStoredBackupPassword: suspend () -> Result<Unit> = { Result.success(Unit) },
     onCreateSignalBackup: suspend (password: String) -> Result<String>,
     onRestoreSignalBackup: suspend (content: String, password: String) -> Result<Unit>,
     signalBackupErrorMessage: (String) -> String,
@@ -84,13 +95,19 @@ fun ChatBackupSettingsScreen(
     var showUploadDialog by remember { mutableStateOf(false) }
     var showRestoreDialog by remember { mutableStateOf(false) }
     var showAutoPasswordDialog by remember { mutableStateOf(false) }
+    var showPasswordEnableDialog by remember { mutableStateOf(false) }
+    var showChangePasswordDialog by remember { mutableStateOf(false) }
+    var showDisablePasswordDialog by remember { mutableStateOf(false) }
     var pendingAutoFrequency by remember { mutableStateOf<ChatBackupFrequency?>(null) }
     var autoBackupMenuExpanded by remember { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
     var passwordConfirm by remember { mutableStateOf("") }
+    var currentPassword by remember { mutableStateOf("") }
+    var changePasswordError by remember { mutableStateOf<String?>(null) }
+    var showAccountPicker by remember { mutableStateOf(false) }
 
-    LaunchedEffect(isGoogleDriveConfigured, googleDriveAccountLabel) {
-        if (isGoogleDriveConfigured) {
+    LaunchedEffect(isGoogleDriveConfigured, googleDriveAccountLabel, showAccountPicker) {
+        if (isGoogleDriveConfigured && (showAccountPicker || googleDriveAccountLabel != null)) {
             onRefreshGoogleDriveStatus()
         }
     }
@@ -105,6 +122,55 @@ fun ChatBackupSettingsScreen(
         "progress_chats" -> context.getString(R.string.settings_google_drive_progress_chats)
         "progress_done" -> context.getString(R.string.settings_chat_backup_progress_creating, progress)
         else -> context.getString(R.string.settings_google_drive_progress_create)
+    }
+
+    fun startUpload(backupPassword: String?) {
+        busy = true
+        progress = 0
+        progressLabel = progressText("progress_auth")
+        scope.launch {
+            onUploadGoogleDriveBackup(backupPassword) { value, key ->
+                progress = value
+                progressLabel = progressText(key)
+            }.onSuccess {
+                statusMessage = context.getString(R.string.settings_google_drive_upload_done)
+                statusIsError = false
+                onRefreshGoogleDriveStatus()
+            }.onFailure { error ->
+                statusMessage = formatBackupError(error, signalBackupErrorMessage)
+                statusIsError = true
+            }
+            busy = false
+            progressLabel = null
+        }
+    }
+
+    fun startRestore(backupPassword: String?, onWrongStoredPassword: () -> Unit = {}) {
+        busy = true
+        progress = 0
+        progressLabel = progressText("progress_auth")
+        scope.launch {
+            onRestoreGoogleDriveBackup(backupPassword) { value, key ->
+                progress = value
+                progressLabel = progressText(key)
+            }.onSuccess { stats ->
+                statusMessage = buildRestoreDoneMessage(context, stats)
+                statusIsError = false
+                onRefreshGoogleDriveStatus()
+            }.onFailure { error ->
+                val code = extractBackupErrorCode(error)
+                if (backupPassword == null && code == "backup_password_invalid") {
+                    onClearStoredBackupPassword()
+                    onWrongStoredPassword()
+                    statusMessage = signalBackupErrorMessage("backup_password_invalid")
+                } else {
+                    statusMessage = formatBackupError(error, signalBackupErrorMessage)
+                }
+                statusIsError = true
+            }
+            busy = false
+            progressLabel = null
+        }
     }
 
     Column(
@@ -153,10 +219,10 @@ fun ChatBackupSettingsScreen(
             )
         }
 
-        if (busy && progressLabel != null) {
+        if (busy) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Text(
-                    text = stringResource(R.string.settings_chat_backup_progress_creating, progress),
+                    text = progressLabel ?: stringResource(R.string.settings_google_drive_progress_create),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -185,6 +251,7 @@ fun ChatBackupSettingsScreen(
                     )
                 },
                 leadingContent = { Icon(Icons.Outlined.Cloud, contentDescription = null) },
+                modifier = Modifier.clickable(enabled = !busy) { showAccountPicker = true },
             )
 
             if (googleDriveAccountLabel == null) {
@@ -198,11 +265,33 @@ fun ChatBackupSettingsScreen(
                     Text(stringResource(R.string.settings_google_drive_sign_in))
                 }
             } else {
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = stringResource(R.string.settings_google_drive_storage_title),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            text = googleDriveStorageQuota?.let { formatStorageQuotaText(context, it) }
+                                ?: stringResource(R.string.settings_google_drive_storage_tap),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                    leadingContent = { Icon(Icons.Outlined.Storage, contentDescription = null) },
+                    modifier = Modifier.clickable(enabled = !busy, onClick = onOpenGoogleStorage),
+                )
+
                 Button(
                     onClick = {
-                        password = ""
-                        passwordConfirm = ""
-                        showUploadDialog = true
+                        if (chatBackupHasStoredPassword) {
+                            startUpload(null)
+                        } else {
+                            password = ""
+                            passwordConfirm = ""
+                            showUploadDialog = true
+                        }
                     },
                     enabled = !busy,
                     modifier = Modifier
@@ -219,8 +308,15 @@ fun ChatBackupSettingsScreen(
                         TextButton(
                             enabled = !busy,
                             onClick = {
-                                password = ""
-                                showRestoreDialog = true
+                                if (chatBackupHasStoredPassword) {
+                                    startRestore(null) {
+                                        password = ""
+                                        showRestoreDialog = true
+                                    }
+                                } else {
+                                    password = ""
+                                    showRestoreDialog = true
+                                }
                             },
                         ) {
                             Text(stringResource(R.string.settings_signal_backup_action))
@@ -355,9 +451,56 @@ fun ChatBackupSettingsScreen(
         )
         ListItem(
             headlineContent = { Text(stringResource(R.string.settings_chat_backup_e2e_item)) },
-            supportingContent = { Text(stringResource(R.string.settings_chat_backup_e2e_on)) },
+            supportingContent = {
+                Text(
+                    if (chatBackupHasStoredPassword) {
+                        stringResource(R.string.settings_chat_backup_e2e_on_remembered)
+                    } else {
+                        stringResource(R.string.settings_chat_backup_e2e_off)
+                    },
+                )
+            },
             leadingContent = { Icon(Icons.Outlined.Lock, contentDescription = null) },
+            trailingContent = {
+                Switch(
+                    checked = chatBackupHasStoredPassword,
+                    onCheckedChange = { enabled ->
+                        if (enabled) {
+                            password = ""
+                            passwordConfirm = ""
+                            showPasswordEnableDialog = true
+                        } else {
+                            showDisablePasswordDialog = true
+                        }
+                    },
+                    enabled = !busy,
+                )
+            },
         )
+
+        if (chatBackupHasStoredPassword) {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_chat_backup_password_change)) },
+                supportingContent = {
+                    Text(stringResource(R.string.settings_chat_backup_password_change_hint))
+                },
+                leadingContent = { Icon(Icons.Outlined.Lock, contentDescription = null) },
+                trailingContent = {
+                    TextButton(
+                        enabled = !busy,
+                        onClick = {
+                            currentPassword = ""
+                            password = ""
+                            passwordConfirm = ""
+                            changePasswordError = null
+                            showChangePasswordDialog = true
+                        },
+                    ) {
+                        Text(stringResource(R.string.settings_signal_backup_action))
+                    }
+                },
+            )
+        }
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
@@ -401,24 +544,8 @@ fun ChatBackupSettingsScreen(
                         statusIsError = true
                     }
                     else -> {
-                        busy = true
-                        progress = 0
-                        scope.launch {
-                            onUploadGoogleDriveBackup(password) { value, key ->
-                                progress = value
-                                progressLabel = progressText(key)
-                            }.onSuccess {
-                                statusMessage = context.getString(R.string.settings_google_drive_upload_done)
-                                statusIsError = false
-                                showUploadDialog = false
-                                onRefreshGoogleDriveStatus()
-                            }.onFailure { error ->
-                                statusMessage = formatBackupError(error, signalBackupErrorMessage)
-                                statusIsError = true
-                            }
-                            busy = false
-                            progressLabel = null
-                        }
+                        showUploadDialog = false
+                        startUpload(password)
                     }
                 }
             },
@@ -440,24 +567,8 @@ fun ChatBackupSettingsScreen(
                     statusMessage = context.getString(R.string.settings_signal_backup_password_required)
                     statusIsError = true
                 } else {
-                    busy = true
-                    progress = 0
-                    scope.launch {
-                        onRestoreGoogleDriveBackup(password) { value, key ->
-                            progress = value
-                            progressLabel = progressText(key)
-                        }.onSuccess { stats ->
-                            statusMessage = buildRestoreDoneMessage(context, stats)
-                            statusIsError = false
-                            showRestoreDialog = false
-                            onRefreshGoogleDriveStatus()
-                        }.onFailure { error ->
-                            statusMessage = formatBackupError(error, signalBackupErrorMessage)
-                            statusIsError = true
-                        }
-                        busy = false
-                        progressLabel = null
-                    }
+                    showRestoreDialog = false
+                    startRestore(password)
                 }
             },
         )
@@ -491,6 +602,7 @@ fun ChatBackupSettingsScreen(
                     }
                     else -> {
                         val frequencyLabel = context.getString(chatBackupFrequencyLabelRes(frequency))
+                        showAutoPasswordDialog = false
                         busy = true
                         scope.launch {
                             onEnableAutoBackup(frequency, password)
@@ -500,7 +612,6 @@ fun ChatBackupSettingsScreen(
                                         frequencyLabel,
                                     )
                                     statusIsError = false
-                                    showAutoPasswordDialog = false
                                     pendingAutoFrequency = null
                                 }
                                 .onFailure { error ->
@@ -516,6 +627,249 @@ fun ChatBackupSettingsScreen(
             },
         )
     }
+
+    if (showPasswordEnableDialog) {
+        BackupPasswordDialog(
+            title = stringResource(R.string.settings_chat_backup_password_enable_title),
+            password = password,
+            passwordConfirm = passwordConfirm,
+            onPasswordChange = { password = it },
+            onPasswordConfirmChange = { passwordConfirm = it },
+            showConfirm = true,
+            busy = busy,
+            onDismiss = { if (!busy) showPasswordEnableDialog = false },
+            onConfirm = {
+                when {
+                    password.length < 8 -> {
+                        statusMessage = context.getString(R.string.settings_signal_backup_password_short)
+                        statusIsError = true
+                    }
+                    password != passwordConfirm -> {
+                        statusMessage = context.getString(R.string.settings_signal_backup_password_mismatch)
+                        statusIsError = true
+                    }
+                    else -> {
+                        showPasswordEnableDialog = false
+                        busy = true
+                        scope.launch {
+                            onSaveBackupPassword(password)
+                                .onSuccess {
+                                    statusMessage = context.getString(R.string.settings_chat_backup_password_saved)
+                                    statusIsError = false
+                                }
+                                .onFailure { error ->
+                                    statusMessage = signalBackupErrorMessage(
+                                        (error as? IllegalArgumentException)?.message ?: "backup_failed",
+                                    )
+                                    statusIsError = true
+                                }
+                            busy = false
+                        }
+                    }
+                }
+            },
+        )
+    }
+
+    if (showChangePasswordDialog) {
+        ChangeBackupPasswordDialog(
+            currentPassword = currentPassword,
+            newPassword = password,
+            newPasswordConfirm = passwordConfirm,
+            errorMessage = changePasswordError,
+            onCurrentPasswordChange = {
+                currentPassword = it
+                changePasswordError = null
+            },
+            onNewPasswordChange = {
+                password = it
+                changePasswordError = null
+            },
+            onNewPasswordConfirmChange = {
+                passwordConfirm = it
+                changePasswordError = null
+            },
+            busy = busy,
+            onDismiss = {
+                if (!busy) {
+                    showChangePasswordDialog = false
+                    changePasswordError = null
+                }
+            },
+            onConfirm = {
+                when {
+                    currentPassword.isBlank() -> {
+                        changePasswordError = context.getString(R.string.settings_chat_backup_password_current_required)
+                    }
+                    password.length < 8 -> {
+                        changePasswordError = context.getString(R.string.settings_signal_backup_password_short)
+                    }
+                    password != passwordConfirm -> {
+                        changePasswordError = context.getString(R.string.settings_signal_backup_password_mismatch)
+                    }
+                    password.contentEquals(currentPassword) -> {
+                        changePasswordError = context.getString(R.string.settings_chat_backup_password_unchanged)
+                    }
+                    else -> {
+                        changePasswordError = null
+                        busy = true
+                        scope.launch {
+                            onChangeBackupPassword(currentPassword, password)
+                                .onSuccess {
+                                    showChangePasswordDialog = false
+                                    statusMessage = context.getString(R.string.settings_chat_backup_password_changed)
+                                    statusIsError = false
+                                    currentPassword = ""
+                                    password = ""
+                                    passwordConfirm = ""
+                                    changePasswordError = null
+                                }
+                                .onFailure { error ->
+                                    changePasswordError = signalBackupErrorMessage(
+                                        (error as? IllegalArgumentException)?.message ?: "backup_failed",
+                                    )
+                                }
+                            busy = false
+                        }
+                    }
+                }
+            },
+        )
+    }
+
+    if (showDisablePasswordDialog) {
+        AlertDialog(
+            onDismissRequest = { showDisablePasswordDialog = false },
+            title = { Text(stringResource(R.string.settings_chat_backup_password_disable_title)) },
+            text = { Text(stringResource(R.string.settings_chat_backup_password_disable_message)) },
+            confirmButton = {
+                TextButton(
+                    enabled = !busy,
+                    onClick = {
+                        showDisablePasswordDialog = false
+                        busy = true
+                        scope.launch {
+                            onDisableBackupPassword()
+                                .onSuccess {
+                                    statusMessage = context.getString(R.string.settings_chat_backup_password_disabled)
+                                    statusIsError = false
+                                }
+                                .onFailure { error ->
+                                    statusMessage = formatBackupError(error, signalBackupErrorMessage)
+                                    statusIsError = true
+                                }
+                            busy = false
+                        }
+                    },
+                ) {
+                    Text(stringResource(R.string.settings_chat_backup_password_disable_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDisablePasswordDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+
+    if (showAccountPicker) {
+        val accounts = remember(googleDriveAccountEmails, googleDriveAccountEmail) {
+            (googleDriveAccountEmails + listOfNotNull(googleDriveAccountEmail?.takeIf { it.isNotBlank() }))
+                .distinct()
+                .sortedBy { it.lowercase() }
+        }
+        GoogleAccountPickerDialog(
+            accounts = accounts,
+            selectedEmail = googleDriveAccountEmail,
+            onAccountSelected = { email ->
+                showAccountPicker = false
+                if (!email.equals(googleDriveAccountEmail, ignoreCase = true)) {
+                    onGoogleDriveAccountSelected(email)
+                }
+            },
+            onAddAccount = {
+                showAccountPicker = false
+                onGoogleDriveAccountSelected(null)
+            },
+            onDismiss = { showAccountPicker = false },
+        )
+    }
+}
+
+@Composable
+private fun ChangeBackupPasswordDialog(
+    currentPassword: String,
+    newPassword: String,
+    newPasswordConfirm: String,
+    errorMessage: String?,
+    onCurrentPasswordChange: (String) -> Unit,
+    onNewPasswordChange: (String) -> Unit,
+    onNewPasswordConfirmChange: (String) -> Unit,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_chat_backup_password_change_title)) },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(R.string.settings_chat_backup_password_change_intro),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                CybOutlinedTextField(
+                    value = currentPassword,
+                    onValueChange = onCurrentPasswordChange,
+                    label = stringResource(R.string.settings_chat_backup_password_current),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    showPasswordToggle = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                CybOutlinedTextField(
+                    value = newPassword,
+                    onValueChange = onNewPasswordChange,
+                    label = stringResource(R.string.settings_chat_backup_password_new),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    showPasswordToggle = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                )
+                CybOutlinedTextField(
+                    value = newPasswordConfirm,
+                    onValueChange = onNewPasswordConfirmChange,
+                    label = stringResource(R.string.settings_signal_backup_password_confirm),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    showPasswordToggle = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                )
+                errorMessage?.let { message ->
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = !busy, onClick = onConfirm) {
+                Text(stringResource(R.string.settings_chat_backup_password_change_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(enabled = !busy, onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
 }
 
 @Composable
@@ -581,6 +935,18 @@ private fun BackupPasswordDialog(
     )
 }
 
+private fun extractBackupErrorCode(error: Throwable): String? {
+    var current: Throwable? = error
+    while (current != null) {
+        val message = current.message?.substringBefore(':')?.trim()
+        if (!message.isNullOrBlank()) {
+            return message
+        }
+        current = current.cause
+    }
+    return null
+}
+
 private fun formatBackupError(error: Throwable, mapCode: (String) -> String): String {
     var current: Throwable? = error
     while (current != null) {
@@ -601,6 +967,37 @@ private fun buildRestoreDoneMessage(context: android.content.Context, stats: Bac
         stats.chatsImported,
         stats.chatsSkipped,
     )}"
+}
+
+private fun formatGoogleStorageAmount(context: android.content.Context, bytes: Long): String {
+    val gib = bytes / (1024.0 * 1024.0 * 1024.0)
+    if (gib >= 0.05) {
+        val rounded = if (gib >= 10 && kotlin.math.abs(gib - gib.toLong()) < 0.05) {
+            gib.toLong().toDouble()
+        } else {
+            gib
+        }
+        return context.getString(R.string.settings_google_drive_storage_gb, rounded)
+    }
+    val mib = bytes / (1024.0 * 1024.0)
+    if (mib >= 0.1) {
+        return context.getString(R.string.settings_google_drive_storage_mb, mib)
+    }
+    return context.getString(R.string.settings_google_drive_storage_kb, (bytes / 1024).coerceAtLeast(0))
+}
+
+private fun formatStorageQuotaText(context: android.content.Context, quota: GoogleDriveStorageQuota): String {
+    val used = formatGoogleStorageAmount(context, quota.usageBytes)
+    val limit = quota.limitBytes
+    return if (limit != null) {
+        context.getString(
+            R.string.settings_google_drive_storage_used,
+            used,
+            formatGoogleStorageAmount(context, limit),
+        )
+    } else {
+        context.getString(R.string.settings_google_drive_storage_used_unlimited, used)
+    }
 }
 
 private fun formatDriveTime(context: android.content.Context, iso: String): String {

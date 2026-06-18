@@ -50,6 +50,9 @@ class AppPreferences(private val context: Context) {
     private val rootBackBehaviorKey = stringPreferencesKey("root_back_behavior")
     private val encryptionReminderChatDismissedKey = booleanPreferencesKey("encryption_reminder_chat_dismissed")
     private val chatFormatToolbarHiddenKey = booleanPreferencesKey("chat_format_toolbar_hidden")
+    private val chatDefaultThemeKey = stringPreferencesKey("chat_default_theme")
+    private val chatSendWithEnterKey = booleanPreferencesKey("chat_send_with_enter")
+    private val chatFontSizeKey = stringPreferencesKey("chat_font_size")
     private val homeWhatsNewBannerHiddenKey = booleanPreferencesKey("home_whats_new_banner_hidden")
     private val chatBackupFrequencyKey = stringPreferencesKey("chat_backup_frequency")
     private val chatBackupOverCellularKey = booleanPreferencesKey("chat_backup_over_cellular")
@@ -290,6 +293,16 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    suspend fun getAllChatDrafts(): Map<String, String> =
+        context.appPreferencesStore.data.first().asMap()
+            .mapNotNull { (key, value) ->
+                if (!key.name.startsWith("chat_draft_")) return@mapNotNull null
+                val friendId = key.name.removePrefix("chat_draft_")
+                val text = (value as? String)?.trim().orEmpty()
+                if (text.isEmpty() || friendId.isBlank()) null else friendId to text
+            }
+            .toMap()
+
     suspend fun getArchivistProgress(): ArchivistProgressSnapshot? {
         val raw = context.appPreferencesStore.data.first()[archivistProgressKey] ?: return null
         val parts = raw.split('\t')
@@ -382,6 +395,45 @@ class AppPreferences(private val context: Context) {
     suspend fun setChatFormatToolbarHidden(hidden: Boolean) {
         context.appPreferencesStore.edit { prefs ->
             prefs[chatFormatToolbarHiddenKey] = hidden
+        }
+    }
+
+    suspend fun getChatDefaultTheme(): ChatDefaultTheme {
+        val name = context.appPreferencesStore.data.first()[chatDefaultThemeKey]
+        return ChatDefaultTheme.fromName(name)
+    }
+
+    suspend fun setChatDefaultTheme(theme: ChatDefaultTheme) {
+        context.appPreferencesStore.edit { prefs ->
+            if (theme == ChatDefaultTheme.SYSTEM) {
+                prefs.remove(chatDefaultThemeKey)
+            } else {
+                prefs[chatDefaultThemeKey] = theme.name
+            }
+        }
+    }
+
+    suspend fun getChatSendWithEnter(): Boolean =
+        context.appPreferencesStore.data.first()[chatSendWithEnterKey] ?: false
+
+    suspend fun setChatSendWithEnter(enabled: Boolean) {
+        context.appPreferencesStore.edit { prefs ->
+            prefs[chatSendWithEnterKey] = enabled
+        }
+    }
+
+    suspend fun getChatFontSize(): ChatFontSize {
+        val name = context.appPreferencesStore.data.first()[chatFontSizeKey]
+        return ChatFontSize.fromName(name)
+    }
+
+    suspend fun setChatFontSize(size: ChatFontSize) {
+        context.appPreferencesStore.edit { prefs ->
+            if (size == ChatFontSize.MEDIUM) {
+                prefs.remove(chatFontSizeKey)
+            } else {
+                prefs[chatFontSizeKey] = size.name
+            }
         }
     }
 

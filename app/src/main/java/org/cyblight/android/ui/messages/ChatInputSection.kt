@@ -1,6 +1,5 @@
 package org.cyblight.android.ui.messages
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -12,9 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.EmojiEmotions
 import androidx.compose.material3.AlertDialog
@@ -31,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -38,16 +37,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalTextToolbar
+import androidx.compose.ui.platform.TextToolbar
+import androidx.compose.ui.platform.TextToolbarStatus
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.cyblight.android.R
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ChatInputSection(
@@ -61,6 +67,7 @@ fun ChatInputSection(
     onClearEdit: () -> Unit = {},
     formatToolbarHidden: Boolean = false,
     onFormatToolbarHiddenChange: (Boolean) -> Unit = {},
+    sendWithEnter: Boolean = false,
     isSending: Boolean,
     onSend: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -69,12 +76,24 @@ fun ChatInputSection(
     var showLinkDialog by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    fun submitDraft() {
+        val text = draft.text.trim()
+        if (text.isBlank() || isSending) return
+        var content = text
+        val firstUrl = ChatFormatUtils.extractFirstUrl(text)
+        if (suppressedPreviewUrl != null && firstUrl != null && suppressedPreviewUrl == firstUrl) {
+            content = ChatFormatUtils.appendNoPreviewToken(content, firstUrl)
+        }
+        onDraftChange(TextFieldValue())
+        onSend(content)
+    }
+
     if (showLinkDialog) {
         LinkInsertDialog(
             selectedText = draft.text.substring(draft.selection.min, draft.selection.max),
             onDismiss = { showLinkDialog = false },
             onConfirm = { label, url ->
-                insertAtSelection(draft, onDraftChange, "[$label]($url)")
+                ChatFormatActions.insertAtSelection(draft, onDraftChange, "[$label]($url)")
                 showLinkDialog = false
             },
         )
@@ -87,7 +106,7 @@ fun ChatInputSection(
         ) {
             EmojiPickerContent(
                 onEmojiSelected = { emoji ->
-                    insertAtSelection(draft, onDraftChange, emoji)
+                    ChatFormatActions.insertAtSelection(draft, onDraftChange, emoji)
                 },
             )
         }
@@ -120,38 +139,34 @@ fun ChatInputSection(
             )
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            FilledTonalIconButton(
-                onClick = { onFormatToolbarHiddenChange(!formatToolbarHidden) },
+        val hasSelection = ChatFormatActions.hasSelection(draft)
+
+        if (!hasSelection) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(
-                    text = "Aa",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (formatToolbarHidden) FontWeight.Normal else FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 2.dp),
-                )
-            }
-            if (!formatToolbarHidden) {
-                ChatFormattingToolbar(
-                    modifier = Modifier.weight(1f),
-                    onBold = { wrapSelection(draft, onDraftChange, "**", "**") },
-                    onItalic = { wrapSelection(draft, onDraftChange, "_", "_") },
-                    onMono = { wrapSelection(draft, onDraftChange, "`", "`") },
-                    onStrike = { wrapSelection(draft, onDraftChange, "~~", "~~") },
-                    onSpoiler = { wrapSelection(draft, onDraftChange, "||", "||") },
-                    onLink = { showLinkDialog = true },
-                    onCode = {
-                        val selected = draft.text.substring(draft.selection.min, draft.selection.max)
-                        val block = "```\n${selected.ifBlank { "код" }}\n```"
-                        insertAtSelection(draft, onDraftChange, block)
-                    },
-                )
+                FilledTonalIconButton(
+                    onClick = { onFormatToolbarHiddenChange(!formatToolbarHidden) },
+                ) {
+                    Text(
+                        text = "Aa",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (formatToolbarHidden) FontWeight.Normal else FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 2.dp),
+                    )
+                }
+                if (!formatToolbarHidden) {
+                    ChatFormattingBar(
+                        draft = draft,
+                        onDraftChange = onDraftChange,
+                        onShowLinkDialog = { showLinkDialog = true },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
 
@@ -162,48 +177,70 @@ fun ChatInputSection(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
         )
 
+        ChatTextSelectionBar(
+            draft = draft,
+            onDraftChange = onDraftChange,
+            onShowLinkDialog = { showLinkDialog = true },
+        )
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 4.dp, vertical = 8.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
             IconButton(onClick = { showEmojiPicker = true }) {
                 Icon(Icons.Outlined.EmojiEmotions, contentDescription = stringResource(R.string.chat_emoji))
             }
-            OutlinedTextField(
-                value = draft,
-                onValueChange = onDraftChange,
-                placeholder = {
-                    Text(
-                        if (editTarget != null) {
-                            stringResource(R.string.chat_edit_placeholder)
-                        } else {
-                            stringResource(R.string.message_placeholder)
+            CompositionLocalProvider(LocalTextToolbar provides DisabledTextToolbar) {
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = onDraftChange,
+                    visualTransformation = ChatInputVisualTransformation,
+                    placeholder = {
+                        Text(
+                            if (editTarget != null) {
+                                stringResource(R.string.chat_edit_placeholder)
+                            } else {
+                                stringResource(R.string.message_placeholder)
+                            },
+                        )
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .onPreviewKeyEvent { event ->
+                            if (!sendWithEnter) return@onPreviewKeyEvent false
+                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            if (event.key != Key.Enter && event.key != Key.NumPadEnter) return@onPreviewKeyEvent false
+                            if (event.isShiftPressed) return@onPreviewKeyEvent false
+                            submitDraft()
+                            true
                         },
-                    )
-                },
-                modifier = Modifier.weight(1f),
-                maxLines = 4,
-            )
+                    maxLines = 4,
+                )
+            }
             IconButton(
-                onClick = {
-                    val text = draft.text.trim()
-                    if (text.isBlank()) return@IconButton
-                    var content = text
-                    val firstUrl = ChatFormatUtils.extractFirstUrl(text)
-                    if (suppressedPreviewUrl != null && firstUrl != null && suppressedPreviewUrl == firstUrl) {
-                        content = ChatFormatUtils.appendNoPreviewToken(content, firstUrl)
-                    }
-                    onDraftChange(TextFieldValue())
-                    onSend(content)
-                },
+                onClick = { submitDraft() },
                 enabled = !isSending && draft.text.isNotBlank(),
             ) {
                 Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = stringResource(R.string.send))
             }
         }
     }
+}
+
+private object DisabledTextToolbar : TextToolbar {
+    override val status: TextToolbarStatus = TextToolbarStatus.Hidden
+
+    override fun hide() = Unit
+
+    override fun showMenu(
+        rect: Rect,
+        onCopyRequested: (() -> Unit)?,
+        onPasteRequested: (() -> Unit)?,
+        onCutRequested: (() -> Unit)?,
+        onSelectAllRequested: (() -> Unit)?,
+    ) = Unit
 }
 
 @Composable
@@ -232,55 +269,6 @@ private fun ChatComposeBanner(
         IconButton(onClick = onDismiss) {
             Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.cancel))
         }
-    }
-}
-
-@Composable
-private fun ChatFormattingToolbar(
-    modifier: Modifier = Modifier,
-    onBold: () -> Unit,
-    onItalic: () -> Unit,
-    onMono: () -> Unit,
-    onStrike: () -> Unit,
-    onSpoiler: () -> Unit,
-    onLink: () -> Unit,
-    onCode: () -> Unit,
-) {
-    Row(
-        modifier = modifier
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        FormatButton("B", fontWeight = FontWeight.Bold, onClick = onBold)
-        FormatButton("I", fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, onClick = onItalic)
-        FormatButton("M", fontFamily = FontFamily.Monospace, onClick = onMono)
-        FormatButton("S", textDecoration = TextDecoration.LineThrough, onClick = onStrike)
-        FormatButton("||", onClick = onSpoiler)
-        FormatButton("🔗", onClick = onLink)
-        FormatButton("{ }", fontFamily = FontFamily.Monospace, onClick = onCode)
-    }
-}
-
-@Composable
-private fun FormatButton(
-    label: String,
-    fontWeight: FontWeight? = null,
-    fontStyle: androidx.compose.ui.text.font.FontStyle? = null,
-    fontFamily: FontFamily? = null,
-    textDecoration: TextDecoration? = null,
-    onClick: () -> Unit,
-) {
-    TextButton(onClick = onClick) {
-        Text(
-            label,
-            style = TextStyle(
-                fontWeight = fontWeight,
-                fontStyle = fontStyle,
-                fontFamily = fontFamily,
-                textDecoration = textDecoration,
-                fontSize = 14.sp,
-            ),
-        )
     }
 }
 
@@ -406,42 +394,4 @@ private fun LinkInsertDialog(
             }
         },
     )
-}
-
-private fun wrapSelection(
-    current: TextFieldValue,
-    onChange: (TextFieldValue) -> Unit,
-    startToken: String,
-    endToken: String,
-) {
-    val selected = current.text.substring(current.selection.min, current.selection.max)
-    val newText = buildString {
-        append(current.text.substring(0, current.selection.min))
-        append(startToken)
-        append(selected)
-        append(endToken)
-        append(current.text.substring(current.selection.max))
-    }
-    val cursorStart = current.selection.min + startToken.length
-    val cursorEnd = cursorStart + selected.length
-    onChange(
-        TextFieldValue(
-            text = newText,
-            selection = TextRange(cursorStart, cursorEnd),
-        ),
-    )
-}
-
-private fun insertAtSelection(
-    current: TextFieldValue,
-    onChange: (TextFieldValue) -> Unit,
-    insertion: String,
-) {
-    val newText = buildString {
-        append(current.text.substring(0, current.selection.min))
-        append(insertion)
-        append(current.text.substring(current.selection.max))
-    }
-    val cursor = current.selection.min + insertion.length
-    onChange(TextFieldValue(newText, TextRange(cursor, cursor)))
 }

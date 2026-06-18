@@ -1,5 +1,6 @@
 package org.cyblight.android.integrations.google_drive
 
+import android.accounts.AccountManager
 import android.content.Context
 import android.content.Intent
 import com.google.android.gms.auth.GoogleAuthException
@@ -19,11 +20,40 @@ class GoogleDriveAuthManager(private val context: Context) {
         .requestIdToken(GoogleDriveConfig.webClientId)
         .requestEmail()
         .requestScopes(Scope(GoogleDriveConfig.DRIVE_FILE_SCOPE))
+        .requestScopes(Scope(GoogleDriveConfig.DRIVE_METADATA_READONLY_SCOPE))
+        .requestScopes(Scope(GoogleDriveConfig.DRIVE_READONLY_SCOPE))
         .build()
 
     private val signInClient: GoogleSignInClient = GoogleSignIn.getClient(context, signInOptions)
 
-    fun getSignInIntent(): Intent = signInClient.signInIntent
+    fun getSignInIntent(preferredEmail: String? = null): Intent {
+        val options = preferredEmail?.trim()?.takeIf { it.isNotEmpty() }?.let { email ->
+            GoogleSignInOptions.Builder(signInOptions)
+                .setAccountName(email)
+                .build()
+        } ?: signInOptions
+        return GoogleSignIn.getClient(context, options).signInIntent
+    }
+
+    fun getDeviceGoogleAccountEmails(): List<String> {
+        @Suppress("DEPRECATION")
+        val fromDevice = AccountManager.get(context)
+            .getAccountsByType("com.google")
+            .mapNotNull { account -> account.name?.trim()?.takeIf { it.isNotEmpty() } }
+        val current = getAccountEmail()?.trim().orEmpty()
+        return (fromDevice + listOfNotNull(current.takeIf { it.isNotEmpty() }))
+            .distinct()
+            .sortedBy { it.lowercase() }
+    }
+
+    suspend fun signOutIfCurrentNot(email: String) {
+        val current = getAccountEmail()?.trim().orEmpty()
+        if (current.isNotEmpty() && !current.equals(email.trim(), ignoreCase = true)) {
+            signOut()
+        }
+    }
+
+    fun getSignInIntent(): Intent = getSignInIntent(preferredEmail = null)
 
     fun hasSession(): Boolean = GoogleSignIn.getLastSignedInAccount(context) != null
 
@@ -59,6 +89,10 @@ class GoogleDriveAuthManager(private val context: Context) {
         val scopes = buildString {
             append("oauth2:")
             append(GoogleDriveConfig.DRIVE_FILE_SCOPE)
+            append(" ")
+            append(GoogleDriveConfig.DRIVE_METADATA_READONLY_SCOPE)
+            append(" ")
+            append(GoogleDriveConfig.DRIVE_READONLY_SCOPE)
             append(" https://www.googleapis.com/auth/userinfo.email")
             append(" https://www.googleapis.com/auth/userinfo.profile")
         }

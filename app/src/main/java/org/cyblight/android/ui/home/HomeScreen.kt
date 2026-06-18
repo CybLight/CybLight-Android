@@ -34,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +45,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.cyblight.android.R
 import org.cyblight.android.data.home.HomeContent
@@ -237,6 +240,15 @@ private fun ProjectsCarousel(
 
     val pagerState = rememberPagerState(pageCount = { projects.size })
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(projects.size) {
+        if (projects.size <= 1) return@LaunchedEffect
+        while (isActive) {
+            delay(5_000)
+            val nextPage = (pagerState.currentPage + 1) % projects.size
+            pagerState.animateScrollToPage(nextPage)
+        }
+    }
 
     Column {
         HorizontalPager(

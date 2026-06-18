@@ -11,6 +11,8 @@ import org.cyblight.android.data.preferences.AppLockTimeout
 import org.cyblight.android.data.preferences.RootBackBehavior
 import org.cyblight.android.data.preferences.SwipeBackEdgeWidth
 import org.cyblight.android.data.preferences.SwipeBackSensitivity
+import org.cyblight.android.data.preferences.ChatDefaultTheme
+import org.cyblight.android.data.preferences.ChatFontSize
 import org.cyblight.android.data.preferences.ThemeMode
 import org.cyblight.android.data.repository.SecurityOverview
 import org.cyblight.android.ui.security.SecurityScreen
@@ -61,9 +63,15 @@ fun SettingsScreen(
     onPickBackupFile: (onPicked: (String) -> Unit) -> Unit,
     onSaveBackupFile: (fileName: String, content: String, onResult: (Boolean?) -> Unit) -> Unit,
     chatFormatToolbarHidden: Boolean = false,
+    chatDefaultTheme: ChatDefaultTheme = ChatDefaultTheme.SYSTEM,
+    chatSendWithEnter: Boolean = false,
+    chatFontSize: ChatFontSize = ChatFontSize.MEDIUM,
     encryptionReminderHidden: Boolean = false,
     isChatsTransferBusy: Boolean = false,
     onChatFormatToolbarHiddenChange: (Boolean) -> Unit = {},
+    onChatDefaultThemeSelected: (ChatDefaultTheme) -> Unit = {},
+    onChatSendWithEnterChange: (Boolean) -> Unit = {},
+    onChatFontSizeSelected: (ChatFontSize) -> Unit = {},
     onEncryptionReminderHiddenChange: (Boolean) -> Unit = {},
     onExportChats: () -> Unit = {},
     onImportChats: () -> Unit = {},
@@ -71,11 +79,16 @@ fun SettingsScreen(
     onChatBackupFocused: () -> Unit = {},
     isGoogleDriveConfigured: Boolean = false,
     googleDriveAccountLabel: String? = null,
+    googleDriveAccountEmail: String? = null,
+    googleDriveAccountEmails: List<String> = emptyList(),
     googleDriveBackupMetadata: org.cyblight.android.integrations.google_drive.DriveBackupMetadata? = null,
+    googleDriveStorageQuota: org.cyblight.android.integrations.google_drive.GoogleDriveStorageQuota? = null,
+    onOpenGoogleStorage: () -> Unit = {},
     onGoogleDriveSignIn: () -> Unit = {},
+    onGoogleDriveAccountSelected: (String?) -> Unit = {},
     onRefreshGoogleDriveStatus: suspend () -> Unit = {},
-    onUploadGoogleDriveBackup: suspend (password: String, onProgress: (Int, String) -> Unit) -> Result<Unit> = { _, _ -> Result.success(Unit) },
-    onRestoreGoogleDriveBackup: suspend (password: String, onProgress: (Int, String) -> Unit) -> Result<org.cyblight.android.crypto.backup.BackupRestoreStats> = { _, _ -> Result.success(org.cyblight.android.crypto.backup.BackupRestoreStats()) },
+    onUploadGoogleDriveBackup: suspend (password: String?, onProgress: (Int, String) -> Unit) -> Result<Unit> = { _, _ -> Result.success(Unit) },
+    onRestoreGoogleDriveBackup: suspend (password: String?, onProgress: (Int, String) -> Unit) -> Result<org.cyblight.android.crypto.backup.BackupRestoreStats> = { _, _ -> Result.success(org.cyblight.android.crypto.backup.BackupRestoreStats()) },
     onDeleteGoogleDriveBackup: suspend () -> Result<Boolean> = { Result.success(false) },
     onGoogleDriveSignOut: suspend () -> Unit = {},
     chatBackupFrequency: org.cyblight.android.data.preferences.ChatBackupFrequency =
@@ -86,6 +99,10 @@ fun SettingsScreen(
     onChatBackupOverCellularChange: (Boolean) -> Unit = {},
     onEnableAutoBackup: suspend (org.cyblight.android.data.preferences.ChatBackupFrequency, String) -> Result<Unit> =
         { _, _ -> Result.success(Unit) },
+    onSaveBackupPassword: suspend (String) -> Result<Unit> = { Result.success(Unit) },
+    onChangeBackupPassword: suspend (String, String) -> Result<Unit> = { _, _ -> Result.success(Unit) },
+    onDisableBackupPassword: suspend () -> Result<Unit> = { Result.success(Unit) },
+    onClearStoredBackupPassword: suspend () -> Result<Unit> = { Result.success(Unit) },
     securityOverview: SecurityOverview? = null,
     isSecurityLoading: Boolean = false,
     isSecurityRefreshing: Boolean = false,
@@ -115,7 +132,10 @@ fun SettingsScreen(
     val sectionBack: () -> Unit = {
         when (settingsSection) {
             SettingsSection.Hub -> onBack()
-            SettingsSection.ChatBackup -> onSettingsSectionChange(SettingsSection.Chats)
+            SettingsSection.ChatBackup,
+            SettingsSection.ChatTheme,
+            SettingsSection.ChatFontSize,
+            -> onSettingsSectionChange(SettingsSection.Chats)
             else -> onSettingsSectionChange(SettingsSection.Hub)
         }
     }
@@ -125,6 +145,8 @@ fun SettingsScreen(
         SettingsSection.Security -> stringResource(R.string.nav_tab_security)
         SettingsSection.AppLock -> stringResource(R.string.settings_hub_app_lock_title)
         SettingsSection.Chats -> stringResource(R.string.settings_section_chats)
+        SettingsSection.ChatTheme -> stringResource(R.string.settings_chats_default_theme)
+        SettingsSection.ChatFontSize -> stringResource(R.string.settings_chats_font_size)
         SettingsSection.ChatBackup -> stringResource(R.string.settings_chats_backup_item)
         SettingsSection.Notifications -> stringResource(R.string.settings_section_notifications)
         SettingsSection.Appearance -> stringResource(R.string.settings_section_appearance)
@@ -190,14 +212,38 @@ fun SettingsScreen(
             }
             SettingsSection.Chats -> {
                 SettingsChatsSection(
+                    chatDefaultTheme = chatDefaultTheme,
+                    chatSendWithEnter = chatSendWithEnter,
+                    chatFontSize = chatFontSize,
                     chatFormatToolbarHidden = chatFormatToolbarHidden,
                     encryptionReminderHidden = encryptionReminderHidden,
                     isChatsTransferBusy = isChatsTransferBusy,
+                    onOpenChatTheme = { onSettingsSectionChange(SettingsSection.ChatTheme) },
+                    onChatSendWithEnterChange = onChatSendWithEnterChange,
+                    onOpenChatFontSize = { onSettingsSectionChange(SettingsSection.ChatFontSize) },
                     onChatFormatToolbarHiddenChange = onChatFormatToolbarHiddenChange,
                     onEncryptionReminderHiddenChange = onEncryptionReminderHiddenChange,
                     onOpenChatBackup = { onSettingsSectionChange(SettingsSection.ChatBackup) },
                     onExportChats = onExportChats,
                     onImportChats = onImportChats,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                )
+            }
+            SettingsSection.ChatTheme -> {
+                ChatDefaultThemeScreen(
+                    selectedTheme = chatDefaultTheme,
+                    onThemeSelected = onChatDefaultThemeSelected,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                )
+            }
+            SettingsSection.ChatFontSize -> {
+                ChatFontSizeScreen(
+                    selectedSize = chatFontSize,
+                    onSizeSelected = onChatFontSizeSelected,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding),
@@ -213,9 +259,14 @@ fun SettingsScreen(
                     accountLogin = accountLogin,
                     isGoogleDriveConfigured = isGoogleDriveConfigured,
                     googleDriveAccountLabel = googleDriveAccountLabel,
+                    googleDriveAccountEmail = googleDriveAccountEmail,
+                    googleDriveAccountEmails = googleDriveAccountEmails,
                     googleDriveBackupMetadata = googleDriveBackupMetadata,
+                    googleDriveStorageQuota = googleDriveStorageQuota,
+                    onOpenGoogleStorage = onOpenGoogleStorage,
                     onRefreshGoogleDriveStatus = onRefreshGoogleDriveStatus,
                     onGoogleDriveSignIn = onGoogleDriveSignIn,
+                    onGoogleDriveAccountSelected = onGoogleDriveAccountSelected,
                     onGoogleDriveSignOut = onGoogleDriveSignOut,
                     onUploadGoogleDriveBackup = onUploadGoogleDriveBackup,
                     onRestoreGoogleDriveBackup = onRestoreGoogleDriveBackup,
@@ -226,6 +277,10 @@ fun SettingsScreen(
                     onChatBackupFrequencySelected = onChatBackupFrequencySelected,
                     onChatBackupOverCellularChange = onChatBackupOverCellularChange,
                     onEnableAutoBackup = onEnableAutoBackup,
+                    onSaveBackupPassword = onSaveBackupPassword,
+                    onChangeBackupPassword = onChangeBackupPassword,
+                    onDisableBackupPassword = onDisableBackupPassword,
+                    onClearStoredBackupPassword = onClearStoredBackupPassword,
                     onCreateSignalBackup = onCreateSignalBackup,
                     onRestoreSignalBackup = onRestoreSignalBackup,
                     signalBackupErrorMessage = signalBackupErrorMessage,
