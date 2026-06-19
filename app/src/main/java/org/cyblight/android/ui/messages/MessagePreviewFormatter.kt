@@ -1,7 +1,9 @@
 package org.cyblight.android.ui.messages
 
+import android.content.Context
+import org.cyblight.android.R
+
 object MessagePreviewFormatter {
-    private const val SPOILER_MARKER = "[[spoiler]]"
     private const val DEFAULT_MAX_LEN = 120
 
     fun formatConversationPreview(
@@ -19,6 +21,31 @@ object MessagePreviewFormatter {
         }
     }
 
+    fun formatReactionPreview(
+        context: Context,
+        currentUserId: String,
+        actorId: String,
+        actorLogin: String,
+        emoji: String,
+        messageSnippet: String,
+    ): String {
+        val trimmedEmoji = emoji.trim()
+        return if (actorId == currentUserId) {
+            if (trimmedEmoji.isEmpty()) {
+                context.getString(R.string.chat_reaction_preview_you_no_emoji, messageSnippet)
+            } else {
+                context.getString(R.string.chat_reaction_preview_you, trimmedEmoji, messageSnippet)
+            }
+        } else {
+            val actor = actorLogin.ifBlank { actorId }
+            if (trimmedEmoji.isEmpty()) {
+                context.getString(R.string.chat_reaction_preview_other_no_emoji, actor, messageSnippet)
+            } else {
+                context.getString(R.string.chat_reaction_preview_other, actor, trimmedEmoji, messageSnippet)
+            }
+        }
+    }
+
     fun truncatePreviewText(content: String, fallback: String, maxLen: Int = DEFAULT_MAX_LEN): String {
         val plain = stripPreviewFormatting(content)
             .replace(Regex("""\s+"""), " ")
@@ -29,17 +56,10 @@ object MessagePreviewFormatter {
     }
 
     private fun stripPreviewFormatting(content: String): String {
-        return maskSpoilersForPreview(ChatFormatUtils.stripMetadataTokens(content))
+        val withoutMetadata = ChatFormatUtils.stripMetadataTokens(content)
             .replace(Regex("""\[reply:[^\]]+]""", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("""\*\*(.+?)\*\*"""), "$1")
-            .replace(Regex("""__(.+?)__"""), "$1")
-            .replace(Regex("""_(.+?)_"""), "$1")
-            .replace(Regex("""~~(.+?)~~"""), "$1")
-            .replace(Regex("""`(.+?)`"""), "$1")
-            .replace(Regex("""(?m)^>\s?"""), "")
-    }
 
-    private fun maskSpoilersForPreview(content: String): String {
-        return content.replace(Regex("""\|\|([^|]+)\|\|"""), SPOILER_MARKER)
+        val withoutSpoilers = withoutMetadata.replace(Regex("""\|\|([\s\S]+?)\|\|"""), "…")
+        return ChatInlineMarkdown.toPlainText(withoutSpoilers)
     }
 }

@@ -153,6 +153,60 @@ interface CybLightApi {
     @POST("auth/easter/archivist")
     suspend fun unlockArchivist(): EasterUnlockResponse
 
+    @POST("auth/easter/typographer")
+    suspend fun unlockTypographer(): EasterUnlockResponse
+
+    @POST("auth/easter/spoiler-hunter")
+    suspend fun unlockSpoilerHunter(): EasterUnlockResponse
+
+    @POST("auth/easter/no-markers")
+    suspend fun unlockNoMarkers(): EasterUnlockResponse
+
+    @POST("auth/easter/enter-master")
+    suspend fun unlockEnterMaster(): EasterUnlockResponse
+
+    @POST("auth/easter/font-extremes")
+    suspend fun unlockFontExtremes(): EasterUnlockResponse
+
+    @POST("auth/easter/cloud-keeper")
+    suspend fun unlockCloudKeeper(): EasterUnlockResponse
+
+    @POST("auth/easter/drive-pilot")
+    suspend fun unlockDrivePilot(): EasterUnlockResponse
+
+    @POST("auth/easter/live-wire")
+    suspend fun unlockLiveWire(): EasterUnlockResponse
+
+    @POST("auth/easter/from-shadow")
+    suspend fun unlockFromShadow(): EasterUnlockResponse
+
+    @POST("auth/easter/watchman")
+    suspend fun unlockWatchman(): EasterUnlockResponse
+
+    @POST("auth/easter/carousel-watcher")
+    suspend fun unlockCarouselWatcher(): EasterUnlockResponse
+
+    @POST("auth/easter/synchronist")
+    suspend fun unlockSynchronist(): EasterUnlockResponse
+
+    @POST("auth/easter/quote-day")
+    suspend fun unlockQuoteDay(): EasterUnlockResponse
+
+    @POST("auth/easter/midnight-editor")
+    suspend fun unlockMidnightEditor(): EasterUnlockResponse
+
+    @POST("auth/easter/polyglot-friend")
+    suspend fun unlockPolyglotFriend(): EasterUnlockResponse
+
+    @POST("auth/easter/silence")
+    suspend fun unlockSilence(): EasterUnlockResponse
+
+    @POST("auth/easter/reaction-streak")
+    suspend fun unlockReactionStreak(): EasterUnlockResponse
+
+    @POST("auth/easter/touch-format-app")
+    suspend fun touchFormatApp(): FormatMirrorTouchResponse
+
     @GET("auth/passkey/list")
     suspend fun passkeyList(): PasskeyListResponse
 

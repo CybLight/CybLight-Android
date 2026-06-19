@@ -20,6 +20,7 @@ object ConversationPreviewEnricher {
         val selfPrefix = { preview: String -> context.getString(R.string.chat_preview_you, preview) }
         val fallback = context.getString(R.string.message_preview_fallback)
         val decryptFailed = context.getString(R.string.message_preview_decrypt_failed)
+        val encryptedSnippet = context.getString(R.string.message_preview_encrypted_snippet)
 
         val pending = previews.mapNotNull { (friendId, entry) ->
             val wire = entry.lastMessage ?: return@mapNotNull null
@@ -44,16 +45,30 @@ object ConversationPreviewEnricher {
             pending.forEach { (friendId, entry, wire) ->
                 val key = wire.id.ifBlank { "${wire.senderId}:${wire.content}" }
                 val text = decryptedById[key] ?: return@forEach
-                put(
-                    friendId,
+                val formatted = if (entry.kind == "reaction") {
+                    val snippet = MessagePreviewFormatter.truncatePreviewText(
+                        content = text,
+                        fallback = encryptedSnippet,
+                        maxLen = 80,
+                    )
+                    MessagePreviewFormatter.formatReactionPreview(
+                        context = context,
+                        currentUserId = userId,
+                        actorId = entry.actorId.orEmpty(),
+                        actorLogin = entry.actorLogin.orEmpty(),
+                        emoji = entry.reactionEmoji.orEmpty(),
+                        messageSnippet = snippet,
+                    )
+                } else {
                     MessagePreviewFormatter.formatConversationPreview(
                         currentUserId = userId,
                         senderId = wire.senderId,
                         text = text,
                         previewYou = selfPrefix,
                         fallback = fallback,
-                    ),
-                )
+                    )
+                }
+                put(friendId, formatted)
             }
         }
     }

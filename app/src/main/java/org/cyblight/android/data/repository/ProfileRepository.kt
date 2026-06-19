@@ -2,6 +2,7 @@ package org.cyblight.android.data.repository
 
 import org.cyblight.android.data.api.CybLightApi
 import org.cyblight.android.data.api.EasterFlagsDto
+import org.cyblight.android.data.api.FormatMirrorTouchResponse
 import org.cyblight.android.data.api.FriendDto
 import org.cyblight.android.data.api.ProfileDto
 import org.cyblight.android.data.api.ProfileResponse
@@ -41,6 +42,49 @@ class ProfileRepository(private val api: CybLightApi) {
     suspend fun unlockEcho(): Result<Unit> = unlockEaster { api.unlockEcho().ok }
 
     suspend fun unlockArchivist(): Result<Unit> = unlockEaster { api.unlockArchivist().ok }
+
+    suspend fun unlockTypographer(): Result<Unit> = unlockEaster { api.unlockTypographer().ok }
+
+    suspend fun unlockSpoilerHunter(): Result<Unit> = unlockEaster { api.unlockSpoilerHunter().ok }
+
+    suspend fun unlockNoMarkers(): Result<Unit> = unlockEaster { api.unlockNoMarkers().ok }
+
+    suspend fun unlockEnterMaster(): Result<Unit> = unlockEaster { api.unlockEnterMaster().ok }
+
+    suspend fun unlockFontExtremes(): Result<Unit> = unlockEaster { api.unlockFontExtremes().ok }
+
+    suspend fun unlockCloudKeeper(): Result<Unit> = unlockEaster { api.unlockCloudKeeper().ok }
+
+    suspend fun unlockDrivePilot(): Result<Unit> = unlockEaster { api.unlockDrivePilot().ok }
+
+    suspend fun unlockLiveWire(): Result<Unit> = unlockEaster { api.unlockLiveWire().ok }
+
+    suspend fun unlockFromShadow(): Result<Unit> = unlockEaster { api.unlockFromShadow().ok }
+
+    suspend fun unlockWatchman(): Result<Unit> = unlockEaster { api.unlockWatchman().ok }
+
+    suspend fun unlockCarouselWatcher(): Result<Unit> = unlockEaster { api.unlockCarouselWatcher().ok }
+
+    suspend fun unlockSynchronist(): Result<Unit> = unlockEaster { api.unlockSynchronist().ok }
+
+    suspend fun unlockQuoteDay(): Result<Unit> = unlockEaster { api.unlockQuoteDay().ok }
+
+    suspend fun unlockMidnightEditor(): Result<Unit> = unlockEaster { api.unlockMidnightEditor().ok }
+
+    suspend fun unlockPolyglotFriend(): Result<Unit> = unlockEaster { api.unlockPolyglotFriend().ok }
+
+    suspend fun unlockSilence(): Result<Unit> = unlockEaster { api.unlockSilence().ok }
+
+    suspend fun unlockReactionStreak(): Result<Unit> = unlockEaster { api.unlockReactionStreak().ok }
+
+    suspend fun touchFormatApp(): Result<FormatMirrorTouchResponse> {
+        return try {
+            val response = api.touchFormatApp()
+            if (response.ok) Result.success(response) else Result.failure(Exception("format_touch_failed"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
     private suspend fun unlockEaster(call: suspend () -> Boolean): Result<Unit> {
         return try {

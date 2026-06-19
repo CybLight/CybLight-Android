@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import org.cyblight.android.ui.AppScreen
 import org.cyblight.android.ui.DetailScreen
+import org.cyblight.android.ui.easter.EasterUnlockCelebrationDialog
 import org.cyblight.android.ui.easter.LightCatcherGameDialog
 import org.cyblight.android.ui.profile.ProfileScreen
 import org.cyblight.android.ui.security.LoginHistoryScreen
@@ -474,6 +475,7 @@ class MainActivity : AppCompatActivity() {
                                     }
                                 },
                                 onGoogleDriveAccountSelected = { email ->
+                                    viewModel.onGoogleDriveAccountPickerInteraction()
                                     coroutineScope.launch {
                                         googleDriveSignInLauncher.launch(
                                             viewModel.prepareGoogleDriveSignInIntent(
@@ -704,6 +706,7 @@ class MainActivity : AppCompatActivity() {
                                     chatFriendIsOnline = uiState.chatFriendIsOnline,
                                     chatFriendLastSeenAt = uiState.chatFriendLastSeenAt,
                                     chatMessages = uiState.chatMessages,
+                                    chatExitingMessageIds = uiState.chatExitingMessageIds,
                                     chatPinnedMessage = uiState.chatPinnedMessage,
                                     chatReplyTarget = uiState.chatReplyTarget,
                                     chatEditTarget = uiState.chatEditTarget,
@@ -742,6 +745,8 @@ class MainActivity : AppCompatActivity() {
                                     onOpenChat = viewModel::openChat,
                                     onCloseChat = viewModel::closeChat,
                                     onSendMessage = viewModel::sendMessage,
+                                    onFormatFromMenu = viewModel::onDraftFormattedViaMenu,
+                                    onSpoilerRevealed = viewModel::onSpoilerRevealed,
                                     onClearChatReply = viewModel::clearChatReply,
                                     onClearChatEdit = viewModel::clearChatEdit,
                                     onStartChatReply = viewModel::startChatReply,
@@ -771,6 +776,7 @@ class MainActivity : AppCompatActivity() {
                                     onOpenChangelog = viewModel::openChangelog,
                                     homeWhatsNewBannerHidden = uiState.homeWhatsNewBannerHidden,
                                     onHomeWhatsNewBannerHiddenChange = viewModel::setHomeWhatsNewBannerHidden,
+                                    onHomeCarouselTick = { viewModel.trackHomeCarouselSeconds(5) },
                                     encryptionReminderChatDismissed = uiState.encryptionReminderChatDismissed,
                                     onDismissEncryptionReminderChat = viewModel::dismissEncryptionReminderChat,
                                     onOpenSecurityBackup = viewModel::openChatBackup,
@@ -820,6 +826,14 @@ class MainActivity : AppCompatActivity() {
                             isUnlocking = uiState.lightCatcherUnlocking,
                             onDismiss = viewModel::dismissLightCatcherGame,
                             onWin = viewModel::onLightCatcherGameWon,
+                        )
+                    }
+
+                    uiState.easterCelebration?.let { celebrationKind ->
+                        EasterUnlockCelebrationDialog(
+                            kind = celebrationKind,
+                            onDismiss = viewModel::dismissEasterCelebration,
+                            onViewCollection = viewModel::openEasterTabFromCelebration,
                         )
                     }
 

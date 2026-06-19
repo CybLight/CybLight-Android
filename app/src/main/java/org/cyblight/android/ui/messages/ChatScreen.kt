@@ -1,6 +1,10 @@
 package org.cyblight.android.ui.messages
 
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -83,6 +87,7 @@ fun ChatScreen(
     friendIsOnline: Boolean,
     friendLastSeenAt: Long?,
     messages: List<MessageDto>,
+    exitingMessageIds: Set<String> = emptySet(),
     pinnedMessage: PinnedMessageDto?,
     friends: List<FriendDto>,
     currentUserId: String,
@@ -101,7 +106,9 @@ fun ChatScreen(
     onFormatToolbarHiddenChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onOpenProfile: (username: String) -> Unit,
-    onSend: (String) -> Unit,
+    onSend: (String, Boolean) -> Unit,
+    onFormatFromMenu: () -> Unit = {},
+    onSpoilerRevealed: () -> Unit = {},
     onClearReply: () -> Unit,
     onClearEdit: () -> Unit,
     onStartReply: (MessageDto) -> Unit,
@@ -426,46 +433,55 @@ fun ChatScreen(
                                         val message = item.message
                                         val isMine = message.senderId == currentUserId
                                         val isSelected = selectedIds.contains(message.id)
-                                        MessageBubble(
-                                            message = message,
-                                            isMine = isMine,
-                                            isSelectionMode = selectionMode,
-                                            isSelected = isSelected,
-                                            isHighlighted = highlightMessageId == message.id,
-                                            chatPalette = chatPalette,
-                                            fontScale = chatFontScale,
-                                            onReplyJump = { targetId -> scrollToMessageId(targetId) },
-                                            onReact = { emoji -> onReactMessage(message.id, emoji) },
-                                            onTap = {
-                                                if (selectionMode) {
-                                                    selectedIds = if (isSelected) {
-                                                        selectedIds - message.id
+                                        AnimatedVisibility(
+                                            visible = message.id !in exitingMessageIds,
+                                            exit = shrinkVertically(
+                                                animationSpec = tween(220),
+                                                shrinkTowards = Alignment.Top,
+                                            ) + fadeOut(animationSpec = tween(180)),
+                                        ) {
+                                            MessageBubble(
+                                                message = message,
+                                                isMine = isMine,
+                                                isSelectionMode = selectionMode,
+                                                isSelected = isSelected,
+                                                isHighlighted = highlightMessageId == message.id,
+                                                chatPalette = chatPalette,
+                                                fontScale = chatFontScale,
+                                                onReplyJump = { targetId -> scrollToMessageId(targetId) },
+                                                onReact = { emoji -> onReactMessage(message.id, emoji) },
+                                                onSpoilerRevealed = onSpoilerRevealed,
+                                                onTap = {
+                                                    if (selectionMode) {
+                                                        selectedIds = if (isSelected) {
+                                                            selectedIds - message.id
+                                                        } else {
+                                                            selectedIds + message.id
+                                                        }
                                                     } else {
-                                                        selectedIds + message.id
+                                                        menuState = MessageMenuState(
+                                                            message = message,
+                                                            isMine = isMine,
+                                                            isPinned = pinnedMessage?.messageId == message.id,
+                                                            canEdit = isMine && canEditMessage(message),
+                                                            hasLink = ChatFormatUtils.extractFirstUrl(message.content) != null,
+                                                        )
                                                     }
-                                                } else {
-                                                    menuState = MessageMenuState(
-                                                        message = message,
-                                                        isMine = isMine,
-                                                        isPinned = pinnedMessage?.messageId == message.id,
-                                                        canEdit = isMine && canEditMessage(message),
-                                                        hasLink = ChatFormatUtils.extractFirstUrl(message.content) != null,
-                                                    )
-                                                }
-                                            },
-                                            onLongPress = {
-                                                if (!selectionMode) {
-                                                    selectionMode = true
-                                                    selectedIds = setOf(message.id)
-                                                } else {
-                                                    selectedIds = if (isSelected) {
-                                                        selectedIds - message.id
+                                                },
+                                                onLongPress = {
+                                                    if (!selectionMode) {
+                                                        selectionMode = true
+                                                        selectedIds = setOf(message.id)
                                                     } else {
-                                                        selectedIds + message.id
+                                                        selectedIds = if (isSelected) {
+                                                            selectedIds - message.id
+                                                        } else {
+                                                            selectedIds + message.id
+                                                        }
                                                     }
-                                                }
-                                            },
-                                        )
+                                                },
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -552,9 +568,10 @@ fun ChatScreen(
                     onFormatToolbarHiddenChange = onFormatToolbarHiddenChange,
                     sendWithEnter = chatSendWithEnter,
                     isSending = isSending,
-                    onSend = { content ->
+                    onFormatFromMenu = onFormatFromMenu,
+                    onSend = { content, sentViaEnter ->
                         val wasEditing = editTarget != null
-                        onSend(content)
+                        onSend(content, sentViaEnter)
                         if (wasEditing) {
                             draft = TextFieldValue(savedDraft)
                         } else {
@@ -670,6 +687,7 @@ private fun MessageBubble(
     fontScale: Float,
     onReplyJump: (String) -> Unit,
     onReact: (String) -> Unit,
+    onSpoilerRevealed: () -> Unit,
     onTap: () -> Unit,
     onLongPress: () -> Unit,
 ) {
@@ -744,6 +762,7 @@ private fun MessageBubble(
                         linkColor = bubbleLinkColor,
                         messageId = message.id,
                         fontScale = fontScale,
+                        onSpoilerRevealed = onSpoilerRevealed,
                     )
                 }
             }

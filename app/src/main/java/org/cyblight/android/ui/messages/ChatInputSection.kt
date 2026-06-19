@@ -69,14 +69,15 @@ fun ChatInputSection(
     onFormatToolbarHiddenChange: (Boolean) -> Unit = {},
     sendWithEnter: Boolean = false,
     isSending: Boolean,
-    onSend: (String) -> Unit,
+    onSend: (String, Boolean) -> Unit,
+    onFormatFromMenu: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showEmojiPicker by remember { mutableStateOf(false) }
     var showLinkDialog by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    fun submitDraft() {
+    fun submitDraft(sentViaEnter: Boolean = false) {
         val text = draft.text.trim()
         if (text.isBlank() || isSending) return
         var content = text
@@ -85,7 +86,7 @@ fun ChatInputSection(
             content = ChatFormatUtils.appendNoPreviewToken(content, firstUrl)
         }
         onDraftChange(TextFieldValue())
-        onSend(content)
+        onSend(content, sentViaEnter)
     }
 
     if (showLinkDialog) {
@@ -181,6 +182,7 @@ fun ChatInputSection(
             draft = draft,
             onDraftChange = onDraftChange,
             onShowLinkDialog = { showLinkDialog = true },
+            onFormatFromMenu = onFormatFromMenu,
         )
 
         Row(
@@ -213,7 +215,7 @@ fun ChatInputSection(
                             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                             if (event.key != Key.Enter && event.key != Key.NumPadEnter) return@onPreviewKeyEvent false
                             if (event.isShiftPressed) return@onPreviewKeyEvent false
-                            submitDraft()
+                            submitDraft(sentViaEnter = true)
                             true
                         },
                     maxLines = 4,

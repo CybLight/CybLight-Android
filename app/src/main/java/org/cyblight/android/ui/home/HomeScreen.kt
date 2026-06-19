@@ -5,7 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
@@ -64,6 +65,7 @@ fun HomeScreen(
     onRefresh: () -> Unit,
     onOpenUrl: (String) -> Unit,
     onOpenChangelog: () -> Unit,
+    onCarouselTick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     when {
@@ -109,6 +111,7 @@ fun HomeScreen(
                     ProjectsCarousel(
                         projects = content?.projects.orEmpty(),
                         onOpenUrl = onOpenUrl,
+                        onCarouselTick = onCarouselTick,
                     )
                 }
 
@@ -228,6 +231,7 @@ private fun WhatsNewBanner(
 private fun ProjectsCarousel(
     projects: List<HomeProjectItem>,
     onOpenUrl: (String) -> Unit,
+    onCarouselTick: () -> Unit = {},
 ) {
     if (projects.isEmpty()) {
         Text(
@@ -245,6 +249,7 @@ private fun ProjectsCarousel(
         if (projects.size <= 1) return@LaunchedEffect
         while (isActive) {
             delay(5_000)
+            onCarouselTick()
             val nextPage = (pagerState.currentPage + 1) % projects.size
             pagerState.animateScrollToPage(nextPage)
         }
@@ -298,38 +303,61 @@ private fun ProjectCard(
     project: HomeProjectItem,
     onOpenUrl: (String) -> Unit,
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onOpenUrl(project.url) },
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
     ) {
-        AsyncImage(
-            model = project.imageUrl,
-            contentDescription = project.title,
+        val isWideScreen = maxWidth >= 600.dp
+        val cardWidth = if (isWideScreen) {
+            minOf(maxWidth * 0.72f, 480.dp)
+        } else {
+            maxWidth
+        }
+        val imageHeight = if (isWideScreen) {
+            cardWidth / 1.55f
+        } else {
+            200.dp
+        }
+
+        Card(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(160.dp)
-                .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
-            contentScale = ContentScale.Crop,
-        )
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = project.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = project.description,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 6.dp),
-            )
-            if (project.tags.isNotEmpty()) {
-                Text(
-                    text = project.tags.joinToString(" · "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 8.dp),
+                .width(cardWidth)
+                .clickable { onOpenUrl(project.url) },
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(imageHeight)
+                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = project.imageUrl,
+                    contentDescription = project.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = if (isWideScreen) ContentScale.Fit else ContentScale.Crop,
                 )
+            }
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = project.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = project.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+                if (project.tags.isNotEmpty()) {
+                    Text(
+                        text = project.tags.joinToString(" · "),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
             }
         }
     }

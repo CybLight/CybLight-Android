@@ -17,6 +17,13 @@ class DecryptCache(context: Context) {
             .commit()
     }
 
+    fun remove(userId: String, messageId: String) {
+        if (messageId.isBlank()) return
+        prefs.edit()
+            .remove(cacheKey(userId, messageId))
+            .commit()
+    }
+
     fun readAllForUser(userId: String): Map<String, String> {
         val prefix = "decrypt_${userId}_"
         val out = linkedMapOf<String, String>()

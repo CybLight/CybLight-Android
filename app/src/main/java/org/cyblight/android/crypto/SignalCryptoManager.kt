@@ -131,6 +131,9 @@ class SignalCryptoManager(
         ensureRegistered(userId)
         val ctx = requireContext(userId)
         if (message.id.isNotBlank()) {
+            if (message.senderId != userId && message.editedAt != null) {
+                decryptCache.remove(userId, message.id)
+            }
             prefetchPlaintextSync(userId, listOf(message.id))
         }
         return decryptIncomingMessage(userId, message, ctx)
@@ -144,10 +147,16 @@ class SignalCryptoManager(
         val decryptedByKey = LinkedHashMap<String, String>()
 
         val syncCandidateIds = decryptOrder.mapNotNull { message ->
-            message.id.takeIf {
-                it.isNotBlank() &&
+            message.id.takeIf { id ->
+                id.isNotBlank() &&
                     message.encryption == "signal_v1" &&
-                    decryptCache.read(userId, it) == null
+                    ((message.senderId != userId && message.editedAt != null) ||
+                        decryptCache.read(userId, id) == null)
+            }
+        }
+        for (message in decryptOrder) {
+            if (message.senderId != userId && message.editedAt != null && message.id.isNotBlank()) {
+                decryptCache.remove(userId, message.id)
             }
         }
         prefetchPlaintextSync(userId, syncCandidateIds)

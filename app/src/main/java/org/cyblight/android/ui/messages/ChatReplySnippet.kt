@@ -80,7 +80,7 @@ fun ChatReplySnippet(
                 lineHeight = 16.sp,
             )
             Text(
-                text = text,
+                text = MessagePreviewFormatter.truncatePreviewText(text, text, maxLen = 120),
                 color = bodyColor,
                 fontSize = 12.sp,
                 lineHeight = 16.sp,

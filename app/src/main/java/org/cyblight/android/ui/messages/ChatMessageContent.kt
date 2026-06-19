@@ -51,6 +51,7 @@ fun ChatMessageContent(
     modifier: Modifier = Modifier,
     enableLinkPreview: Boolean = true,
     fontScale: Float = 1f,
+    onSpoilerRevealed: () -> Unit = {},
 ) {
     val parsed = remember(rawContent, linkColor) {
         ChatMessageParser.parseWithSpoilers(rawContent, linkColor)
@@ -62,9 +63,11 @@ fun ChatMessageContent(
             RenderChatMessagePart(
                 part = part,
                 textColor = textColor,
+                linkColor = linkColor,
                 messageId = messageId,
                 revealedSpoilers = revealedSpoilers,
                 fontScale = fontScale,
+                onSpoilerRevealed = onSpoilerRevealed,
             )
         }
 
@@ -83,9 +86,11 @@ fun ChatMessageContent(
 private fun RenderChatMessagePart(
     part: ChatMessagePart,
     textColor: Color,
+    linkColor: Color,
     messageId: String,
     revealedSpoilers: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Boolean>,
     fontScale: Float,
+    onSpoilerRevealed: () -> Unit,
 ) {
     when (part) {
         is ChatMessagePart.Text -> {
@@ -128,9 +133,13 @@ private fun RenderChatMessagePart(
             val key = "$messageId-spoiler-${part.id}"
             val revealed = revealedSpoilers[key] == true
             SpoilerText(
-                text = part.text,
+                markdown = part.text,
+                linkColor = linkColor,
                 revealed = revealed,
-                onReveal = { revealedSpoilers[key] = true },
+                onReveal = {
+                    revealedSpoilers[key] = true
+                    onSpoilerRevealed()
+                },
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
                     color = textColor,
                     fontSize = MaterialTheme.typography.bodyMedium.fontSize * fontScale,
@@ -155,9 +164,11 @@ private fun RenderChatMessagePart(
                         RenderChatMessagePart(
                             part = inner,
                             textColor = textColor.copy(alpha = 0.88f),
+                            linkColor = linkColor,
                             messageId = messageId,
                             revealedSpoilers = revealedSpoilers,
                             fontScale = fontScale,
+                            onSpoilerRevealed = onSpoilerRevealed,
                         )
                     }
                 }

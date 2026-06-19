@@ -59,6 +59,7 @@ class AppPreferences(private val context: Context) {
     private val lastAutoBackupSuccessMsKey = longPreferencesKey("last_auto_backup_success_ms")
     private val driveRestoreDismissedUserKey = stringPreferencesKey("drive_restore_dismissed_user")
     private val easterTelegramLoggedKey = stringSetPreferencesKey("easter_telegram_logged")
+    private val v010EasterProgressKey = stringPreferencesKey("v010_easter_progress")
 
     private fun chatDraftKey(friendId: String) = stringPreferencesKey("chat_draft_$friendId")
 
@@ -513,6 +514,44 @@ class AppPreferences(private val context: Context) {
 
     private fun easterTelegramEntryKey(userName: String, eggKey: String): String =
         "${userName.trim().lowercase()}:$eggKey"
+
+    suspend fun getV010EasterProgress(): V010EasterProgressSnapshot {
+        val raw = context.appPreferencesStore.data.first()[v010EasterProgressKey] ?: return V010EasterProgressSnapshot()
+        val parts = raw.split('\t')
+        if (parts.size < 9) return V010EasterProgressSnapshot()
+        return V010EasterProgressSnapshot(
+            spoilerReveals = parts[0].toIntOrNull()?.coerceAtLeast(0) ?: 0,
+            enterSendCount = parts[1].toIntOrNull()?.coerceAtLeast(0) ?: 0,
+            driveAccountPicks = parts[2].toIntOrNull()?.coerceAtLeast(0) ?: 0,
+            watchmanOpens = parts[3].toIntOrNull()?.coerceAtLeast(0) ?: 0,
+            carouselSeconds = parts[4].toIntOrNull()?.coerceAtLeast(0) ?: 0,
+            quoteCount = parts[5].toIntOrNull()?.coerceAtLeast(0) ?: 0,
+            reactionStreak = parts[6].toIntOrNull()?.coerceAtLeast(0) ?: 0,
+            reactionStreakChatId = parts[7].ifBlank { null },
+            polyglotLocales = parts[8].split(',').filter { it.isNotBlank() }.toSet(),
+            fontMinSent = parts.getOrNull(9) == "1",
+            fontMaxSent = parts.getOrNull(10) == "1",
+        )
+    }
+
+    suspend fun saveV010EasterProgress(progress: V010EasterProgressSnapshot) {
+        val encoded = listOf(
+            progress.spoilerReveals.toString(),
+            progress.enterSendCount.toString(),
+            progress.driveAccountPicks.toString(),
+            progress.watchmanOpens.toString(),
+            progress.carouselSeconds.toString(),
+            progress.quoteCount.toString(),
+            progress.reactionStreak.toString(),
+            progress.reactionStreakChatId.orEmpty(),
+            progress.polyglotLocales.joinToString(","),
+            if (progress.fontMinSent) "1" else "0",
+            if (progress.fontMaxSent) "1" else "0",
+        ).joinToString("\t")
+        context.appPreferencesStore.edit { prefs ->
+            prefs[v010EasterProgressKey] = encoded
+        }
+    }
 }
 
 data class ArchivistProgressSnapshot(
@@ -521,4 +560,18 @@ data class ArchivistProgressSnapshot(
     val edited: Boolean = false,
     val reacted: Boolean = false,
     val forwarded: Boolean = false,
+)
+
+data class V010EasterProgressSnapshot(
+    val spoilerReveals: Int = 0,
+    val enterSendCount: Int = 0,
+    val driveAccountPicks: Int = 0,
+    val watchmanOpens: Int = 0,
+    val carouselSeconds: Int = 0,
+    val quoteCount: Int = 0,
+    val reactionStreak: Int = 0,
+    val reactionStreakChatId: String? = null,
+    val polyglotLocales: Set<String> = emptySet(),
+    val fontMinSent: Boolean = false,
+    val fontMaxSent: Boolean = false,
 )

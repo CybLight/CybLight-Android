@@ -2,6 +2,56 @@ package org.cyblight.android.data.home
 
 object ChangelogLocalizedNotes {
     private val notes: Map<String, Map<String, String>> = mapOf(
+        "0.9.1" to mapOf(
+            "ru" to """
+                Что нового
+
+                - 🎉 Добавлена полноценная система Easter Eggs (с UI, логикой и локализацией)
+                - 💬 Большое обновление чата (markdown, spoilers, replies, selection, parser)
+                - 🔐 Улучшения криптографии и кэша расшифровки
+                - 🌐 Обновление API
+                - ⚙️ Обновления настроек приложения
+                - 🧩 Рефакторинг UI (Main/Home/Chat screens)
+                - 🌍 Новые строки локализации
+                - 🔧 Возможны баги в приложении (буду фиксить позже, сообщайте если найдете какой-то баг)
+
+                Установка
+
+                Скачайте APK ниже или на сайте: https://cyblight.org/ru/downloads/
+            """.trimIndent(),
+            "en" to """
+                What's New
+
+                - 🎉 Added a full-fledged Easter Eggs system (with UI, logic, and localization)
+                - 💬 Major chat update (Markdown, spoilers, replies, text selection, parser)
+                - 🔐 Improvements to cryptography and the decryption cache
+                - 🌐 API update
+                - ⚙️ Updates to app settings
+                - 🧩 UI refactoring (Main/Home/Chat screens)
+                - 🌍 New localization strings
+                - 🔧 There may be bugs in the app (I’ll fix them later; please let me know if you find any)
+
+                Installation
+
+                Download the APK below or from the website: https://cyblight.org/ru/downloads/
+            """.trimIndent(),
+            "uk" to """
+                Що нового
+
+                - 🎉 Додано повноцінну систему «пасхалок» (з інтерфейсом, логікою та локалізацією)
+                - 💬 Велике оновлення чату (markdown, spoilers, replies, selection, parser)
+                - 🔐 Покращення криптографії та кешу розшифрування
+                - 🌐 Оновлення API
+                - ⚙️ Оновлення налаштувань додатка
+                - 🧩 Рефакторинг інтерфейсу (екрани Main/Home/Chat)
+                - 🌍 Нові рядки локалізації
+                - 🔧 Можливі помилки в додатку (виправлятиму пізніше, повідомляйте, якщо знайдете якусь помилку)
+
+                Встановлення
+
+                Завантажте APK нижче або на сайті: https://cyblight.org/ru/downloads/
+            """.trimIndent(),
+        ),
         "0.9.0" to mapOf(
             "ru" to """
                 Что нового

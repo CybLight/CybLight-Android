@@ -62,6 +62,7 @@ fun ChatTextSelectionBar(
     draft: TextFieldValue,
     onDraftChange: (TextFieldValue) -> Unit,
     onShowLinkDialog: () -> Unit,
+    onFormatFromMenu: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (!ChatFormatActions.hasSelection(draft)) return
@@ -95,6 +96,7 @@ fun ChatTextSelectionBar(
                     draft = draft,
                     onDraftChange = onDraftChange,
                     onShowLinkDialog = onShowLinkDialog,
+                    onFormatFromMenu = onFormatFromMenu,
                     onBack = { showFormatMenu = false },
                 )
             } else {
@@ -157,8 +159,13 @@ private fun FormatSelectionMenu(
     draft: TextFieldValue,
     onDraftChange: (TextFieldValue) -> Unit,
     onShowLinkDialog: () -> Unit,
+    onFormatFromMenu: () -> Unit,
     onBack: () -> Unit,
 ) {
+    fun formatAction(action: () -> Unit) {
+        onFormatFromMenu()
+        action()
+    }
     Column(
         modifier = Modifier
             .widthIn(min = 220.dp, max = 280.dp)
@@ -174,56 +181,58 @@ private fun FormatSelectionMenu(
             FormatMenuItem(
                 icon = Icons.Outlined.FormatQuote,
                 text = stringResource(R.string.chat_format_quote),
-                onClick = { ChatFormatActions.insertBlockquote(draft, onDraftChange) },
+                onClick = { formatAction { ChatFormatActions.insertBlockquote(draft, onDraftChange) } },
             )
             FormatMenuItem(
                 icon = Icons.Outlined.BlurOn,
                 text = stringResource(R.string.chat_format_spoiler),
-                onClick = { ChatFormatActions.wrapSelection(draft, onDraftChange, "||", "||") },
+                onClick = { formatAction { ChatFormatActions.wrapSelection(draft, onDraftChange, "||", "||") } },
             )
             FormatMenuItem(
                 icon = Icons.Outlined.FormatBold,
                 text = stringResource(R.string.chat_format_bold),
-                onClick = { ChatFormatActions.wrapSelection(draft, onDraftChange, "**", "**") },
+                onClick = { formatAction { ChatFormatActions.wrapSelection(draft, onDraftChange, "**", "**") } },
             )
             FormatMenuItem(
                 icon = Icons.Outlined.FormatItalic,
                 text = stringResource(R.string.chat_format_italic),
-                onClick = { ChatFormatActions.wrapSelection(draft, onDraftChange, "_", "_") },
+                onClick = { formatAction { ChatFormatActions.wrapSelection(draft, onDraftChange, "_", "_") } },
             )
             FormatMenuItem(
                 icon = Icons.Outlined.Code,
                 text = stringResource(R.string.chat_format_mono),
-                onClick = { ChatFormatActions.wrapSelection(draft, onDraftChange, "`", "`") },
+                onClick = { formatAction { ChatFormatActions.wrapSelection(draft, onDraftChange, "`", "`") } },
             )
             FormatMenuItem(
                 icon = Icons.Outlined.FormatStrikethrough,
                 text = stringResource(R.string.chat_format_strike),
-                onClick = { ChatFormatActions.wrapSelection(draft, onDraftChange, "~~", "~~") },
+                onClick = { formatAction { ChatFormatActions.wrapSelection(draft, onDraftChange, "~~", "~~") } },
             )
             FormatMenuItem(
                 icon = Icons.Outlined.FormatUnderlined,
                 text = stringResource(R.string.chat_format_underline),
-                onClick = { ChatFormatActions.wrapSelection(draft, onDraftChange, "__", "__") },
+                onClick = { formatAction { ChatFormatActions.wrapSelection(draft, onDraftChange, "__", "__") } },
             )
             FormatMenuItem(
                 icon = Icons.Outlined.Link,
                 text = stringResource(R.string.chat_format_link),
-                onClick = onShowLinkDialog,
+                onClick = { formatAction { onShowLinkDialog() } },
             )
             FormatMenuItem(
                 icon = Icons.Outlined.DataObject,
                 text = stringResource(R.string.chat_format_code),
                 onClick = {
-                    val selected = draft.text.substring(draft.selection.min, draft.selection.max)
-                    val block = "```\n${selected.ifBlank { "code" }}\n```"
-                    ChatFormatActions.insertAtSelection(draft, onDraftChange, block)
+                    formatAction {
+                        val selected = draft.text.substring(draft.selection.min, draft.selection.max)
+                        val block = "```\n${selected.ifBlank { "code" }}\n```"
+                        ChatFormatActions.insertAtSelection(draft, onDraftChange, block)
+                    }
                 },
             )
             FormatMenuItem(
                 icon = Icons.Outlined.FormatClear,
                 text = stringResource(R.string.chat_format_regular),
-                onClick = { ChatFormatActions.stripFormatting(draft, onDraftChange) },
+                onClick = { formatAction { ChatFormatActions.stripFormatting(draft, onDraftChange) } },
             )
         }
 

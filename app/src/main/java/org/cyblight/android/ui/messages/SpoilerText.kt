@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -26,15 +27,20 @@ private val SpoilerDotWarm = Color(0xBFFFB624)
 
 @Composable
 fun SpoilerText(
-    text: String,
+    markdown: String,
+    linkColor: Color,
     revealed: Boolean,
     onReveal: () -> Unit,
     textStyle: TextStyle,
     modifier: Modifier = Modifier,
 ) {
+    val formatted = remember(markdown, linkColor) {
+        ChatInlineMarkdown.parse(markdown, linkColor)
+    }
+
     if (revealed) {
         Text(
-            text = text,
+            text = formatted,
             style = textStyle,
             modifier = modifier,
         )
@@ -58,7 +64,7 @@ fun SpoilerText(
             },
     ) {
         Text(
-            text = text,
+            text = formatted,
             style = textStyle.copy(color = Color.Transparent),
         )
     }

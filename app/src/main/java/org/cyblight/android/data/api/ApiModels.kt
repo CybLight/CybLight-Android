@@ -175,6 +175,26 @@ data class EasterFlagsDto(
     @SerializedName("bridgeAppToday") val bridgeAppToday: Boolean = false,
     val echo: Boolean = false,
     val archivist: Boolean = false,
+    val typographer: Boolean = false,
+    @SerializedName("spoilerHunter") val spoilerHunter: Boolean = false,
+    @SerializedName("noMarkers") val noMarkers: Boolean = false,
+    @SerializedName("enterMaster") val enterMaster: Boolean = false,
+    @SerializedName("fontExtremes") val fontExtremes: Boolean = false,
+    @SerializedName("cloudKeeper") val cloudKeeper: Boolean = false,
+    @SerializedName("drivePilot") val drivePilot: Boolean = false,
+    @SerializedName("liveWire") val liveWire: Boolean = false,
+    @SerializedName("fromShadow") val fromShadow: Boolean = false,
+    val watchman: Boolean = false,
+    @SerializedName("carouselWatcher") val carouselWatcher: Boolean = false,
+    @SerializedName("formatMirror") val formatMirror: Boolean = false,
+    @SerializedName("formatMirrorWebToday") val formatMirrorWebToday: Boolean = false,
+    @SerializedName("formatMirrorAppToday") val formatMirrorAppToday: Boolean = false,
+    val synchronist: Boolean = false,
+    @SerializedName("quoteDay") val quoteDay: Boolean = false,
+    @SerializedName("midnightEditor") val midnightEditor: Boolean = false,
+    @SerializedName("polyglotFriend") val polyglotFriend: Boolean = false,
+    val silence: Boolean = false,
+    @SerializedName("reactionStreak") val reactionStreak: Boolean = false,
 )
 
 data class EasterProgress(
@@ -182,10 +202,27 @@ data class EasterProgress(
     val nightGuardSeconds: Int = 0,
     val archivistStepsCompleted: Int = 0,
     val bridgePlatformsToday: Int = 0,
+    val spoilerReveals: Int = 0,
+    val enterSendCount: Int = 0,
+    val driveAccountPicks: Int = 0,
+    val watchmanOpens: Int = 0,
+    val carouselSeconds: Int = 0,
+    val quoteCount: Int = 0,
+    val reactionStreak: Int = 0,
+    val polyglotLocalesCount: Int = 0,
+    val formatMirrorPlatformsToday: Int = 0,
 )
 
 data class EasterUnlockResponse(
     val ok: Boolean = false,
+    val error: String? = null,
+)
+
+data class FormatMirrorTouchResponse(
+    val ok: Boolean = false,
+    @SerializedName("formatMirror") val formatMirror: Boolean = false,
+    @SerializedName("formatMirrorWebToday") val formatMirrorWebToday: Boolean = false,
+    @SerializedName("formatMirrorAppToday") val formatMirrorAppToday: Boolean = false,
     val error: String? = null,
 )
 
@@ -385,6 +422,9 @@ data class ConversationPreviewDto(
     @SerializedName("latestAt") val latestAt: Long = 0L,
     val kind: String = "message",
     @SerializedName("lastMessage") val lastMessage: LastMessageDto? = null,
+    @SerializedName("reactionEmoji") val reactionEmoji: String? = null,
+    @SerializedName("actorId") val actorId: String? = null,
+    @SerializedName("actorLogin") val actorLogin: String? = null,
 )
 
 data class UnreadDetailDto(

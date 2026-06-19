@@ -84,11 +84,14 @@ import org.cyblight.android.R
 import org.cyblight.android.data.preferences.ChatBackupFrequency
 import org.cyblight.android.security.BackupPasswordStore
 import org.cyblight.android.util.SystemSettings
+import org.cyblight.android.ui.easter.EasterCelebrationKind
+import org.cyblight.android.ui.easter.V010EasterUnlockHelper
 import org.cyblight.android.ui.messages.ChatEditTarget
 import org.cyblight.android.ui.messages.ChatFormatUtils
 import org.cyblight.android.ui.messages.ChatReplyTarget
 import org.cyblight.android.ui.main.MainTab
 import java.io.File
+import java.util.ArrayDeque
 import java.util.Calendar
 
 private data class ArchivistTracker(
@@ -122,6 +125,8 @@ enum class DetailScreen {
     Changelog,
 }
 
+private const val CHAT_MESSAGE_EXIT_ANIM_MS = 260L
+
 data class AppUiState(
     val screen: AppScreen = AppScreen.Loading,
     val user: UserDto? = null,
@@ -143,6 +148,7 @@ data class AppUiState(
     val friendsError: String? = null,
     val messagesError: String? = null,
     val chatMessages: List<MessageDto> = emptyList(),
+    val chatExitingMessageIds: Set<String> = emptySet(),
     val chatPinnedMessage: PinnedMessageDto? = null,
     val chatReplyTarget: ChatReplyTarget? = null,
     val chatEditTarget: ChatEditTarget? = null,
@@ -193,6 +199,7 @@ data class AppUiState(
     val easterError: String? = null,
     val showLightCatcherGame: Boolean = false,
     val lightCatcherUnlocking: Boolean = false,
+    val easterCelebration: EasterCelebrationKind? = null,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val notificationsEnabled: Boolean = true,
     val loginAlertsEnabled: Boolean = true,
@@ -272,6 +279,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         onConnectionChanged = { connected -> chatWebSocketConnected = connected },
     )
     private var archivistTracker: ArchivistTracker? = null
+    private var carouselWatcherJob: Job? = null
+    private val pendingEasterCelebrations = ArrayDeque<EasterCelebrationKind>()
+    private var bridgeCelebrationEligible = false
+    private val v010EasterHelper = V010EasterUnlockHelper(
+        profileRepository = profileRepository,
+        appPreferences = appPreferences,
+        currentLogin = { _uiState.value.user?.login },
+        currentFlags = { _uiState.value.easterFlags },
+        currentLocale = { _uiState.value.locale },
+        currentFontSize = { _uiState.value.chatFontSize },
+        isAppLockEnabled = { _uiState.value.appLockEnabled },
+        onFlagsRefreshed = { refreshEasterFlagsFromServer() },
+        onUnlocked = ::celebrateEasterUnlock,
+    )
     private var appLockBackgroundedAtMs: Long? = null
     private var skipAppLockOnce = false
     private var unlockedThisSession = false
@@ -879,7 +900,27 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun openChatFromNotification(friendId: String, friendName: String) {
         if (friendId.isBlank()) return
         if (_uiState.value.screen != AppScreen.Main || _uiState.value.user == null) return
+        v010EasterHelper.markOpenedChatFromNotification()
         openChat(friendId, friendName.ifBlank { friendId })
+        viewModelScope.launch {
+            v010EasterHelper.onOpenedChatFromNotificationHandled()
+        }
+    }
+
+    fun onDraftFormattedViaMenu() {
+        v010EasterHelper.markDraftFormattedViaMenu()
+    }
+
+    fun onSpoilerRevealed() {
+        viewModelScope.launch { v010EasterHelper.onSpoilerRevealed() }
+    }
+
+    fun onGoogleDriveAccountPickerInteraction() {
+        viewModelScope.launch { v010EasterHelper.onGoogleAccountPicked() }
+    }
+
+    fun trackHomeCarouselSeconds(seconds: Int) {
+        viewModelScope.launch { v010EasterHelper.addCarouselWatchSeconds(seconds) }
     }
 
     fun openSessionsFromNotification() {
@@ -950,17 +991,45 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun handleChatWebSocketEvent(event: ChatWsEvent) {
-        if (event.type != "message.new") return
-        val openChatId = _uiState.value.chatFriendId ?: run {
-            refreshConversationsOnly()
-            return
-        }
-        if (event.peerId != openChatId && event.senderId != openChatId) {
-            refreshConversationsOnly()
-            return
-        }
-        viewModelScope.launch {
-            reloadChat(openChatId)
+        when (event.type) {
+            "message.new" -> {
+                val openChatId = _uiState.value.chatFriendId ?: run {
+                    refreshConversationsOnly()
+                    return
+                }
+                if (event.peerId != openChatId && event.senderId != openChatId) {
+                    refreshConversationsOnly()
+                    return
+                }
+                viewModelScope.launch {
+                    reloadChat(openChatId)
+                    v010EasterHelper.onWebSocketMessageReceived()
+                }
+            }
+            "message.deleted" -> {
+                val openChatId = _uiState.value.chatFriendId ?: run {
+                    refreshConversationsOnly()
+                    return
+                }
+                if (event.peerId != openChatId && event.senderId != openChatId) {
+                    refreshConversationsOnly()
+                    return
+                }
+                removeChatMessagesWithAnimation(setOf(event.messageId))
+            }
+            "message.edited" -> {
+                val openChatId = _uiState.value.chatFriendId ?: run {
+                    refreshConversationsOnly()
+                    return
+                }
+                if (event.peerId != openChatId && event.senderId != openChatId) {
+                    refreshConversationsOnly()
+                    return
+                }
+                viewModelScope.launch {
+                    reloadChat(openChatId, refreshSocial = false)
+                }
+            }
         }
     }
 
@@ -1063,6 +1132,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     appPreferences.setLastAutoBackupSuccessMs(System.currentTimeMillis())
                     authSetupCompletedForUser = null
                 }
+                v010EasterHelper.onGoogleDriveRestoreSuccess()
                 clearDriveRestoreUi()
                 userId?.let { completeAuthSetup(it) }
                 refreshGoogleDriveStatusSync()
@@ -1692,6 +1762,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             ?: throw IllegalArgumentException("backup_password_required")
         googleDriveBackupService.uploadBackup(userId, login, resolvedPassword, onProgress)
         appPreferences.setLastAutoBackupSuccessMs(System.currentTimeMillis())
+        v010EasterHelper.onGoogleDriveBackupSuccess()
         backupPasswordStore.savePassword(resolvedPassword)
         _uiState.value = _uiState.value.copy(chatBackupHasStoredPassword = true)
         Unit
@@ -2016,6 +2087,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(showLightCatcherGame = false)
     }
 
+    private fun celebrateEasterUnlock(kind: EasterCelebrationKind) {
+        if (kind != EasterCelebrationKind.BRIDGE) {
+            bridgeCelebrationEligible = true
+        }
+        val state = _uiState.value
+        if (state.easterCelebration == null) {
+            _uiState.value = state.copy(easterCelebration = kind)
+        } else if (state.easterCelebration != kind) {
+            pendingEasterCelebrations.addLast(kind)
+        }
+    }
+
+    fun dismissEasterCelebration() {
+        val next = pendingEasterCelebrations.pollFirst()
+        _uiState.value = _uiState.value.copy(easterCelebration = next)
+    }
+
+    fun openEasterTabFromCelebration() {
+        dismissEasterCelebration()
+        selectMainTab(MainTab.Easter)
+    }
+
     fun onLightCatcherGameWon() {
         val flags = _uiState.value.easterFlags
         if (flags?.lightCatcher == true) {
@@ -2033,6 +2126,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         showLightCatcherGame = false,
                         lightCatcherUnlocking = false,
                     )
+                    celebrateEasterUnlock(EasterCelebrationKind.LIGHT_CATCHER)
                     refreshEasterFlagsFromServer()
                 }
                 .onFailure {
@@ -2126,6 +2220,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         chatPresenceJob = null
         chatRefreshJob?.cancel()
         chatRefreshJob = null
+        pendingEasterCelebrations.clear()
+        bridgeCelebrationEligible = false
         viewModelScope.launch {
             authRepository.logout()
             _uiState.value = AppUiState(
@@ -2357,6 +2453,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 isChatLoading = true,
                 messagesError = null,
                 chatMessages = emptyList(),
+                chatExitingMessageIds = emptySet(),
                 chatPinnedMessage = null,
                 chatReplyTarget = null,
                 chatEditTarget = null,
@@ -2429,6 +2526,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             chatFriendIsOnline = false,
             chatFriendLastSeenAt = null,
             chatMessages = emptyList(),
+            chatExitingMessageIds = emptySet(),
             chatPinnedMessage = null,
             chatReplyTarget = null,
             chatEditTarget = null,
@@ -2498,6 +2596,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val trimmed = emoji.trim()
         if (trimmed.isEmpty()) return
 
+        val targetMessage = _uiState.value.chatMessages.find { it.id == messageId }
+
         val optimisticMessages = _uiState.value.chatMessages.map { message ->
             if (message.id != messageId) return@map message
             val existing = message.reactions.find { it.emoji == trimmed }
@@ -2517,10 +2617,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(chatMessages = optimisticMessages)
 
         viewModelScope.launch {
+            val userId = sessionManager.getUserId().orEmpty()
+            val isIncomingReaction = targetMessage?.senderId?.let { it != userId } == true
+
             messagesRepository.reactToMessage(messageId, trimmed)
                 .onSuccess {
                     reloadChat(friendId)
                     markArchivistAction(friendId) { it.reacted = true }
+                    if (isIncomingReaction) {
+                        v010EasterHelper.onReactionAdded(friendId)
+                    }
                 }
                 .onFailure {
                     reloadChat(friendId)
@@ -2555,23 +2661,50 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteChatMessage(messageId: String) {
         val friendId = _uiState.value.chatFriendId ?: return
+        removeChatMessagesWithAnimation(setOf(messageId))
         viewModelScope.launch {
             messagesRepository.deleteMessage(messageId)
-                .onSuccess { reloadChat(friendId) }
                 .onFailure {
+                    reloadChat(friendId)
                     _uiState.value = _uiState.value.copy(messagesError = "delete_failed")
                 }
+            refreshConversationsOnly()
         }
     }
 
     fun deleteChatMessages(messageIds: List<String>) {
         val friendId = _uiState.value.chatFriendId ?: return
+        val ids = messageIds.toSet()
+        if (ids.isEmpty()) return
+        removeChatMessagesWithAnimation(ids)
         viewModelScope.launch {
             messagesRepository.deleteMessages(messageIds)
-                .onSuccess { reloadChat(friendId) }
                 .onFailure {
+                    reloadChat(friendId)
                     _uiState.value = _uiState.value.copy(messagesError = "delete_failed")
                 }
+            refreshConversationsOnly()
+        }
+    }
+
+    private fun removeChatMessagesWithAnimation(messageIds: Set<String>) {
+        if (messageIds.isEmpty()) return
+        val presentIds = messageIds.filter { id ->
+            _uiState.value.chatMessages.any { it.id == id }
+        }.toSet()
+        if (presentIds.isEmpty()) return
+
+        _uiState.value = _uiState.value.copy(
+            chatExitingMessageIds = _uiState.value.chatExitingMessageIds + presentIds,
+        )
+        viewModelScope.launch {
+            delay(CHAT_MESSAGE_EXIT_ANIM_MS)
+            val pinned = _uiState.value.chatPinnedMessage
+            _uiState.value = _uiState.value.copy(
+                chatMessages = _uiState.value.chatMessages.filter { it.id !in presentIds },
+                chatExitingMessageIds = _uiState.value.chatExitingMessageIds - presentIds,
+                chatPinnedMessage = pinned?.takeUnless { it.messageId in presentIds },
+            )
         }
     }
 
@@ -2598,6 +2731,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (_uiState.value.chatFriendId != friendId) return
                 _uiState.value = _uiState.value.copy(
                     chatMessages = thread.messages,
+                    chatExitingMessageIds = emptySet(),
                     chatPinnedMessage = thread.pinned,
                     messagesError = null,
                 )
@@ -2631,7 +2765,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun sendMessage(content: String) {
+    fun sendMessage(content: String, sentViaEnter: Boolean = false) {
         val friendId = _uiState.value.chatFriendId ?: return
         val editTarget = _uiState.value.chatEditTarget
         val replyTarget = _uiState.value.chatReplyTarget
@@ -2688,6 +2822,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         viewModelScope.launch { reloadChat(friendId, refreshSocial = false) }
                     }
                     maybeUnlockEchoEaster()
+                    v010EasterHelper.onMessageSent(finalContent, sentViaEnter)
                     _uiState.value = _uiState.value.copy(
                         isSending = false,
                         chatReplyTarget = null,
@@ -2752,6 +2887,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                                 EasterLogger.logNightGuard(appPreferences, login)
                             }
                             appPreferences.clearNightGuardElapsedMs()
+                            celebrateEasterUnlock(EasterCelebrationKind.NIGHT_GUARD)
                             refreshEasterFlagsFromServer()
                         }
                     break
@@ -2771,6 +2907,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         _uiState.value.user?.login?.let { login ->
                             EasterLogger.logTrustedFingerprint(appPreferences, login)
                         }
+                        celebrateEasterUnlock(EasterCelebrationKind.TRUSTED_FINGERPRINT)
                         refreshEasterFlagsFromServer()
                     }
             }
@@ -2787,6 +2924,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     _uiState.value.user?.login?.let { login ->
                         EasterLogger.logEcho(appPreferences, login)
                     }
+                    celebrateEasterUnlock(EasterCelebrationKind.ECHO)
                     refreshEasterFlagsFromServer()
                 }
         }
@@ -2812,6 +2950,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     _uiState.value.user?.login?.let { login ->
                         EasterLogger.logArchivist(appPreferences, login)
                     }
+                    celebrateEasterUnlock(EasterCelebrationKind.ARCHIVIST)
                     refreshEasterFlagsFromServer()
                 }
         }
@@ -2826,11 +2965,23 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
         val bridgeCount = (if (flags?.bridgeWebToday == true) 1 else 0) +
             (if (flags?.bridgeAppToday == true) 1 else 0)
+        val formatMirrorCount = (if (flags?.formatMirrorWebToday == true) 1 else 0) +
+            (if (flags?.formatMirrorAppToday == true) 1 else 0)
+        val v010 = appPreferences.getV010EasterProgress()
         return EasterProgress(
             biometricUnlockCount = appPreferences.getBiometricUnlockCount().coerceIn(0, 100),
             nightGuardSeconds = (appPreferences.getNightGuardElapsedMs() / 1_000).toInt().coerceIn(0, 30),
             archivistStepsCompleted = archivistCount.coerceIn(0, 4),
             bridgePlatformsToday = bridgeCount.coerceIn(0, 2),
+            spoilerReveals = v010.spoilerReveals.coerceIn(0, 5),
+            enterSendCount = v010.enterSendCount.coerceIn(0, 10),
+            driveAccountPicks = v010.driveAccountPicks.coerceIn(0, 3),
+            watchmanOpens = v010.watchmanOpens.coerceIn(0, 3),
+            carouselSeconds = v010.carouselSeconds.coerceIn(0, 30),
+            quoteCount = v010.quoteCount.coerceIn(0, 3),
+            reactionStreak = v010.reactionStreak.coerceIn(0, 10),
+            polyglotLocalesCount = v010.polyglotLocales.size.coerceIn(0, 3),
+            formatMirrorPlatformsToday = formatMirrorCount.coerceIn(0, 2),
         )
     }
 
@@ -2844,12 +2995,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val previous = _uiState.value.easterFlags
             val hadBridge = previous?.bridge == true
+            val hadFormatMirror = previous?.formatMirror == true
             profileRepository.loadEasterFlags()
                 .onSuccess { flags ->
                     val login = _uiState.value.user?.login
                     if (previous != null && !hadBridge && flags.bridge && login != null) {
                         EasterLogger.logBridge(appPreferences, login)
                     }
+                    if (previous != null && !hadFormatMirror && flags.formatMirror && login != null) {
+                        EasterLogger.logFormatMirror(appPreferences, login)
+                    }
+                    maybeCelebrateBridgeFromRefresh(previous, flags)
                     if (login != null) {
                         EasterLogger.syncLoggedFromServerFlags(appPreferences, login, flags)
                     }
@@ -2860,5 +3016,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
         }
+    }
+
+    private fun maybeCelebrateBridgeFromRefresh(previous: EasterFlagsDto?, flags: EasterFlagsDto) {
+        if (previous == null || previous.bridge || !flags.bridge || !bridgeCelebrationEligible) return
+        bridgeCelebrationEligible = false
+        celebrateEasterUnlock(EasterCelebrationKind.BRIDGE)
     }
 }
