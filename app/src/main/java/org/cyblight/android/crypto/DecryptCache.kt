@@ -14,14 +14,27 @@ class DecryptCache(context: Context) {
         if (messageId.isBlank()) return
         prefs.edit()
             .putString(cacheKey(userId, messageId), plaintext)
-            .commit()
+            .apply()
+        trimIfNeeded(userId)
+    }
+
+    fun writeBatch(userId: String, entries: Map<String, String>) {
+        if (entries.isEmpty()) return
+        val editor = prefs.edit()
+        entries.forEach { (id, text) ->
+            if (id.isNotBlank()) {
+                editor.putString(cacheKey(userId, id), text)
+            }
+        }
+        editor.apply()
+        trimIfNeeded(userId)
     }
 
     fun remove(userId: String, messageId: String) {
         if (messageId.isBlank()) return
         prefs.edit()
             .remove(cacheKey(userId, messageId))
-            .commit()
+            .apply()
     }
 
     fun readAllForUser(userId: String): Map<String, String> {
@@ -39,7 +52,7 @@ class DecryptCache(context: Context) {
         val prefix = "decrypt_${userId}_"
         val editor = prefs.edit()
         prefs.all.keys.filter { it.startsWith(prefix) }.forEach(editor::remove)
-        editor.commit()
+        editor.apply()
     }
 
     fun replaceAllForUser(userId: String, entries: Map<String, String>) {
@@ -51,13 +64,24 @@ class DecryptCache(context: Context) {
                 editor.putString(cacheKey(userId, messageId), plaintext)
             }
         }
-        editor.commit()
+        editor.apply()
     }
 
     private fun cacheKey(userId: String, messageId: String): String =
         "decrypt_${userId}_$messageId"
 
+    private fun trimIfNeeded(userId: String) {
+        val prefix = "decrypt_${userId}_"
+        val keys = prefs.all.keys.filter { it.startsWith(prefix) }
+        if (keys.size <= MAX_ENTRIES_PER_USER) return
+        val dropCount = keys.size - MAX_ENTRIES_PER_USER
+        val editor = prefs.edit()
+        keys.take(dropCount).forEach(editor::remove)
+        editor.apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "cyblight_signal_decrypt_cache"
+        private const val MAX_ENTRIES_PER_USER = 5_000
     }
 }

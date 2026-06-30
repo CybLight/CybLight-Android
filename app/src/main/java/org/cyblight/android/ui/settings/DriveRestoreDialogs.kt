@@ -21,6 +21,43 @@ import java.text.DateFormat
 import java.util.Locale
 
 @Composable
+fun BackupResultDialog(
+    message: String,
+    isError: Boolean,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                stringResource(
+                    if (isError) {
+                        R.string.settings_backup_result_error_title
+                    } else {
+                        R.string.settings_backup_result_success_title
+                    },
+                ),
+            )
+        },
+        text = {
+            Text(
+                text = message,
+                color = if (isError) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.ok))
+            }
+        },
+    )
+}
+
+@Composable
 fun DriveRestoreConfirmDialog(
     metadata: DriveBackupMetadata,
     onRestore: () -> Unit,

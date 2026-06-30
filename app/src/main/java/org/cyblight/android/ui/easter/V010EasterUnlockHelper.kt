@@ -34,6 +34,7 @@ internal class V010EasterUnlockHelper(
         val plain = content.trim()
         if (plain.isEmpty()) return
 
+        // 1. Direct unlocks (no progress)
         if (!flags.typographer && EasterEggChecks.isTypographerMessage(plain)) {
             unlock(EasterEggKind.Typographer)
         }
@@ -45,16 +46,10 @@ internal class V010EasterUnlockHelper(
         }
         if (!flags.midnightEditor && draftFormattedViaMenu && EasterEggChecks.isMidnightNow()) {
             unlock(EasterEggKind.MidnightEditor)
+
         }
-        if (EasterEggChecks.hasQuote(plain)) {
-            bumpProgress { progress ->
-                val next = progress.copy(quoteCount = progress.quoteCount + 1)
-                if (!flags.quoteDay && next.quoteCount >= 3) {
-                    unlock(EasterEggKind.QuoteDay)
-                }
-                next
-            }
-        }
+        
+        // 2. Format Mirror (API call)
         if (EasterEggChecks.hasFormatting(plain)) {
             val hadFormatMirror = flags.formatMirror
             profileRepository.touchFormatApp().onSuccess { response ->
@@ -65,39 +60,49 @@ internal class V010EasterUnlockHelper(
             }
         }
 
+        // 3. Progress based unlocks
         val locale = currentLocale()
-        bumpProgress { progress ->
-            val locales = progress.polyglotLocales + locale
-            val next = progress.copy(polyglotLocales = locales)
-            if (!flags.polyglotFriend && setOf("ru", "uk", "en").all { it in locales }) {
-                unlock(EasterEggKind.PolyglotFriend)
-            }
-            next
-        }
-
         val fontSize = currentFontSize()
-        bumpProgress { progress ->
-            var next = progress
-            if (fontSize == org.cyblight.android.data.preferences.ChatFontSize.SMALL) {
-                next = next.copy(fontMinSent = true)
+        
+        val currentProgress = appPreferences.getV010EasterProgress()
+        var nextProgress = currentProgress
+        
+        // Quote Day
+        if (EasterEggChecks.hasQuote(plain)) {
+            nextProgress = nextProgress.copy(quoteCount = nextProgress.quoteCount + 1)
+            if (!flags.quoteDay && nextProgress.quoteCount >= 3) {
+                unlock(EasterEggKind.QuoteDay)
             }
-            if (fontSize == org.cyblight.android.data.preferences.ChatFontSize.EXTRA_LARGE) {
-                next = next.copy(fontMaxSent = true)
-            }
-            if (!flags.fontExtremes && next.fontMinSent && next.fontMaxSent) {
-                unlock(EasterEggKind.FontExtremes)
-            }
-            next
         }
-
+        
+        // Polyglot Friend
+        val locales = nextProgress.polyglotLocales + locale
+        nextProgress = nextProgress.copy(polyglotLocales = locales)
+        if (!flags.polyglotFriend && setOf("ru", "uk", "en").all { it in locales }) {
+            unlock(EasterEggKind.PolyglotFriend)
+        }
+        
+        // Font Extremes
+        if (fontSize == org.cyblight.android.data.preferences.ChatFontSize.SMALL) {
+            nextProgress = nextProgress.copy(fontMinSent = true)
+        }
+        if (fontSize == org.cyblight.android.data.preferences.ChatFontSize.EXTRA_LARGE) {
+            nextProgress = nextProgress.copy(fontMaxSent = true)
+        }
+        if (!flags.fontExtremes && nextProgress.fontMinSent && nextProgress.fontMaxSent) {
+            unlock(EasterEggKind.FontExtremes)
+        }
+        
+        // Enter Master
         if (sentViaEnter) {
-            bumpProgress { progress ->
-                val next = progress.copy(enterSendCount = progress.enterSendCount + 1)
-                if (!flags.enterMaster && next.enterSendCount >= 10) {
-                    unlock(EasterEggKind.EnterMaster)
-                }
-                next
+            nextProgress = nextProgress.copy(enterSendCount = nextProgress.enterSendCount + 1)
+            if (!flags.enterMaster && nextProgress.enterSendCount >= 10) {
+                unlock(EasterEggKind.EnterMaster)
             }
+        }
+        
+        if (nextProgress != currentProgress) {
+            appPreferences.saveV010EasterProgress(nextProgress)
         }
 
         draftFormattedViaMenu = false
@@ -183,8 +188,15 @@ internal class V010EasterUnlockHelper(
     }
 
     private suspend fun bumpProgress(transform: suspend (V010EasterProgressSnapshot) -> V010EasterProgressSnapshot) {
-        val current = appPreferences.getV010EasterProgress()
-        appPreferences.saveV010EasterProgress(transform(current))
+        try {
+            val current = appPreferences.getV010EasterProgress()
+            val next = transform(current)
+            if (next != current) {
+                appPreferences.saveV010EasterProgress(next)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("EasterHelper", "Failed to bump progress", e)
+        }
     }
 
     private suspend fun unlockIfLocked(kind: EasterEggKind) {
@@ -194,10 +206,20 @@ internal class V010EasterUnlockHelper(
     }
 
     private suspend fun unlock(kind: EasterEggKind) {
+        val flags = currentFlags() ?: run {
+            android.util.Log.w("EasterHelper", "Cannot unlock $kind: flags are null")
+            return
+        }
+        if (kind.isUnlocked(flags)) return
+        
+        android.util.Log.i("EasterHelper", "Attempting to unlock $kind")
         kind.unlock(profileRepository).onSuccess {
+            android.util.Log.i("EasterHelper", "Successfully unlocked $kind")
             currentLogin()?.let { login -> kind.log(appPreferences, login) }
             onUnlocked(kind.toCelebrationKind())
             onFlagsRefreshed()
+        }.onFailure { e ->
+            android.util.Log.e("EasterHelper", "Failed to unlock $kind", e)
         }
     }
 }

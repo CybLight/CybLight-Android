@@ -2,6 +2,8 @@ package org.cyblight.android.crypto.backup
 
 import android.util.Base64
 import com.google.gson.Gson
+import org.cyblight.android.data.api.createApiGson
+import java.nio.charset.StandardCharsets
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
@@ -10,7 +12,7 @@ import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 object BackupCrypto {
-    private val gson = Gson()
+    private val gson = createApiGson()
     private val secureRandom = SecureRandom()
 
     fun encryptPayload(payload: CyblightBackupPayload, password: String): CyblightBackupFile {
@@ -30,40 +32,73 @@ object BackupCrypto {
     }
 
     fun decryptPayload(file: CyblightBackupFile, password: String): CyblightBackupPayload {
-        if (file.format != BACKUP_FILE_FORMAT || file.version != BACKUP_VERSION) {
-            throw IllegalArgumentException("backup_format_unsupported")
+        val normalized = normalizeFile(file)
+        val salt = base64Decode(normalized.saltBase64)
+        val iv = base64Decode(normalized.ivBase64)
+        val key = deriveKey(password, salt, normalized.iterations)
+        
+        val ciphertext = file.ciphertext
+        val decryptedBytes = decryptBytes(ciphertext, key, iv)
+        
+        return try {
+            val bis = java.io.ByteArrayInputStream(decryptedBytes)
+            val reader = java.io.InputStreamReader(bis, StandardCharsets.UTF_8)
+            val jsonReader = com.google.gson.stream.JsonReader(reader)
+            val payload = gson.fromJson<CyblightBackupPayload>(jsonReader, CyblightBackupPayload::class.java)
+            jsonReader.close()
+            payload
+        } catch (e: Exception) {
+            android.util.Log.e("BackupCrypto", "JSON parse error", e)
+            throw IllegalArgumentException("backup_payload_invalid")
+        } finally {
+            // No easy way to null out locals in Kotlin, but we can call GC
+            if (decryptedBytes.size > 256 * 1024) {
+                System.gc()
+            }
         }
-        if (file.kdf != BACKUP_KDF) {
-            throw IllegalArgumentException("backup_kdf_unsupported")
-        }
+    }
 
-        val salt = base64Decode(file.saltBase64)
-        val iv = base64Decode(file.ivBase64)
-        val key = deriveKey(password, salt, file.iterations)
+    private fun decryptBytes(ciphertextBase64: String, key: ByteArray, iv: ByteArray): ByteArray {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, iv))
-
-        val decrypted = try {
-            cipher.doFinal(base64Decode(file.ciphertext))
+        
+        val encrypted = base64Decode(ciphertextBase64)
+        return try {
+            cipher.doFinal(encrypted)
         } catch (_: Exception) {
             throw IllegalArgumentException("backup_password_invalid")
         }
-
-        val payload = gson.fromJson(String(decrypted, Charsets.UTF_8), CyblightBackupPayload::class.java)
-        if (payload.format != BACKUP_PAYLOAD_FORMAT || payload.version != BACKUP_VERSION) {
-            throw IllegalArgumentException("backup_payload_invalid")
-        }
-        return payload
     }
 
     fun serializeFile(file: CyblightBackupFile): String = gson.toJson(file)
 
     fun parseFile(raw: String): CyblightBackupFile {
-        val file = gson.fromJson(raw, CyblightBackupFile::class.java)
-        if (file.format != BACKUP_FILE_FORMAT) {
+        val trimmed = raw.trim().removePrefix("\uFEFF")
+        if (trimmed.isBlank()) {
+            throw IllegalArgumentException("backup_file_invalid")
+        }
+        val file = try {
+            gson.fromJson(trimmed, CyblightBackupFile::class.java)
+        } catch (_: Exception) {
+            throw IllegalArgumentException("backup_file_invalid")
+        }
+        if (file == null) {
+            throw IllegalArgumentException("backup_file_invalid")
+        }
+        if (file.saltBase64.isNullOrBlank() || file.ivBase64.isNullOrBlank() || file.ciphertext.isNullOrBlank()) {
             throw IllegalArgumentException("backup_file_invalid")
         }
         return file
+    }
+
+    private fun normalizeFile(file: CyblightBackupFile): CyblightBackupFile {
+        val version = if (file.version <= 0) BACKUP_VERSION else file.version
+        val kdf = file.kdf.takeIf { it.isNotBlank() } ?: BACKUP_KDF
+        val iterations = if (file.iterations <= 0) BACKUP_ITERATIONS else file.iterations
+        if (kdf != BACKUP_KDF) {
+            throw IllegalArgumentException("backup_kdf_unsupported")
+        }
+        return file.copy(version = version, kdf = kdf, iterations = iterations)
     }
 
     private fun deriveKey(password: String, salt: ByteArray, iterations: Int): ByteArray {
@@ -76,5 +111,9 @@ object BackupCrypto {
         Base64.encodeToString(bytes, Base64.NO_WRAP)
 
     private fun base64Decode(value: String): ByteArray =
-        Base64.decode(value, Base64.NO_WRAP)
+        try {
+            Base64.decode(value, Base64.NO_WRAP)
+        } catch (_: Exception) {
+            throw IllegalArgumentException("backup_file_invalid")
+        }
 }

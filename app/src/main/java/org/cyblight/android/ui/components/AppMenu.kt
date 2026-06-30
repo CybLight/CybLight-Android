@@ -3,6 +3,7 @@ package org.cyblight.android.ui.components
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Favorite
@@ -27,6 +28,7 @@ fun AppMenu(
     onSettings: () -> Unit,
     onCheckUpdates: () -> Unit,
     onReportBug: () -> Unit,
+    onSessions: (() -> Unit)? = null,
     onDonate: (() -> Unit)? = null,
     onLogout: (() -> Unit)? = null,
 ) {
@@ -48,6 +50,16 @@ fun AppMenu(
                 onSettings()
             },
         )
+        if (onSessions != null) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.menu_sessions)) },
+                leadingIcon = { Icon(Icons.Outlined.Devices, contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    onSessions()
+                },
+            )
+        }
         DropdownMenuItem(
             text = { Text(stringResource(R.string.menu_check_updates)) },
             leadingIcon = { Icon(Icons.Outlined.SystemUpdate, contentDescription = null) },

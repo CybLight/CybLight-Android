@@ -14,9 +14,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.Alignment
 import org.cyblight.android.ui.components.CybOutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -35,7 +44,7 @@ import java.util.Locale
 fun SignalBackupSection(
     accountLogin: String,
     onCreateBackup: suspend (password: String) -> Result<String>,
-    onRestoreBackup: suspend (content: String, password: String) -> Result<Unit>,
+    onRestoreBackup: suspend (content: String, password: String, onProgress: (Int, String) -> Unit) -> Result<Unit>,
     backupErrorMessage: (String) -> String,
     onPickBackupFile: (onPicked: (String) -> Unit) -> Unit,
     onSaveBackupFile: (fileName: String, content: String, onResult: (Boolean?) -> Unit) -> Unit,
@@ -52,6 +61,21 @@ fun SignalBackupSection(
     var busy by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var statusIsError by remember { mutableStateOf(false) }
+
+    var importProgress by remember { mutableIntStateOf(0) }
+    var importProgressKey by remember { mutableStateOf<String?>(null) }
+
+    fun progressText(key: String): String = when (key) {
+        "progress_auth" -> "Авторизация..."
+        "progress_create" -> "Создание копии..."
+        "progress_upload" -> "Загрузка в облако..."
+        "progress_find" -> "Поиск копии..."
+        "progress_download" -> "Скачивание..."
+        "progress_restore" -> "Восстановление данных..."
+        "progress_chats" -> "Импорт чатов..."
+        "progress_done" -> "Готово"
+        else -> "Обработка..."
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -100,14 +124,14 @@ fun SignalBackupSection(
             },
         )
 
-        statusMessage?.let { message ->
-            Text(
-                text = message,
-                color = if (statusIsError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-        }
+    }
+
+    statusMessage?.let { message ->
+        BackupResultDialog(
+            message = message,
+            isError = statusIsError,
+            onDismiss = { statusMessage = null },
+        )
     }
 
     if (showExportDialog) {
@@ -175,8 +199,7 @@ fun SignalBackupSection(
                                     }
                                 }
                             }.onFailure { error ->
-                                val code = (error as? IllegalArgumentException)?.message ?: "backup_failed"
-                                statusMessage = backupErrorMessage(code)
+                                statusMessage = backupErrorMessage(extractBackupErrorCode(error))
                                 statusIsError = true
                             }
                         }
@@ -205,6 +228,7 @@ fun SignalBackupSection(
                         label = stringResource(R.string.settings_signal_backup_password),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         showPasswordToggle = true,
+                        enabled = !busy,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Text(
@@ -213,6 +237,53 @@ fun SignalBackupSection(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 16.dp, top = 4.dp),
                     )
+
+                    if (busy && importProgressKey != null) {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = progressText(importProgressKey!!),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Text(
+                                    text = "$importProgress%",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                progress = { importProgress / 100f },
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            )
+                        }
+                    } else if (busy) {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp,
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(
+                                text = stringResource(R.string.settings_chat_backup_busy),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {
@@ -226,17 +297,23 @@ fun SignalBackupSection(
                             return@TextButton
                         }
                         busy = true
+                        importProgress = 0
+                        importProgressKey = "progress_restore"
                         scope.launch {
-                            val result = onRestoreBackup(content, importPassword)
+                            val backupContent = pendingImportContent ?: ""
+                            pendingImportContent = null // Clear original reference ASAP
+                            
+                            val result = onRestoreBackup(backupContent, importPassword) { p, k ->
+                                importProgress = p
+                                importProgressKey = k
+                            }
                             busy = false
                             result.onSuccess {
                                 statusMessage = context.getString(R.string.settings_signal_backup_import_done)
                                 statusIsError = false
                                 showImportDialog = false
-                                pendingImportContent = null
                             }.onFailure { error ->
-                                val code = (error as? IllegalArgumentException)?.message ?: "backup_failed"
-                                statusMessage = backupErrorMessage(code)
+                                statusMessage = backupErrorMessage(extractBackupErrorCode(error))
                                 statusIsError = true
                             }
                         }
@@ -252,6 +329,18 @@ fun SignalBackupSection(
             },
         )
     }
+}
+
+private fun extractBackupErrorCode(error: Throwable): String {
+    var current: Throwable? = error
+    while (current != null) {
+        val message = current.message?.substringBefore(':')?.trim()
+        if (!message.isNullOrBlank()) {
+            return message
+        }
+        current = current.cause
+    }
+    return "backup_failed"
 }
 
 private fun buildBackupFileName(login: String): String {

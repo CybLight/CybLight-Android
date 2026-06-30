@@ -174,12 +174,14 @@ object EasterLogger {
         appPreferences: AppPreferences,
         userName: String,
         eggKey: String,
-        send: () -> Unit,
+        send: () -> Boolean,
     ) {
         scope.launch {
             if (appPreferences.isEasterTelegramLogged(userName, eggKey)) return@launch
-            send()
-            appPreferences.markEasterTelegramLogged(userName, eggKey)
+            val logged = send()
+            if (logged) {
+                appPreferences.markEasterTelegramLogged(userName, eggKey)
+            }
         }
     }
 
@@ -189,7 +191,7 @@ object EasterLogger {
         source: String,
         route: String,
         page: String,
-    ) {
+    ): Boolean {
         val payload = mapOf(
             "type" to type,
             "userName" to userName,
@@ -201,7 +203,7 @@ object EasterLogger {
             "referrer" to null,
         )
 
-        runCatching {
+        return runCatching {
             val body = gson.toJson(payload)
                 .toRequestBody("application/json; charset=utf-8".toMediaType())
             val request = Request.Builder()
@@ -210,10 +212,18 @@ object EasterLogger {
                 .header("Origin", BuildConfig.WEBSITE_URL)
                 .header("User-Agent", AppUserAgent.build())
                 .build()
-            client.newCall(request).execute().close()
-        }
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@runCatching false
+                val parsed = runCatching {
+                    gson.fromJson(response.body?.string().orEmpty(), EasterLogResponse::class.java)
+                }.getOrNull()
+                parsed?.duplicate != true
+            }
+        }.getOrDefault(false)
     }
 }
+
+private data class EasterLogResponse(val ok: Boolean = false, val duplicate: Boolean = false)
 
 private object EasterLogKey {
     const val LIGHT_CATCHER = "light_catcher"

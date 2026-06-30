@@ -31,12 +31,14 @@ object ConversationPreviewEnricher {
 
         signalCrypto.ensureRegistered(userId)
         val decryptedById = LinkedHashMap<String, String>()
-        val sorted = pending.sortedBy { (_, entry, _) -> entry.latestAt }
-        for ((_, _, wire) in sorted) {
+        val sorted = pending.sortedByDescending { (_, entry, _) -> entry.latestAt }
+        val limited = sorted.take(50) // Limit enrichment to save memory
+
+        for ((_, _, wire) in limited) {
             val key = wire.id.ifBlank { "${wire.senderId}:${wire.content}" }
             if (decryptedById.containsKey(key)) continue
             val text = runCatching {
-                signalCrypto.decryptMessage(userId, wire.toMessageDto())
+                signalCrypto.decryptMessageNoPrefetch(userId, wire.toMessageDto())
             }.getOrElse { decryptFailed }
             decryptedById[key] = text
         }

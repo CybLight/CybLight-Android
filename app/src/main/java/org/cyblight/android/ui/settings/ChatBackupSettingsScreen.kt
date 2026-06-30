@@ -79,7 +79,7 @@ fun ChatBackupSettingsScreen(
     onDisableBackupPassword: suspend () -> Result<Unit> = { Result.success(Unit) },
     onClearStoredBackupPassword: suspend () -> Result<Unit> = { Result.success(Unit) },
     onCreateSignalBackup: suspend (password: String) -> Result<String>,
-    onRestoreSignalBackup: suspend (content: String, password: String) -> Result<Unit>,
+    onRestoreSignalBackup: suspend (content: String, password: String, onProgress: (Int, String) -> Unit) -> Result<Unit>,
     signalBackupErrorMessage: (String) -> String,
     onPickBackupFile: (onPicked: (String) -> Unit) -> Unit,
     onSaveBackupFile: (fileName: String, content: String, onResult: (Boolean?) -> Unit) -> Unit,
@@ -344,10 +344,6 @@ fun ChatBackupSettingsScreen(
                                 onClick = {
                                     autoBackupMenuExpanded = false
                                     when {
-                                        option != ChatBackupFrequency.OFF && googleDriveAccountLabel == null -> {
-                                            statusMessage = context.getString(R.string.settings_google_drive_sign_in_hint)
-                                            statusIsError = true
-                                        }
                                         option == ChatBackupFrequency.OFF -> {
                                             onChatBackupFrequencySelected(ChatBackupFrequency.OFF)
                                         }
@@ -513,14 +509,14 @@ fun ChatBackupSettingsScreen(
             onSaveBackupFile = onSaveBackupFile,
         )
 
-        statusMessage?.let { message ->
-            Text(
-                text = message,
-                color = if (statusIsError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-        }
+    }
+
+    statusMessage?.let { message ->
+        BackupResultDialog(
+            message = message,
+            isError = statusIsError,
+            onDismiss = { statusMessage = null },
+        )
     }
 
     if (showUploadDialog) {

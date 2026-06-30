@@ -1,0 +1,9 @@
+{
+  "devDependencies": {
+    "prettier": "^3.8.4",
+    "prettier-plugin-kotlin": "^2.1.0"
+  },
+  "scripts": {
+    "format": "prettier --write \"**/*.kt\""
+  }
+}

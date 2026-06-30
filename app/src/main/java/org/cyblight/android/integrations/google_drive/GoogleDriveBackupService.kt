@@ -87,13 +87,23 @@ class GoogleDriveBackupService(
         onProgress(18, "progress_download")
         val raw = driveClient.downloadBackupFile(accessToken, driveFile.id)
         onProgress(32, "progress_restore")
+        
+        // Decrypt and process
         val payload = backupManager.decryptBackupPayload(raw, password)
-        backupManager.restorePayload(userId, payload)
+        backupManager.restorePayload(userId, payload, onProgress)
+        
         var stats = BackupRestoreStats()
-        if (payload.version == BACKUP_PAYLOAD_VERSION_V2 && payload.chats != null) {
+        val chats = payload.chats
+        if (payload.version == BACKUP_PAYLOAD_VERSION_V2 && chats != null) {
             onProgress(80, "progress_chats")
-            stats = importChats(payload.chats)
+            stats = importChats(chats)
         }
+        
+        // Clear references and hint GC for large backups
+        if (raw.length > 1024 * 1024) {
+            System.gc()
+        }
+
         onProgress(100, "progress_done")
         stats
     }
@@ -105,7 +115,11 @@ class GoogleDriveBackupService(
 
     private suspend fun importChats(chats: ChatsExportPayload): BackupRestoreStats {
         val result = messagesRepository.importChatsPayload(chats)
-        return result.getOrElse { throw IllegalStateException("chats_import_failed") }.let { stats ->
+        return result.getOrElse { error ->
+            val code = error.message?.substringBefore(':')?.trim()?.takeIf { it.isNotBlank() }
+                ?: "chats_import_failed"
+            throw IllegalStateException(code)
+        }.let { stats ->
             BackupRestoreStats(
                 chatsImported = stats.imported,
                 chatsSkipped = stats.skipped,

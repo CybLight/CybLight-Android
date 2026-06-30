@@ -5,22 +5,22 @@ import org.cyblight.android.data.api.MessageReactionDto
 
 object MessageNormalizer {
     fun normalize(messages: List<MessageDto>): List<MessageDto> {
-        return messages.mapIndexedNotNull { index, message ->
-            runCatching {
-                val safeId = safeString(message.id)
-                val safeSenderId = safeString(message.senderId)
-                val safeContent = safeString(message.content)
-                val id = safeId.ifBlank { "msg-$index-${message.createdAt}" }
+        return messages.map { message ->
+            val id = message.id.takeIf { it.isNotBlank() } ?: "msg-gen-${message.createdAt}"
+            val createdAt = normalizeTimestamp(message.createdAt)
+            
+            if (message.id == id && message.createdAt == createdAt && message.content.isNotBlank()) {
+                message
+            } else {
                 message.copy(
                     id = id,
-                    senderId = safeSenderId,
-                    content = safeContent.ifBlank { " " },
-                    createdAt = normalizeTimestamp(message.createdAt),
+                    content = message.content.takeIf { it.isNotBlank() } ?: " ",
+                    createdAt = createdAt,
                     readAt = message.readAt?.let { normalizeTimestamp(it) },
                     editedAt = message.editedAt?.let { normalizeTimestamp(it) },
                     reactions = normalizeReactions(message.reactions),
                 )
-            }.getOrNull()
+            }
         }
     }
 
@@ -32,8 +32,6 @@ object MessageNormalizer {
             MessageReactionDto(emoji = emoji, count = count)
         }
     }
-
-    private fun safeString(value: String?): String = value?.trim().orEmpty()
 
     private fun normalizeTimestamp(value: Long): Long {
         if (value <= 0L) return System.currentTimeMillis()

@@ -55,7 +55,7 @@
     <string name="encryption_reminder_title">Сообщения защищены шифрованием</string>
     <string name="encryption_reminder_body">Сохраните резервную копию ключей, чтобы не потерять доступ к переписке при смене устройства или браузера.</string>
     <string name="encryption_reminder_body_compact">Сохраните резервную копию ключей в разделе «Безопасность».</string>
-    <string name="encryption_reminder_link">Перейти в раздел «Безопасность» →</string>
+    <string name="encryption_reminder_link">Перейти в раздел «Резервная копия чатов» →</string>
     <string name="online">В сети</string>
     <string name="offline">Не в сети</string>
     <string name="presence_just_now">Был(а) только что</string>
@@ -170,6 +170,7 @@
     <string name="menu_about">О приложении</string>
     <string name="menu_check_updates">Проверить обновления</string>
     <string name="menu_report_bug">Сообщить об ошибке</string>
+    <string name="menu_sessions">Связанные устройства</string>
     <string name="about_title">О приложении</string>
     <string name="about_description">Мобильное приложение CybLight для Android: вход в аккаунт, список друзей и обмен сообщениями.</string>
     <string name="about_creator">Создатель: %1$s</string>
@@ -189,7 +190,7 @@
     <string name="settings_hub_chats_subtitle">Резервная копия, форматирование, экспорт</string>
     <string name="settings_chats_section_screen">Экран</string>
     <string name="settings_chats_section_chat_settings">Настройки чата</string>
-    <string name="settings_chats_default_theme">Тема чата по умолчанию</string>
+    <string name="settings_chats_default_theme">Тема чата</string>
     <string name="settings_chats_theme_section">Темы</string>
     <string name="settings_chats_theme_hint">Изменятся фон чата и цвет пузырей сообщений.</string>
     <string name="settings_chats_theme_system">По умолчанию</string>
@@ -211,9 +212,11 @@
     <string name="settings_chats_format_toolbar_hint">Не показывать панель форматирования при открытии чата</string>
     <string name="settings_chats_hide_backup_reminder">Скрыть напоминание о резервной копии</string>
     <string name="settings_chats_hide_backup_reminder_hint">Не показывать баннер о резервном копировании в списке чатов</string>
+    <string name="settings_chats_quote_color">Цвет цитаты</string>
     <string name="settings_chats_section_backup">Резервное копирование</string>
     <string name="settings_chats_backup_item">Резервная копия чатов</string>
     <string name="settings_chats_backup_item_hint">Google Drive и локальный файл ключей и сообщений</string>
+    <string name="settings_chat_backup_busy">Обработка данных…</string>
     <string name="settings_chat_backup_section_title">Настройки резервного копирования</string>
     <string name="settings_chat_backup_intro">Создавайте резервные копии чатов и ключей шифрования в облаке, чтобы не потерять их при переходе на новый телефон.</string>
     <string name="settings_chat_backup_last_with_size">Последнее резервное копирование: %1$s · %2$s</string>
@@ -294,13 +297,26 @@
     <string name="home_projects_empty">Проекты недоступны</string>
     <string name="home_load_failed">Не удалось загрузить главную</string>
     <string-array name="home_whats_new_features">
-        <item>Настройки в новом стиле с разделами безопасности и уведомлений</item>
-        <item>Расшифровка превью зашифрованных сообщений в чатах и push</item>
-        <item>Резервное копирование чатов и ключей в Google Drive</item>
-        <item>Экспорт и импорт чатов</item>
-        <item>Разделители дат и переход к цитируемому сообщению</item>
-        <item>Уведомление о входе открывает раздел «Сессии»</item>
-        <item>Можно скрыть баннер «Что нового» на главной</item>
+        <item>💬 Большое обновление чата:</item>
+        <item>  • Улучшенные цитаты в чатах: цветная полоса и насыщенный фон</item>
+        <item>  • Выбор цвета цитаты в настройках через компактное меню</item>
+        <item>  • Исправлено отображение курсива на Android 16 и устройствах Samsung</item>
+        <item>  • Оптимизация парсера сообщений и поддержка сложных Markdown-комбинаций</item>
+        <item>🎉 Система Easter Eggs:</item>
+        <item>  • «Зеркало формата» синхронизируется с действиями на сайте</item>
+        <item>  • «Синхронист» теперь корректно зачисляется при любом способе восстановления</item>
+        <item>  • Авто-обновление статуса достижений через WebSocket в реальном времени</item>
+        <item>🔐 Безопасность и Бэкапы:</item>
+        <item>  • Стабильное восстановление больших файлов резервных копий (исправлены OOM-вылеты)</item>
+        <item>  • Улучшена навигация и читаемость баннера шифрования в списке чатов</item>
+        <item>  • Оптимизация Signal Protocol и кэша расшифровки</item>
+        <item> ⚙️ Настройки:</item>
+        <item>  • Реорганизация разделов «Экран» и «Настройки чата»</item>
+        <item> 🧩 UI/UX:</item>
+        <item>  • Повышена общая плавность прокрутки и работы интерфейса</item>
+        <item>  • Исправлено обрезание текста на узких экранах</item>
+        <item> 🌍 Локализация:</item>
+        <item>  • Полная актуализация строк на русском, украинском и английском языках</item>
     </string-array>
     <string name="home_fallback_news_title">Сайт CybLight</string>
     <string name="home_project_site_title">Сайт CybLight</string>
@@ -377,6 +393,8 @@
     <string name="settings_google_drive_upload_done">Резервная копия сохранена в Google Drive.</string>
     <string name="settings_google_drive_restore_done">Ключи и чаты восстановлены из Google Drive.</string>
     <string name="settings_google_drive_restore_chats_stats">Чаты: добавлено %1$d, пропущено %2$d.</string>
+    <string name="settings_backup_result_success_title">Готово</string>
+    <string name="settings_backup_result_error_title">Ошибка</string>
     <string name="settings_google_drive_delete_done">Резервная копия удалена из Google Drive.</string>
     <string name="settings_google_drive_progress_auth">Вход в Google…</string>
     <string name="settings_google_drive_progress_create">Создание резервной копии…</string>

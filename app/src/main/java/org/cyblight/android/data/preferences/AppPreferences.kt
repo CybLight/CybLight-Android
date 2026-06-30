@@ -51,6 +51,7 @@ class AppPreferences(private val context: Context) {
     private val encryptionReminderChatDismissedKey = booleanPreferencesKey("encryption_reminder_chat_dismissed")
     private val chatFormatToolbarHiddenKey = booleanPreferencesKey("chat_format_toolbar_hidden")
     private val chatDefaultThemeKey = stringPreferencesKey("chat_default_theme")
+    private val chatQuoteColorKey = intPreferencesKey("chat_quote_color")
     private val chatSendWithEnterKey = booleanPreferencesKey("chat_send_with_enter")
     private val chatFontSizeKey = stringPreferencesKey("chat_font_size")
     private val homeWhatsNewBannerHiddenKey = booleanPreferencesKey("home_whats_new_banner_hidden")
@@ -414,6 +415,19 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    suspend fun getChatQuoteColor(): Int? =
+        context.appPreferencesStore.data.first()[chatQuoteColorKey]
+
+    suspend fun setChatQuoteColor(color: Int?) {
+        context.appPreferencesStore.edit { prefs ->
+            if (color == null) {
+                prefs.remove(chatQuoteColorKey)
+            } else {
+                prefs[chatQuoteColorKey] = color
+            }
+        }
+    }
+
     suspend fun getChatSendWithEnter(): Boolean =
         context.appPreferencesStore.data.first()[chatSendWithEnterKey] ?: false
 
@@ -550,6 +564,25 @@ class AppPreferences(private val context: Context) {
         ).joinToString("\t")
         context.appPreferencesStore.edit { prefs ->
             prefs[v010EasterProgressKey] = encoded
+        }
+    }
+
+    suspend fun syncV010EasterProgressWithServerFlags(flags: org.cyblight.android.data.api.EasterFlagsDto) {
+        val current = getV010EasterProgress()
+        val synced = current.copy(
+            spoilerReveals = if (flags.spoilerHunter) 5 else current.spoilerReveals,
+            enterSendCount = if (flags.enterMaster) 10 else current.enterSendCount,
+            driveAccountPicks = if (flags.drivePilot) 3 else current.driveAccountPicks,
+            watchmanOpens = if (flags.watchman) 3 else current.watchmanOpens,
+            carouselSeconds = if (flags.carouselWatcher) 30 else current.carouselSeconds,
+            quoteCount = if (flags.quoteDay) 3 else current.quoteCount,
+            reactionStreak = if (flags.reactionStreak) 10 else current.reactionStreak,
+            polyglotLocales = if (flags.polyglotFriend) setOf("ru", "uk", "en") else current.polyglotLocales,
+            fontMinSent = flags.fontExtremes || current.fontMinSent,
+            fontMaxSent = flags.fontExtremes || current.fontMaxSent,
+        )
+        if (synced != current) {
+            saveV010EasterProgress(synced)
         }
     }
 }

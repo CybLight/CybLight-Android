@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -49,12 +50,23 @@ fun ChatMessageContent(
     linkColor: androidx.compose.ui.graphics.Color,
     messageId: String,
     modifier: Modifier = Modifier,
+    quoteBarColor: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color(0xFF60A5FA),
+    isOutgoing: Boolean = false,
     enableLinkPreview: Boolean = true,
     fontScale: Float = 1f,
     onSpoilerRevealed: () -> Unit = {},
 ) {
     val parsed = remember(rawContent, linkColor) {
-        ChatMessageParser.parseWithSpoilers(rawContent, linkColor)
+        runCatching {
+            ChatMessageParser.parseWithSpoilers(rawContent, linkColor)
+        }.getOrElse { error ->
+            android.util.Log.e("ChatMessageContent", "Failed to parse message", error)
+            ParsedChatMessage(
+                parts = listOf(ChatMessagePart.Text(AnnotatedString(rawContent))),
+                previewUrl = null,
+                previewSuppressed = false
+            )
+        }
     }
     val revealedSpoilers = remember { mutableStateMapOf<String, Boolean>() }
 
@@ -64,10 +76,13 @@ fun ChatMessageContent(
                 part = part,
                 textColor = textColor,
                 linkColor = linkColor,
+                quoteBarColor = quoteBarColor,
+                isOutgoing = isOutgoing,
                 messageId = messageId,
                 revealedSpoilers = revealedSpoilers,
                 fontScale = fontScale,
                 onSpoilerRevealed = onSpoilerRevealed,
+                depth = 0,
             )
         }
 
@@ -87,11 +102,16 @@ private fun RenderChatMessagePart(
     part: ChatMessagePart,
     textColor: Color,
     linkColor: Color,
+    quoteBarColor: Color,
+    isOutgoing: Boolean,
     messageId: String,
     revealedSpoilers: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Boolean>,
     fontScale: Float,
     onSpoilerRevealed: () -> Unit,
+    depth: Int = 0,
 ) {
+    if (depth > 10) return // Recursive depth safety
+
     when (part) {
         is ChatMessagePart.Text -> {
             if (part.content.text.isNotBlank()) {
@@ -147,28 +167,36 @@ private fun RenderChatMessagePart(
             )
         }
         is ChatMessagePart.Quote -> {
+            val bgAlpha = if (isOutgoing) 0.35f else 0.2f
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(IntrinsicSize.Min),
+                    .height(IntrinsicSize.Min)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(quoteBarColor.copy(alpha = bgAlpha)),
             ) {
                 Box(
                     modifier = Modifier
-                        .width(3.dp)
+                        .width(4.dp)
                         .fillMaxHeight()
-                        .padding(end = 8.dp)
-                        .background(textColor.copy(alpha = 0.4f), RoundedCornerShape(2.dp)),
+                        .background(quoteBarColor, RoundedCornerShape(2.dp)),
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     part.parts.forEach { inner ->
                         RenderChatMessagePart(
                             part = inner,
-                            textColor = textColor.copy(alpha = 0.88f),
+                            textColor = textColor.copy(alpha = 0.92f),
                             linkColor = linkColor,
+                            quoteBarColor = quoteBarColor,
+                            isOutgoing = isOutgoing,
                             messageId = messageId,
                             revealedSpoilers = revealedSpoilers,
                             fontScale = fontScale,
                             onSpoilerRevealed = onSpoilerRevealed,
+                            depth = depth + 1,
                         )
                     }
                 }

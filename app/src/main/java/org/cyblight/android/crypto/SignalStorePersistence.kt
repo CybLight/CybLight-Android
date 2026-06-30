@@ -3,6 +3,7 @@ package org.cyblight.android.crypto
 import android.content.Context
 import android.util.Base64
 import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
 import org.signal.libsignal.protocol.IdentityKeyPair
 import org.signal.libsignal.protocol.SignalProtocolAddress
 import org.signal.libsignal.protocol.state.KyberPreKeyRecord
@@ -12,14 +13,23 @@ import org.signal.libsignal.protocol.state.SignedPreKeyRecord
 import org.signal.libsignal.protocol.state.impl.InMemorySignalProtocolStore
 
 data class SignalStoreManifest(
+    @SerializedName("registrationId")
     val registrationId: Int = 0,
+    @SerializedName("identitySerialized")
     val identitySerialized: String = "",
+    @SerializedName("preKeyIds")
     val preKeyIds: List<Int> = emptyList(),
+    @SerializedName("signedPreKeyIds")
     val signedPreKeyIds: List<Int> = emptyList(),
+    @SerializedName("kyberPreKeyIds")
     val kyberPreKeyIds: List<Int> = emptyList(),
+    @SerializedName("sessionKeys")
     val sessionKeys: List<String> = emptyList(),
+    @SerializedName("preKeyHandshakePeers")
     val preKeyHandshakePeers: List<String> = emptyList(),
+    @SerializedName("latestSignedPreKeyId")
     val latestSignedPreKeyId: Int? = null,
+    @SerializedName("latestKyberPreKeyId")
     val latestKyberPreKeyId: Int? = null,
 )
 
@@ -76,36 +86,47 @@ class SignalStorePersistence(context: Context) {
     fun loadContext(userId: String): SignalStoreContext? {
         val manifestJson = prefs.getString(manifestKey(userId), null) ?: return null
         val snapshot = runCatching { gson.fromJson(manifestJson, SignalStoreManifest::class.java) }.getOrNull()
-            ?: return null
-        if (snapshot.registrationId <= 0 || snapshot.identitySerialized.isBlank()) return null
-
-        val identityKeyPair = IdentityKeyPair(base64Decode(snapshot.identitySerialized))
-        val store = InMemorySignalProtocolStore(identityKeyPair, snapshot.registrationId)
-        val manifest = MutableSignalStoreManifest.fromSnapshot(snapshot)
-
-        snapshot.preKeyIds.forEach { keyId ->
-            readRecord(userId, "prekey", keyId)?.let { bytes ->
-                store.storePreKey(keyId, PreKeyRecord(bytes))
-            }
-        }
-        snapshot.signedPreKeyIds.forEach { keyId ->
-            readRecord(userId, "signed", keyId)?.let { bytes ->
-                store.storeSignedPreKey(keyId, SignedPreKeyRecord(bytes))
-            }
-        }
-        snapshot.kyberPreKeyIds.forEach { keyId ->
-            readRecord(userId, "kyber", keyId)?.let { bytes ->
-                store.storeKyberPreKey(keyId, KyberPreKeyRecord(bytes))
-            }
-        }
-        snapshot.sessionKeys.forEach { sessionKey ->
-            val address = parseSessionAddress(sessionKey) ?: return@forEach
-            readSession(userId, sessionKey)?.let { bytes ->
-                store.storeSession(address, SessionRecord(bytes))
-            }
+        if (snapshot == null || snapshot.identitySerialized.isBlank()) {
+            android.util.Log.e("SignalStore", "Failed to load manifest for $userId: $manifestJson")
+            return null
         }
 
-        return SignalStoreContext(userId, store, manifest)
+        val identityKeyPair = runCatching {
+            IdentityKeyPair(base64Decode(snapshot.identitySerialized))
+        }.onFailure {
+            android.util.Log.e("SignalStore", "Invalid identity key for $userId", it)
+        }.getOrNull() ?: return null
+
+        return runCatching {
+            val store = InMemorySignalProtocolStore(identityKeyPair, snapshot.registrationId)
+            val manifest = MutableSignalStoreManifest.fromSnapshot(snapshot)
+
+            snapshot.preKeyIds.forEach { keyId ->
+                readRecord(userId, "prekey", keyId)?.let { bytes ->
+                    runCatching { store.storePreKey(keyId, PreKeyRecord(bytes)) }
+                }
+            }
+            snapshot.signedPreKeyIds.forEach { keyId ->
+                readRecord(userId, "signed", keyId)?.let { bytes ->
+                    runCatching { store.storeSignedPreKey(keyId, SignedPreKeyRecord(bytes)) }
+                }
+            }
+            snapshot.kyberPreKeyIds.forEach { keyId ->
+                readRecord(userId, "kyber", keyId)?.let { bytes ->
+                    runCatching { store.storeKyberPreKey(keyId, KyberPreKeyRecord(bytes)) }
+                }
+            }
+            snapshot.sessionKeys.forEach { sessionKey ->
+                val address = parseSessionAddress(sessionKey) ?: return@forEach
+                readSession(userId, sessionKey)?.let { bytes ->
+                    runCatching { store.storeSession(address, SessionRecord(bytes)) }
+                }
+            }
+
+            SignalStoreContext(userId, store, manifest)
+        }.onFailure {
+            android.util.Log.e("SignalStore", "Failed to initialize store for $userId", it)
+        }.getOrNull()
     }
 
     fun loadLegacyIdentityContext(userId: String): SignalStoreContext? {
@@ -238,6 +259,27 @@ class SignalStorePersistence(context: Context) {
 
     fun writeSessionRecord(userId: String, sessionKey: String, value: String) {
         prefs.edit().putString(sessionKey(userId, sessionKey), value).apply()
+    }
+
+    fun writeRecordsBatch(
+        userId: String,
+        manifest: SignalStoreManifest?,
+        preKeys: Map<String, String>,
+        signedPreKeys: Map<String, String>,
+        kyberPreKeys: Map<String, String>,
+        sessions: Map<String, String>,
+    ) {
+        val editor = prefs.edit()
+        manifest?.let { editor.putString(manifestKey(userId), gson.toJson(it)) }
+        preKeys.forEach { (id, value) -> id.toIntOrNull()?.let { editor.putString(recordKey(userId, "prekey", it), value) } }
+        signedPreKeys.forEach { (id, value) -> id.toIntOrNull()?.let { editor.putString(recordKey(userId, "signed", it), value) } }
+        kyberPreKeys.forEach { (id, value) -> id.toIntOrNull()?.let { editor.putString(recordKey(userId, "kyber", it), value) } }
+        sessions.forEach { (key, value) -> editor.putString(sessionKey(userId, key), value) }
+        editor.apply()
+        
+        if (preKeys.size + sessions.size > 500) {
+            System.gc()
+        }
     }
 
     fun clearUser(userId: String) {

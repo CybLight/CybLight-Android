@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Chat
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
@@ -565,7 +565,7 @@ private fun FriendCard(
                 PresenceLabel(isOnline = friend.isOnline, lastSeenAt = friend.lastSeenAt)
             }
             IconButton(onClick = { onOpenChat(friend.id, friend.username) }) {
-                Icon(Icons.Outlined.Chat, contentDescription = stringResource(R.string.write_message))
+                Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = stringResource(R.string.write_message))
             }
             IconButton(onClick = onRemoveFriend) {
                 Text("❌", style = MaterialTheme.typography.bodyLarge)

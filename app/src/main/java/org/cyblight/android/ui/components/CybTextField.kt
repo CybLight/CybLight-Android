@@ -53,6 +53,7 @@ fun CybOutlinedTextField(
     modifier: Modifier = Modifier,
     label: String? = null,
     placeholder: String? = null,
+    enabled: Boolean = true,
     singleLine: Boolean = true,
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
     visualTransformation: VisualTransformation = VisualTransformation.None,
@@ -127,6 +128,7 @@ fun CybOutlinedTextField(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
+        enabled = enabled,
         label = label?.let { labelText -> { Text(labelText) } },
         placeholder = placeholder?.let { placeholderText -> { Text(placeholderText) } },
         singleLine = singleLine,

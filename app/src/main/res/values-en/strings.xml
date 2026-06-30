@@ -170,6 +170,7 @@
     <string name="menu_about">About</string>
     <string name="menu_check_updates">Check for updates</string>
     <string name="menu_report_bug">Report a bug</string>
+    <string name="menu_sessions">Linked devices</string>
     <string name="about_title">About</string>
     <string name="about_description">CybLight mobile app for Android: sign in, friends list, and messaging.</string>
     <string name="about_creator">Creator: %1$s</string>
@@ -189,7 +190,7 @@
     <string name="settings_hub_chats_subtitle">Backup, formatting, export</string>
     <string name="settings_chats_section_screen">Screen</string>
     <string name="settings_chats_section_chat_settings">Chat settings</string>
-    <string name="settings_chats_default_theme">Default chat theme</string>
+    <string name="settings_chats_default_theme">Chat theme</string>
     <string name="settings_chats_theme_section">Themes</string>
     <string name="settings_chats_theme_hint">Changes the chat background and message bubble colors.</string>
     <string name="settings_chats_theme_system">Default</string>
@@ -211,9 +212,11 @@
     <string name="settings_chats_format_toolbar_hint">Hide the formatting toolbar when opening a chat</string>
     <string name="settings_chats_hide_backup_reminder">Hide backup reminder</string>
     <string name="settings_chats_hide_backup_reminder_hint">Do not show the backup banner in the chat list</string>
+    <string name="settings_chats_quote_color">Quote color</string>
     <string name="settings_chats_section_backup">Backup</string>
     <string name="settings_chats_backup_item">Chat backup</string>
     <string name="settings_chats_backup_item_hint">Google Drive and local keys and messages file</string>
+    <string name="settings_chat_backup_busy">Processing data…</string>
     <string name="settings_chat_backup_section_title">Backup settings</string>
     <string name="settings_chat_backup_intro">Back up your chats and encryption keys to the cloud so you do not lose them when switching to a new phone.</string>
     <string name="settings_chat_backup_last_with_size">Last backup: %1$s · %2$s</string>
@@ -294,13 +297,26 @@
     <string name="home_projects_empty">Projects unavailable</string>
     <string name="home_load_failed">Could not load home</string>
     <string-array name="home_whats_new_features">
-        <item>Settings in a new style with security and notification sections</item>
-        <item>Decrypted previews for encrypted messages in chats and push</item>
-        <item>Google Drive backup for chats and encryption keys</item>
-        <item>Export and import chats</item>
-        <item>Date separators and jump to quoted message</item>
-        <item>Sign-in alert opens Sessions</item>
-        <item>Hide the &quot;What&apos;s new&quot; banner on Home</item>
+        <item>💬 Major chat update:</item>
+        <item>  • Improved quotes in chats: colored bar and rich background</item>
+        <item>  • Choose quote colors in settings via the compact menu</item>
+        <item>  • Fixed italic text display on Android 16 and Samsung devices</item>
+        <item>  • Optimized message parser and support for complex Markdown combinations</item>
+        <item>🎉 Система Easter Eggs:</item>
+        <item>  • «Format Mirror» syncs with website actions</item>
+        <item>  • «Synchronist» achievement now correctly awarded for any restore method</item>
+        <item>  • Real-time achievement status updates via WebSocket</item>
+        <item>🔐 Security and Backups:</item>
+        <item>  • Stable restoration of large backup files (OOM crashes fixed)</item>
+        <item>  • Improved navigation and readability of the encryption banner in the chat list</item>
+        <item>  • Optimization of the Signal Protocol and decryption cache</item>
+        <item> ⚙️ Settings:</item>
+        <item>  • Reorganization of the “Screen” and “Chat Settings” sections</item>
+        <item> 🧩 UI/UX:</item>
+        <item>  • Improved overall scrolling smoothness and interface performance</item>
+        <item>  • Fixed text clipping on narrow screens</item>
+        <item> 🌍 Localization:</item>
+        <item>  • Full localization update for Russian, Ukrainian, and English languages</item>
     </string-array>
     <string name="home_fallback_news_title">CybLight website</string>
     <string name="home_project_site_title">CybLight website</string>
@@ -377,6 +393,8 @@
     <string name="settings_google_drive_upload_done">Backup saved to Google Drive.</string>
     <string name="settings_google_drive_restore_done">Keys and chats restored from Google Drive.</string>
     <string name="settings_google_drive_restore_chats_stats">Chats: added %1$d, skipped %2$d.</string>
+    <string name="settings_backup_result_success_title">Done</string>
+    <string name="settings_backup_result_error_title">Error</string>
     <string name="settings_google_drive_delete_done">Backup deleted from Google Drive.</string>
     <string name="settings_google_drive_progress_auth">Signing in to Google…</string>
     <string name="settings_google_drive_progress_create">Creating backup…</string>

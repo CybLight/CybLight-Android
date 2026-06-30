@@ -7,6 +7,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.atomic.AtomicReference
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -27,18 +28,18 @@ class ChatWebSocketClient(
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.MILLISECONDS)
-        .pingInterval(45, TimeUnit.SECONDS)
+        .pingInterval(25, TimeUnit.SECONDS)
         .build()
 
-    @Volatile
-    private var webSocket: WebSocket? = null
+    private val webSocketRef = AtomicReference<WebSocket?>(null)
 
     private val running = AtomicBoolean(false)
     private var reconnectJob: Job? = null
+    private var pingJob: Job? = null
     private var connectAttempts = 0
 
     val isConnected: Boolean
-        get() = webSocket != null
+        get() = webSocketRef.get() != null
 
     fun start(scope: CoroutineScope) {
         val wasRunning = !running.compareAndSet(false, true)
@@ -55,9 +56,15 @@ class ChatWebSocketClient(
         running.set(false)
         reconnectJob?.cancel()
         reconnectJob = null
-        webSocket?.close(1000, "stop")
-        webSocket = null
+        pingJob?.cancel()
+        pingJob = null
+        closeGracefully("stop")
         onConnectionChanged(false)
+    }
+
+    private fun closeGracefully(reason: String) {
+        val socket = webSocketRef.getAndSet(null) ?: return
+        runCatching { socket.close(1000, reason) }
     }
 
     private fun connect(scope: CoroutineScope) {
@@ -80,47 +87,67 @@ class ChatWebSocketClient(
             .header("Origin", BuildConfig.WEBSITE_URL)
             .build()
 
-        webSocket?.cancel()
-        webSocket = httpClient.newWebSocket(
-            request,
-            object : WebSocketListener() {
-                override fun onOpen(webSocket: WebSocket, response: Response) {
-                    connectAttempts = 0
-                    onConnectionChanged(true)
-                }
+        closeGracefully("reconnect")
+        webSocketRef.set(
+            httpClient.newWebSocket(
+                request,
+                object : WebSocketListener() {
+                    override fun onOpen(webSocket: WebSocket, response: Response) {
+                        connectAttempts = 0
+                        onConnectionChanged(true)
+                        startApplicationPing(scope, webSocket)
+                    }
 
-                override fun onMessage(webSocket: WebSocket, text: String) {
-                    if (text == "pong") return
-                    runCatching {
-                        val event = gson.fromJson(text, ChatWsEvent::class.java)
-                        if (event?.type == "message.new") {
-                            onEvent(event)
+                    override fun onMessage(webSocket: WebSocket, text: String) {
+                        if (text == "pong") return
+                        runCatching {
+                            val event = gson.fromJson(text, ChatWsEvent::class.java) ?: return@runCatching
+                            when (event.type) {
+                                "message.new", "message.deleted", "message.edited" -> onEvent(event)
+                            }
                         }
                     }
-                }
 
-                override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                    webSocket.close(code, reason)
-                }
+                    override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                        if (isTransmittableCloseCode(code)) {
+                            runCatching { webSocket.close(code, reason) }
+                        }
+                    }
 
-                override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                    handleDisconnect(webSocket, scope)
-                }
+                    override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                        handleDisconnect(webSocket, scope)
+                    }
 
-                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                    handleDisconnect(webSocket, scope)
-                }
-            },
+                    override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                        handleDisconnect(webSocket, scope)
+                    }
+                },
+            ),
         )
     }
 
-    private fun handleDisconnect(closedSocket: WebSocket, scope: CoroutineScope) {
-        if (webSocket === closedSocket) {
-            webSocket = null
+    private fun startApplicationPing(scope: CoroutineScope, webSocket: WebSocket) {
+        pingJob?.cancel()
+        pingJob = scope.launch {
+            while (isActive && running.get() && webSocketRef.get() === webSocket) {
+                delay(25_000)
+                if (!isActive || !running.get() || webSocketRef.get() !== webSocket) break
+                runCatching { webSocket.send("ping") }
+            }
         }
-        onConnectionChanged(false)
-        scheduleReconnect(scope)
     }
+
+    private fun handleDisconnect(closedSocket: WebSocket, scope: CoroutineScope) {
+        if (webSocketRef.compareAndSet(closedSocket, null)) {
+            pingJob?.cancel()
+            pingJob = null
+            onConnectionChanged(false)
+            scheduleReconnect(scope)
+        }
+    }
+
+    private fun isTransmittableCloseCode(code: Int): Boolean =
+        code in 1000..4999 && code !in setOf(1004, 1005, 1006, 1015)
 
     private fun scheduleReconnect(scope: CoroutineScope) {
         if (!running.get()) return

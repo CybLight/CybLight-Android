@@ -170,6 +170,7 @@
     <string name="menu_about">Про застосунок</string>
     <string name="menu_check_updates">Перевірити оновлення</string>
     <string name="menu_report_bug">Повідомити про помилку</string>
+    <string name="menu_sessions">Пов’язані пристрої</string>
     <string name="about_title">Про застосунок</string>
     <string name="about_description">Мобільний застосунок CybLight для Android: вхід в акаунт, список друзів та обмін повідомленнями.</string>
     <string name="about_creator">Творець: %1$s</string>
@@ -189,7 +190,7 @@
     <string name="settings_hub_chats_subtitle">Резервна копія, форматування, експорт</string>
     <string name="settings_chats_section_screen">Екран</string>
     <string name="settings_chats_section_chat_settings">Налаштування чату</string>
-    <string name="settings_chats_default_theme">Тема чату за замовчуванням</string>
+    <string name="settings_chats_default_theme">Тема чату</string>
     <string name="settings_chats_theme_section">Теми</string>
     <string name="settings_chats_theme_hint">Зміняться фон чату та колір бульбашок повідомлень.</string>
     <string name="settings_chats_theme_system">За замовчуванням</string>
@@ -211,9 +212,11 @@
     <string name="settings_chats_format_toolbar_hint">Не показувати панель форматування при відкритті чату</string>
     <string name="settings_chats_hide_backup_reminder">Приховати нагадування про резервну копію</string>
     <string name="settings_chats_hide_backup_reminder_hint">Не показувати банер про резервне копіювання у списку чатів</string>
+    <string name="settings_chats_quote_color">Колір цитати</string>
     <string name="settings_chats_section_backup">Резервне копіювання</string>
     <string name="settings_chats_backup_item">Резервна копія чатів</string>
     <string name="settings_chats_backup_item_hint">Google Drive і локальний файл ключів та повідомлень</string>
+    <string name="settings_chat_backup_busy">Обробка даних…</string>
     <string name="settings_chat_backup_section_title">Налаштування резервного копіювання</string>
     <string name="settings_chat_backup_intro">Створюйте резервні копії чатів і ключів шифрування в хмарі, щоб не втратити їх при переході на новий телефон.</string>
     <string name="settings_chat_backup_last_with_size">Останнє резервне копіювання: %1$s · %2$s</string>
@@ -294,13 +297,26 @@
     <string name="home_projects_empty">Проєкти недоступні</string>
     <string name="home_load_failed">Не вдалося завантажити головну</string>
     <string-array name="home_whats_new_features">
-        <item>Налаштування в новому стилі з розділами безпеки та сповіщень</item>
-        <item>Розшифрування превʼю зашифрованих повідомлень у чатах і push</item>
-        <item>Резервне копіювання чатів і ключів у Google Drive</item>
-        <item>Експорт і імпорт чатів</item>
-        <item>Роздільники дат і перехід до цитованого повідомлення</item>
-        <item>Сповіщення про вхід відкриває розділ «Сесії»</item>
-        <item>Можна приховати банер «Що нового» на головній</item>
+        <item>💬 Велике оновлення чату:</item>
+        <item>  • Покращені цитати в чатах: кольорова смуга та насичений фон</item>
+        <item>  • Вибір кольору цитати в налаштуваннях через компактне меню</item>
+        <item>  • Виправлено відображення курсиву на Android 16 та пристроях Samsung</item>
+        <item>  • Оптимізація парсера повідомлень та підтримка складних комбінацій Markdown</item>
+        <item>🎉 Система Easter Eggs:</item>
+        <item>  • «Дзеркало формату» синхронізується з діями на сайті</item>
+        <item>  • «Синхроніст» тепер коректно зараховується при будь-якому способі відновлення</item>
+        <item>  • Автоматичне оновлення статусу досягнень через WebSocket у реальному часі</item>
+        <item>🔐 Безпека та резервні копії:</item>
+        <item>  • Стабільне відновлення великих файлів резервних копій (виправлені OOM-збої)</item>
+        <item>  • Покращено навігацію та читабельність банера шифрування у списку чатів</item>
+        <item>  • Оптимізація Signal Protocol та кешу розшифрування</item>
+        <item> ⚙️ Налаштування:</item>
+        <item>  • Реорганізація розділів «Екран» та «Налаштування чату»</item>
+        <item> 🧩 UI/UX:</item>
+        <item>  • Підвищено загальну плавність прокрутки та роботи інтерфейсу</item>
+        <item>  • Виправлено обрізання тексту на вузьких екранах</item>
+        <item> 🌍 Локалізація:</item>
+        <item>  • Повна актуалізація рядків українською, російською та англійською мовами</item>
     </string-array>
     <string name="home_fallback_news_title">Сайт CybLight</string>
     <string name="home_project_site_title">Сайт CybLight</string>
@@ -377,6 +393,8 @@
     <string name="settings_google_drive_upload_done">Резервну копію збережено в Google Drive.</string>
     <string name="settings_google_drive_restore_done">Ключі та чати відновлено з Google Drive.</string>
     <string name="settings_google_drive_restore_chats_stats">Чати: додано %1$d, пропущено %2$d.</string>
+    <string name="settings_backup_result_success_title">Готово</string>
+    <string name="settings_backup_result_error_title">Помилка</string>
     <string name="settings_google_drive_delete_done">Резервну копію видалено з Google Drive.</string>
     <string name="settings_google_drive_progress_auth">Вхід у Google…</string>
     <string name="settings_google_drive_progress_create">Створення резервної копії…</string>

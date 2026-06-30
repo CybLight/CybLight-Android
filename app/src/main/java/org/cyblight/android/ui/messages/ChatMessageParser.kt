@@ -30,6 +30,7 @@ object ChatMessageParser {
         var spoilerCounter = 0
 
         splitQuoteChunks(clean).forEach { chunk ->
+            if (parts.size >= 100) return@forEach // Prevent extreme complexity
             val segmentParts = parseSegment(chunk.text, linkColor, spoilerCounter)
             spoilerCounter = segmentParts.second
             if (chunk.quoted && segmentParts.first.isNotEmpty()) {
@@ -86,7 +87,7 @@ object ChatMessageParser {
         spoilerStart: Int,
     ): Pair<List<ChatMessagePart>, Int> {
         val parts = mutableListOf<ChatMessagePart>()
-        val codeRegex = Regex("""```(\w*)\n([\s\S]*?)\n```""")
+        val codeRegex = Regex("""```(\w*)\n?([\s\S]*?)```""")
         var lastIndex = 0
         var spoilerCounter = spoilerStart
 

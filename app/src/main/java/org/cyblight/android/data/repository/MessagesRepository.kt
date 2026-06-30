@@ -78,7 +78,9 @@ class MessagesRepository(
 
             val response = api.messages(friendId)
             if (response.ok) {
-                val normalized = MessageNormalizer.normalize(response.messages)
+                val allMessages = response.messages
+                val limited = if (allMessages.size > 1000) allMessages.takeLast(1000) else allMessages
+                val normalized = MessageNormalizer.normalize(limited)
                 val decrypted = signalCrypto.decryptMessages(userId, normalized)
                 val pinned = response.pinned?.takeIf { it.messageId.isNotBlank() && it.content.isNotBlank() }
                     ?.let { pin ->
@@ -254,9 +256,6 @@ class MessagesRepository(
 
     suspend fun importChatsPayload(payload: ChatsExportPayload): Result<ChatsImportStats> {
         return try {
-            if (payload.format != "cyblight-chats" || payload.version != 1) {
-                return Result.failure(Exception("invalid_export_format"))
-            }
             val response = api.importChats(org.cyblight.android.data.api.ChatsImportRequest(payload))
             if (response.ok) {
                 Result.success(
@@ -276,7 +275,7 @@ class MessagesRepository(
 
     suspend fun importChatsJson(json: String): Result<ChatsImportStats> {
         return try {
-            val gson = com.google.gson.Gson()
+            val gson = org.cyblight.android.data.api.createApiGson()
             val root = gson.fromJson(json, com.google.gson.JsonObject::class.java)
             val exportElement = root.get("export") ?: root
             val payload = gson.fromJson(exportElement, ChatsExportPayload::class.java)

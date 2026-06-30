@@ -139,6 +139,12 @@ class SignalCryptoManager(
         return decryptIncomingMessage(userId, message, ctx)
     }
 
+    suspend fun decryptMessageNoPrefetch(userId: String, message: MessageDto): String {
+        ensureRegistered(userId)
+        val ctx = requireContext(userId)
+        return decryptIncomingMessage(userId, message, ctx)
+    }
+
     suspend fun decryptMessages(userId: String, messages: List<MessageDto>): List<MessageDto> {
         ensureRegistered(userId)
         val ctx = requireContext(userId)
@@ -161,10 +167,11 @@ class SignalCryptoManager(
         }
         prefetchPlaintextSync(userId, syncCandidateIds)
 
+        val newDecrypted = mutableMapOf<String, String>()
         for (message in decryptOrder) {
             val key = messageKey(message)
             if (decryptedByKey.containsKey(key)) continue
-            val content = runCatching { decryptIncomingMessage(userId, message, ctx) }
+            val content = runCatching { decryptIncomingMessage(userId, message, ctx, newDecrypted) }
                 .getOrElse { failed ->
                     if (message.id.isNotBlank()) {
                         prefetchPlaintextSync(userId, listOf(message.id))
@@ -174,6 +181,10 @@ class SignalCryptoManager(
                     } ?: "🔒 Не удалось расшифровать сообщение"
                 }
             decryptedByKey[key] = content
+        }
+        
+        if (newDecrypted.isNotEmpty()) {
+            decryptCache.writeBatch(userId, newDecrypted)
         }
 
         return messages.map { message ->
@@ -185,6 +196,7 @@ class SignalCryptoManager(
         userId: String,
         message: MessageDto,
         ctx: SignalStoreContext,
+        batchCache: MutableMap<String, String>? = null,
     ): String {
         if (message.encryption != "signal_v1") {
             return message.content
@@ -229,7 +241,11 @@ class SignalCryptoManager(
 
         val text = String(plaintext, Charsets.UTF_8)
         if (message.id.isNotBlank()) {
-            decryptCache.write(userId, message.id, text)
+            if (batchCache != null) {
+                batchCache[message.id] = text
+            } else {
+                decryptCache.write(userId, message.id, text)
+            }
             plaintextSync.push(userId, message.id, text)
         }
         return text
@@ -348,6 +364,18 @@ class SignalCryptoManager(
         val batch = generateOneTimePreKeys(ctx, ONE_TIME_PREKEY_BATCH)
         api.replenishSignalPreKeys(SignalReplenishPreKeysRequest(batch))
         persistence.persistContext(ctx)
+    }
+
+    fun invalidateUserCache(userId: String) {
+        lock.withLock {
+            if (prekeysAlignedForUser == userId) {
+                prekeysAlignedForUser = null
+            }
+            if (lastEnsureUserId == userId) {
+                lastEnsureUserId = null
+                lastEnsureAtMs = 0L
+            }
+        }
     }
 
     private fun requireContext(userId: String): SignalStoreContext =

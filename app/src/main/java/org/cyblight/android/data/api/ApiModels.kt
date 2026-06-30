@@ -528,16 +528,16 @@ data class MessageActionResponse(
 )
 
 data class ChatsExportChat(
-    @SerializedName("friendId") val friendId: String = "",
-    @SerializedName("friendUsername") val friendUsername: String = "",
-    val messages: List<Map<String, Any?>> = emptyList(),
+    @SerializedName("friend_id", alternate = ["friendId"]) val friendId: String = "",
+    @SerializedName("friend_username", alternate = ["friendUsername"]) val friendUsername: String = "",
+    val messages: List<MessageDto> = emptyList(),
 )
 
 data class ChatsExportPayload(
     val format: String = "",
     val version: Int = 0,
-    @SerializedName("exportedAt") val exportedAt: Long = 0L,
-    @SerializedName("ownerUserId") val ownerUserId: String = "",
+    @SerializedName("exported_at", alternate = ["exportedAt"]) val exportedAt: Long = 0L,
+    @SerializedName("owner_user_id", alternate = ["ownerUserId"]) val ownerUserId: String = "",
     val chats: List<ChatsExportChat> = emptyList(),
 )
 

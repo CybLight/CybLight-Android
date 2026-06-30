@@ -51,6 +51,7 @@ import org.cyblight.android.ui.home.ChangelogScreen
 import org.cyblight.android.ui.main.MainScreen
 import org.cyblight.android.ui.navigation.SwipeBackContainer
 import org.cyblight.android.ui.help.HelpScreen
+import org.cyblight.android.ui.settings.BackupResultDialog
 import org.cyblight.android.ui.settings.DriveRestoreConfirmDialog
 import org.cyblight.android.ui.settings.DriveRestorePasswordDialog
 import org.cyblight.android.ui.settings.DriveRestoreProgressDialog
@@ -60,7 +61,7 @@ import org.cyblight.android.ui.update.UpdateCheckDialog
 import org.cyblight.android.ui.update.UpdateDialog
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.launch
@@ -233,9 +234,10 @@ class MainActivity : AppCompatActivity() {
             }
 
             var driveRestorePassword by remember { mutableStateOf("") }
+            var driveRestoreResultDialog by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
             LaunchedEffect(uiState.driveRestoreToast) {
                 val toast = viewModel.consumeDriveRestoreToast() ?: return@LaunchedEffect
-                Toast.makeText(context, toast.first, Toast.LENGTH_LONG).show()
+                driveRestoreResultDialog = toast.first to toast.second
             }
 
             var chatsImportConsumer by remember { mutableStateOf<((String) -> Unit)?>(null) }
@@ -400,12 +402,14 @@ class MainActivity : AppCompatActivity() {
                                 onChatBackupFocused = viewModel::clearSettingsFocusChatBackup,
                                 chatFormatToolbarHidden = uiState.chatFormatToolbarHidden,
                                 chatDefaultTheme = uiState.chatDefaultTheme,
+                                chatQuoteColor = uiState.chatQuoteColor,
                                 chatSendWithEnter = uiState.chatSendWithEnter,
                                 chatFontSize = uiState.chatFontSize,
                                 encryptionReminderHidden = uiState.encryptionReminderChatDismissed,
                                 isChatsTransferBusy = chatsTransferBusy,
                                 onChatFormatToolbarHiddenChange = viewModel::setChatFormatToolbarHidden,
                                 onChatDefaultThemeSelected = viewModel::setChatDefaultTheme,
+                                onChatQuoteColorSelected = viewModel::setChatQuoteColor,
                                 onChatSendWithEnterChange = viewModel::setChatSendWithEnter,
                                 onChatFontSizeSelected = viewModel::setChatFontSize,
                                 onEncryptionReminderHiddenChange = viewModel::setEncryptionReminderChatDismissed,
@@ -713,6 +717,7 @@ class MainActivity : AppCompatActivity() {
                                     chatDraftText = uiState.chatDraftText,
                                     chatFormatToolbarHidden = uiState.chatFormatToolbarHidden,
                                     chatDefaultTheme = uiState.chatDefaultTheme,
+                                    chatQuoteColor = uiState.chatQuoteColor,
                                     chatSendWithEnter = uiState.chatSendWithEnter,
                                     chatFontSize = uiState.chatFontSize,
                                     localeTag = uiState.locale,
@@ -731,6 +736,7 @@ class MainActivity : AppCompatActivity() {
                                     onReportBug = { BugReport.open(context) },
                                     onDonate = { viewModel.openDonate(context) },
                                     onLogout = viewModel::logout,
+                                    onOpenSessions = viewModel::openSessions,
                                     onOpenProfile = viewModel::openOwnProfile,
                                     onOpenFriendProfile = viewModel::openFriendProfile,
                                     onRefresh = viewModel::refreshSocialData,
@@ -818,6 +824,14 @@ class MainActivity : AppCompatActivity() {
                         DriveRestoreProgressDialog(
                             progress = uiState.driveRestoreProgress,
                             progressLabel = viewModel.driveRestoreProgressLabel(uiState.driveRestoreProgressKey),
+                        )
+                    }
+
+                    driveRestoreResultDialog?.let { (message, isError) ->
+                        BackupResultDialog(
+                            message = message,
+                            isError = isError,
+                            onDismiss = { driveRestoreResultDialog = null },
                         )
                     }
 

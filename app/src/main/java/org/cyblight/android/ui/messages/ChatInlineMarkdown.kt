@@ -10,10 +10,20 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextGeometricTransform
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 
 internal object ChatInlineMarkdown {
+    private val URL_REGEX = Regex("""https?://[^\s]+""")
+    private val MARKDOWN_PATTERNS = listOf(
+        Triple("**", "**", SpanStyle(fontWeight = FontWeight.Bold)),
+        Triple("__", "__", SpanStyle(textDecoration = TextDecoration.Underline)),
+        Triple("~~", "~~", SpanStyle(textDecoration = TextDecoration.LineThrough)),
+        Triple("`", "`", SpanStyle(fontFamily = FontFamily.Monospace)),
+        Triple("_", "_", SpanStyle(fontStyle = FontStyle.Italic, textGeometricTransform = TextGeometricTransform(1.0f, -0.15f))),
+    )
+
     private data class TokenMatch(
         val start: Int,
         val end: Int,
@@ -33,6 +43,7 @@ internal object ChatInlineMarkdown {
                 linkColor = linkColor,
                 baseStyle = baseStyle,
                 builder = this,
+                depth = 0,
             )
         }
     }
@@ -40,27 +51,23 @@ internal object ChatInlineMarkdown {
     fun toPlainText(text: String): String {
         if (text.isEmpty()) return ""
         val builder = StringBuilder()
-        extractPlainRange(text, 0, text.length, builder)
+        extractPlainRange(text, 0, text.length, builder, 0)
         return builder.toString()
     }
 
-    private fun extractPlainRange(source: String, start: Int, end: Int, out: StringBuilder) {
+    private fun extractPlainRange(source: String, start: Int, end: Int, out: StringBuilder, depth: Int) {
+        if (depth > 20) { // Safety limit
+            if (start < end) out.append(source.substring(start, end))
+            return
+        }
         var cursor = start
         while (cursor < end) {
-            val atLineStart = cursor == start && (cursor == 0 || source[cursor - 1] == '\n')
-            if (atLineStart && source.startsWith("> ", cursor) && cursor + 2 <= end) {
-                val lineEnd = source.indexOf('\n', cursor + 2).let { if (it == -1 || it > end) end else it }
-                extractPlainRange(source, cursor + 2, lineEnd, out)
-                cursor = lineEnd
-                continue
-            }
-
-            val match = findEarliestMatch(source, cursor, end)
+            val match = findMatchAt(source, cursor, end)
             if (match == null) {
                 out.append(source[cursor])
                 cursor++
             } else {
-                extractPlainRange(source, match.contentStart, match.contentEnd, out)
+                extractPlainRange(source, match.contentStart, match.contentEnd, out, depth + 1)
                 cursor = match.end
             }
         }
@@ -73,28 +80,15 @@ internal object ChatInlineMarkdown {
         linkColor: Color,
         baseStyle: SpanStyle,
         builder: AnnotatedString.Builder,
+        depth: Int,
     ) {
+        if (depth > 20) { // Safety limit for nested formatting
+            if (start < end) builder.append(source.substring(start, end))
+            return
+        }
         var cursor = start
         while (cursor < end) {
-            val atLineStart = cursor == start && (cursor == 0 || source[cursor - 1] == '\n')
-            if (atLineStart && source.startsWith("> ", cursor) && cursor + 2 <= end) {
-                val lineEnd = source.indexOf('\n', cursor + 2).let { if (it == -1 || it > end) end else it }
-                renderRange(
-                    source = source,
-                    start = cursor + 2,
-                    end = lineEnd,
-                    linkColor = linkColor,
-                    baseStyle = mergeStyles(
-                        baseStyle,
-                        SpanStyle(color = Color(0xFF8B9DC3), fontStyle = FontStyle.Italic),
-                    ),
-                    builder = builder,
-                )
-                cursor = lineEnd
-                continue
-            }
-
-            val match = findEarliestMatch(source, cursor, end)
+            val match = findMatchAt(source, cursor, end)
             if (match != null) {
                 val nestedStyle = when {
                     match.linkUrl != null -> mergeStyles(
@@ -104,7 +98,7 @@ internal object ChatInlineMarkdown {
                     match.style != null -> mergeStyles(baseStyle, match.style)
                     else -> baseStyle
                 }
-                if (match.linkUrl != null) {
+                if (match.linkUrl != null && isValidLinkUrl(match.linkUrl)) {
                     builder.withLink(
                         LinkAnnotation.Url(
                             url = match.linkUrl,
@@ -123,6 +117,7 @@ internal object ChatInlineMarkdown {
                             linkColor = linkColor,
                             baseStyle = nestedStyle,
                             builder = this,
+                            depth = depth + 1,
                         )
                     }
                 } else {
@@ -134,6 +129,7 @@ internal object ChatInlineMarkdown {
                             linkColor = linkColor,
                             baseStyle = nestedStyle,
                             builder = this,
+                            depth = depth + 1,
                         )
                     }
                 }
@@ -146,68 +142,49 @@ internal object ChatInlineMarkdown {
         }
     }
 
-    private fun findEarliestMatch(source: String, cursor: Int, end: Int): TokenMatch? {
-        val patterns = listOf(
-            Triple("**", "**", SpanStyle(fontWeight = FontWeight.Bold)),
-            Triple("__", "__", SpanStyle(textDecoration = TextDecoration.Underline)),
-            Triple("~~", "~~", SpanStyle(textDecoration = TextDecoration.LineThrough)),
-            Triple("`", "`", SpanStyle(fontFamily = FontFamily.Monospace)),
-            Triple("_", "_", SpanStyle(fontStyle = FontStyle.Italic)),
-        )
-
-        var earliest: TokenMatch? = null
-        for ((open, close, style) in patterns) {
-            if (!source.startsWith(open, cursor)) continue
-            val contentStart = cursor + open.length
-            if (contentStart > end) continue
-            val contentEnd = source.indexOf(close, contentStart)
-            if (contentEnd == -1 || contentEnd > end) continue
-            val tokenEnd = contentEnd + close.length
-            val match = TokenMatch(cursor, tokenEnd, contentStart, contentEnd, style)
-            if (earliest == null || match.start < earliest.start) {
-                earliest = match
-            }
-        }
-
-        if (source[cursor] == '[') {
-            val labelEnd = source.indexOf(']', cursor + 1)
-            if (labelEnd != -1 && labelEnd + 1 < end && source[labelEnd + 1] == '(') {
-                val urlStart = labelEnd + 2
-                val urlEnd = source.indexOf(')', urlStart)
-                if (urlEnd != -1 && urlEnd < end) {
-                    val url = source.substring(urlStart, urlEnd)
-                    val match = TokenMatch(
-                        start = cursor,
-                        end = urlEnd + 1,
-                        contentStart = cursor + 1,
-                        contentEnd = labelEnd,
-                        style = null,
-                        linkUrl = url,
-                    )
-                    if (earliest == null || match.start < earliest.start) {
-                        earliest = match
-                    }
+    private fun findMatchAt(source: String, cursor: Int, end: Int): TokenMatch? {
+        // Markdown patterns
+        for ((open, close, style) in MARKDOWN_PATTERNS) {
+            if (source.startsWith(open, cursor)) {
+                val contentStart = cursor + open.length
+                if (contentStart > end) continue
+                val contentEnd = source.indexOf(close, contentStart)
+                if (contentEnd != -1 && contentEnd < end) {
+                    return TokenMatch(cursor, contentEnd + close.length, contentStart, contentEnd, style)
                 }
             }
         }
 
-        val urlMatch = Regex("""https?://[^\s]+""").find(source, cursor)?.takeIf { it.range.last < end }
-        if (urlMatch != null) {
-            val url = urlMatch.value.trimEnd(',', '.', ')', '!', '?')
-            val match = TokenMatch(
-                start = urlMatch.range.first,
-                end = urlMatch.range.first + url.length,
-                contentStart = urlMatch.range.first,
-                contentEnd = urlMatch.range.first + url.length,
-                style = null,
-                linkUrl = url,
-            )
-            if (earliest == null || match.start < earliest.start) {
-                earliest = match
+        // Markdown Link: [label](url)
+        if (source[cursor] == '[') {
+            val labelEnd = source.indexOf(']', cursor + 1)
+            if (labelEnd != -1 && labelEnd + 2 < end && source[labelEnd + 1] == '(') {
+                val urlEnd = source.indexOf(')', labelEnd + 2)
+                if (urlEnd != -1 && urlEnd < end) {
+                    val url = source.substring(labelEnd + 2, urlEnd)
+                    return TokenMatch(cursor, urlEnd + 1, cursor + 1, labelEnd, null, url)
+                }
             }
         }
 
-        return earliest
+        // Auto-link URL
+        val urlMatch = URL_REGEX.find(source, cursor)
+        if (urlMatch != null && urlMatch.range.first == cursor && urlMatch.range.last < end) {
+            val url = urlMatch.value.trimEnd(',', '.', ')', '!', '?', ';')
+            if (isValidLinkUrl(url)) {
+                return TokenMatch(cursor, cursor + url.length, cursor, cursor + url.length, null, url)
+            }
+        }
+
+        return null
+    }
+
+    private fun isValidLinkUrl(url: String): Boolean {
+        if (url.isBlank()) return false
+        return runCatching {
+            val scheme = android.net.Uri.parse(url).scheme?.lowercase()
+            scheme == "http" || scheme == "https"
+        }.getOrDefault(false)
     }
 
     private fun mergeStyles(base: SpanStyle, extra: SpanStyle): SpanStyle {
@@ -224,6 +201,7 @@ internal object ChatInlineMarkdown {
                 else -> base.textDecoration
             },
             background = extra.background ?: base.background,
+            textGeometricTransform = extra.textGeometricTransform ?: base.textGeometricTransform,
         )
     }
 }

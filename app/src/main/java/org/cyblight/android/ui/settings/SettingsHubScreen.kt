@@ -6,7 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.BatteryChargingFull
-import androidx.compose.material.icons.outlined.Chat
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
@@ -61,7 +61,7 @@ fun SettingsHubScreen(
         }
         item {
             SettingsHubItem(
-                icon = Icons.Outlined.Chat,
+                icon = Icons.AutoMirrored.Outlined.Chat,
                 title = stringResource(R.string.settings_section_chats),
                 subtitle = stringResource(R.string.settings_hub_chats_subtitle),
                 onClick = { onNavigate(SettingsSection.Chats) },

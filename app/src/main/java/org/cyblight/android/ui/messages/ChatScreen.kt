@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -101,6 +102,7 @@ fun ChatScreen(
     localeTag: String,
     formatToolbarHidden: Boolean,
     chatDefaultTheme: ChatDefaultTheme = ChatDefaultTheme.SYSTEM,
+    chatQuoteColor: Int? = null,
     chatSendWithEnter: Boolean = false,
     chatFontSize: ChatFontSize = ChatFontSize.MEDIUM,
     onFormatToolbarHiddenChange: (Boolean) -> Unit,
@@ -130,7 +132,13 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
-    val chatPalette = resolveChatThemePalette(chatDefaultTheme)
+    val chatPalette = if (chatQuoteColor != null) {
+        resolveChatThemePalette(chatDefaultTheme).copy(
+            quoteBar = Color(chatQuoteColor)
+        )
+    } else {
+        resolveChatThemePalette(chatDefaultTheme)
+    }
     val chatFontScale = chatFontSize.scale
 
     var selectionMode by remember { mutableStateOf(false) }
@@ -447,6 +455,7 @@ fun ChatScreen(
                                                 isSelected = isSelected,
                                                 isHighlighted = highlightMessageId == message.id,
                                                 chatPalette = chatPalette,
+                                                chatTheme = chatDefaultTheme,
                                                 fontScale = chatFontScale,
                                                 onReplyJump = { targetId -> scrollToMessageId(targetId) },
                                                 onReact = { emoji -> onReactMessage(message.id, emoji) },
@@ -569,6 +578,7 @@ fun ChatScreen(
                     sendWithEnter = chatSendWithEnter,
                     isSending = isSending,
                     onFormatFromMenu = onFormatFromMenu,
+                    quoteColor = chatPalette.quoteBar,
                     onSend = { content, sentViaEnter ->
                         val wasEditing = editTarget != null
                         onSend(content, sentViaEnter)
@@ -684,6 +694,7 @@ private fun MessageBubble(
     isSelected: Boolean,
     isHighlighted: Boolean,
     chatPalette: ChatThemePalette,
+    chatTheme: ChatDefaultTheme,
     fontScale: Float,
     onReplyJump: (String) -> Unit,
     onReact: (String) -> Unit,
@@ -761,6 +772,8 @@ private fun MessageBubble(
                         textColor = fg,
                         linkColor = bubbleLinkColor,
                         messageId = message.id,
+                        quoteBarColor = chatPalette.quoteBar,
+                        isOutgoing = isMine,
                         fontScale = fontScale,
                         onSpoilerRevealed = onSpoilerRevealed,
                     )

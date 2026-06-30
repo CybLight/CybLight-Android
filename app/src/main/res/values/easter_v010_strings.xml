@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="easter_typographer_title">Типограф</string>
-    <string name="easter_typographer_desc_unlocked">Отправил сообщение со всеми видами форматирования</string>
-    <string name="easter_typographer_desc_locked">Собери все стили в одном сообщении</string>
-    <string name="easter_typographer_hint_locked">💡 Подсказка: жирный, курсив, цитата, скрытый, ссылка, код и остальное — в одном тексте</string>
+    <string name="easter_typographer_desc_unlocked">Отправил сообщение, используя минимум три стиля форматирования</string>
+    <string name="easter_typographer_desc_locked">Слишком простое сообщение</string>
+    <string name="easter_typographer_hint_locked">💡 Подсказка: используй минимум 3 стиля текста (жирный, курсив, ссылка и др.) одновременно в одном сообщении</string>
     <string name="easter_typographer_hint_unlocked">🎊 Редакция одобряет все стили!</string>
     <string name="easter_spoiler_hunter_title">Спойлерщик</string>
     <string name="easter_spoiler_hunter_desc_unlocked">Раскрыл пять скрытых текстов</string>

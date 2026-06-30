@@ -1,12 +1,27 @@
 package org.cyblight.android.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.CloudUpload
@@ -20,13 +35,22 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.cyblight.android.R
 import org.cyblight.android.data.preferences.ChatDefaultTheme
 import org.cyblight.android.data.preferences.ChatFontSize
+import org.cyblight.android.data.preferences.resolveChatThemePalette
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun SettingsChatsSection(
     chatDefaultTheme: ChatDefaultTheme,
@@ -34,17 +58,21 @@ internal fun SettingsChatsSection(
     chatFontSize: ChatFontSize,
     chatFormatToolbarHidden: Boolean,
     encryptionReminderHidden: Boolean,
+    chatQuoteColor: Int?,
     isChatsTransferBusy: Boolean,
     onOpenChatTheme: () -> Unit,
     onChatSendWithEnterChange: (Boolean) -> Unit,
     onOpenChatFontSize: () -> Unit,
     onChatFormatToolbarHiddenChange: (Boolean) -> Unit,
     onEncryptionReminderHiddenChange: (Boolean) -> Unit,
+    onChatQuoteColorChange: (Int?) -> Unit,
     onOpenChatBackup: () -> Unit,
     onExportChats: () -> Unit,
     onImportChats: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var isQuoteColorExpanded by remember { mutableStateOf(false) }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -86,6 +114,76 @@ internal fun SettingsChatsSection(
                 .fillMaxWidth()
                 .clickable(onClick = onOpenChatFontSize),
         )
+
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.settings_chats_quote_color)) },
+            leadingContent = { Icon(Icons.Outlined.Palette, contentDescription = null) },
+            trailingContent = {
+                val themePalette = resolveChatThemePalette(chatDefaultTheme)
+                val currentColor = chatQuoteColor?.let { Color(it) } ?: themePalette.quoteBar
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(currentColor)
+                        .border(1.dp, Color.White.copy(alpha = 0.4f), CircleShape)
+                )
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { isQuoteColorExpanded = !isQuoteColorExpanded }
+        )
+
+        AnimatedVisibility(
+            visible = isQuoteColorExpanded,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            val themePalette = resolveChatThemePalette(chatDefaultTheme)
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                val colors = listOf(
+                    null to themePalette.quoteBar, // Default
+                    0xFF0EA5E9.toInt() to Color(0xFF0EA5E9L), // Sky Blue
+                    0xFF3B82F6.toInt() to Color(0xFF3B82F6L), // Blue
+                    0xFFEF4444.toInt() to Color(0xFFEF4444L), // Red
+                    0xFF10B981.toInt() to Color(0xFF10B981L), // Green
+                    0xFFF59E0B.toInt() to Color(0xFFF59E0BL), // Amber
+                    0xFF8B5CF6.toInt() to Color(0xFF8B5CF6L), // Violet
+                    0xFFEC4899.toInt() to Color(0xFFEC4899L), // Pink
+                )
+                colors.forEach { (colorInt, color) ->
+                    val isSelected = chatQuoteColor == colorInt
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                            .border(
+                                width = if (isSelected) 2.5.dp else 1.2.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.45f),
+                                shape = CircleShape
+                            )
+                            .clickable { onChatQuoteColorChange(colorInt) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isSelected) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         ListItem(
             headlineContent = { Text(stringResource(R.string.messages_format_toolbar_hidden)) },

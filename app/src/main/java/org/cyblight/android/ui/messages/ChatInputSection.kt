@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -70,12 +71,17 @@ fun ChatInputSection(
     sendWithEnter: Boolean = false,
     isSending: Boolean,
     onSend: (String, Boolean) -> Unit,
+    quoteColor: Color = Color(0xFF60A5FA),
     onFormatFromMenu: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showEmojiPicker by remember { mutableStateOf(false) }
     var showLinkDialog by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    
+    val visualTransformation = remember(quoteColor) {
+        ChatInputVisualTransformation(quoteColor)
+    }
 
     fun submitDraft(sentViaEnter: Boolean = false) {
         val text = draft.text.trim()
@@ -198,7 +204,7 @@ fun ChatInputSection(
                 OutlinedTextField(
                     value = draft,
                     onValueChange = onDraftChange,
-                    visualTransformation = ChatInputVisualTransformation,
+                    visualTransformation = visualTransformation,
                     placeholder = {
                         Text(
                             if (editTarget != null) {

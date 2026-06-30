@@ -2,18 +2,19 @@ package org.cyblight.android.crypto.backup
 
 import android.content.Context
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import org.cyblight.android.crypto.DecryptCache
 import org.cyblight.android.crypto.PlaintextSyncKey
 import org.cyblight.android.crypto.SignalStoreManifest
 import org.cyblight.android.crypto.SignalStorePersistence
 import org.cyblight.android.data.api.ChatsExportPayload
+import org.cyblight.android.data.api.createApiGson
+import org.signal.libsignal.protocol.IdentityKeyPair
 
 class CyblightBackupManager(context: Context) {
     private val persistence = SignalStorePersistence(context)
     private val decryptCache = DecryptCache(context)
     private val plaintextSyncKey = PlaintextSyncKey(context)
-    private val gson = Gson()
+    private val gson = createApiGson()
 
     fun hasLocalBackupKeys(userId: String): Boolean = collectPayload(userId) != null
 
@@ -22,10 +23,6 @@ class CyblightBackupManager(context: Context) {
         chats: ChatsExportPayload? = null,
     ): CyblightBackupPayload? {
         val manifest = persistence.readManifest(userId) ?: return null
-        val manifestMap = gson.fromJson<Map<String, Any?>>(
-            gson.toJson(manifest),
-            object : TypeToken<Map<String, Any?>>() {}.type,
-        )
 
         val preKeys = linkedMapOf<String, String>()
         val signedPreKeys = linkedMapOf<String, String>()
@@ -48,7 +45,7 @@ class CyblightBackupManager(context: Context) {
         val base = CyblightBackupPayload(
             userId = userId,
             createdAt = System.currentTimeMillis(),
-            signal = CyblightBackupSignal(manifest = manifestMap),
+            signal = CyblightBackupSignal(manifest = manifest),
             records = CyblightBackupRecords(
                 preKeys = preKeys,
                 signedPreKeys = signedPreKeys,
@@ -66,38 +63,67 @@ class CyblightBackupManager(context: Context) {
         }
     }
 
-    fun restorePayload(expectedUserId: String, payload: CyblightBackupPayload) {
-        if (payload.userId != expectedUserId) {
+    fun restorePayload(
+        expectedUserId: String,
+        payload: CyblightBackupPayload,
+        onProgress: (Int, String) -> Unit = { _, _ -> },
+    ) {
+        val payloadUserId = payload.userId?.trim()
+        if (payloadUserId != null && payloadUserId.lowercase() != expectedUserId.trim().lowercase()) {
             throw IllegalArgumentException("backup_user_mismatch")
         }
 
-        val manifest = gson.fromJson(
-            gson.toJson(payload.signal.manifest),
-            SignalStoreManifest::class.java,
-        )
-        if (manifest.registrationId <= 0 || manifest.identitySerialized.isBlank()) {
+        // Handle nested, flat-field, or root-level manifest structures
+        onProgress(42, "progress_restore")
+        val manifest = payload.manifest ?: payload.signal?.manifest ?: if (payload.identitySerialized.isNotBlank()) {
+            SignalStoreManifest(
+                registrationId = payload.registrationId,
+                identitySerialized = payload.identitySerialized,
+                preKeyIds = payload.preKeyIds,
+                signedPreKeyIds = payload.signedPreKeyIds,
+                kyberPreKeyIds = payload.kyberPreKeyIds,
+                sessionKeys = payload.sessionKeys,
+            )
+        } else null
+
+        if (manifest != null && !isValidManifest(manifest)) {
             throw IllegalArgumentException("backup_payload_invalid")
         }
+
+        onProgress(45, "progress_restore")
+        val records = payload.records ?: CyblightBackupRecords(
+            preKeys = payload.preKeysFlat ?: emptyMap(),
+            signedPreKeys = payload.signedPreKeysFlat ?: emptyMap(),
+            kyberPreKeys = payload.kyberPreKeysFlat ?: emptyMap(),
+            sessions = payload.sessionsFlat ?: emptyMap(),
+        )
+        val decryptEntries = payload.decryptCache ?: emptyMap()
 
         persistence.clearUser(expectedUserId)
         decryptCache.clearUser(expectedUserId)
         plaintextSyncKey.clearUser(expectedUserId)
 
-        persistence.writeManifest(expectedUserId, manifest)
-        payload.records.preKeys.forEach { (keyId, value) ->
-            persistence.writePreKeyRecord(expectedUserId, keyId, value)
+        onProgress(48, "progress_restore")
+        persistence.writeRecordsBatch(
+            userId = expectedUserId,
+            manifest = manifest,
+            preKeys = records.preKeys,
+            signedPreKeys = records.signedPreKeys,
+            kyberPreKeys = records.kyberPreKeys,
+            sessions = records.sessions,
+        )
+
+        onProgress(55, "progress_restore")
+        if (decryptEntries.isNotEmpty()) {
+            decryptCache.replaceAllForUser(expectedUserId, decryptEntries)
         }
-        payload.records.signedPreKeys.forEach { (keyId, value) ->
-            persistence.writeSignedPreKeyRecord(expectedUserId, keyId, value)
-        }
-        payload.records.kyberPreKeys.forEach { (keyId, value) ->
-            persistence.writeKyberPreKeyRecord(expectedUserId, keyId, value)
-        }
-        payload.records.sessions.forEach { (sessionKey, value) ->
-            persistence.writeSessionRecord(expectedUserId, sessionKey, value)
-        }
-        decryptCache.replaceAllForUser(expectedUserId, payload.decryptCache)
+        
+        onProgress(58, "progress_restore")
         plaintextSyncKey.restoreFromBackup(expectedUserId, payload.plaintextSyncKey)
+        
+        // Help GC for large payloads
+        payload.records = null
+        payload.decryptCache = emptyMap()
     }
 
     fun createBackupFile(
@@ -112,7 +138,37 @@ class CyblightBackupManager(context: Context) {
 
     fun decryptBackupPayload(rawFile: String, password: String): CyblightBackupPayload {
         val file = BackupCrypto.parseFile(rawFile)
-        return BackupCrypto.decryptPayload(file, password)
+        val payload = BackupCrypto.decryptPayload(file, password)
+
+        // Post-process to ensure all data is correctly normalized regardless of source
+        if (payload.manifest == null && payload.signal?.manifest == null && payload.identitySerialized.isNotBlank()) {
+            payload.manifest = SignalStoreManifest(
+                registrationId = payload.registrationId,
+                identitySerialized = payload.identitySerialized,
+                preKeyIds = payload.preKeyIds,
+                signedPreKeyIds = payload.signedPreKeyIds,
+                kyberPreKeyIds = payload.kyberPreKeyIds,
+                sessionKeys = payload.sessionKeys,
+            )
+        }
+
+        if (payload.records == null) {
+            val preKeys = payload.preKeysFlat ?: emptyMap()
+            val signedPreKeys = payload.signedPreKeysFlat ?: emptyMap()
+            val kyberPreKeys = payload.kyberPreKeysFlat ?: emptyMap()
+            val sessions = payload.sessionsFlat ?: emptyMap()
+
+            if (preKeys.isNotEmpty() || signedPreKeys.isNotEmpty() || kyberPreKeys.isNotEmpty() || sessions.isNotEmpty()) {
+                payload.records = CyblightBackupRecords(
+                    preKeys = preKeys,
+                    signedPreKeys = signedPreKeys,
+                    kyberPreKeys = kyberPreKeys,
+                    sessions = sessions,
+                )
+            }
+        }
+
+        return payload
     }
 
     fun importBackupFile(userId: String, rawFile: String, password: String): BackupRestoreStats {
@@ -121,16 +177,34 @@ class CyblightBackupManager(context: Context) {
         return BackupRestoreStats()
     }
 
+    private fun isValidManifest(manifest: SignalStoreManifest): Boolean {
+        if (manifest.identitySerialized.isBlank()) return false
+        return try {
+            SignalStorePersistence.base64Decode(manifest.identitySerialized)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun errorMessage(code: String): String = when (code) {
         "backup_no_local_keys" -> "Нет локальных ключей шифрования для резервной копии."
         "backup_password_invalid" -> "Неверный пароль резервной копии."
+        "backup_password_required" -> "Введите пароль резервной копии."
+        "backup_password_short" -> "Пароль должен содержать не менее 8 символов."
         "backup_password_current_invalid" -> "Неверный текущий пароль."
         "backup_password_unchanged" -> "Новый пароль не может совпадать с текущим."
+        "backup_user_missing" -> "Войдите в аккаунт, чтобы восстановить резервную копию."
         "backup_user_mismatch" -> "Эта копия создана для другого аккаунта."
-        "backup_file_invalid", "backup_payload_invalid", "backup_format_unsupported" ->
+        "backup_file_invalid", "backup_payload_invalid", "backup_format_unsupported", "backup_kdf_unsupported" ->
             "Некорректный файл резервной копии."
         "backup_share_failed", "backup_save_failed" -> "Не удалось сохранить резервную копию."
-        "chats_import_failed" -> "Не удалось импортировать чаты из резервной копии."
+        "sync_key_invalid" -> "Некорректный ключ синхронизации в резервной копии."
+        "chats_import_failed", "import_failed", "invalid_export_format" ->
+            "Не удалось импортировать чаты из резервной копии."
+        "signal_user_not_registered", "signal_store_missing" ->
+            "Ошибка инициализации Signal в резервной копии."
+        "signal_invalid_identity_key" -> "Некорректный ключ личности в резервной копии."
         "google_drive_not_configured" -> "Google Drive не настроен в приложении."
         "google_drive_auth_failed", "google_drive_auth_denied" -> "Не удалось войти через Google."
         "google_drive_no_backup" -> "В Google Drive нет резервной копии для этого аккаунта."
@@ -139,6 +213,7 @@ class CyblightBackupManager(context: Context) {
         "google_drive_network_failed" -> "Нет подключения к Google Drive. Проверьте интернет."
         "google_drive_download_failed" -> "Не удалось скачать резервную копию из Google Drive."
         "google_drive_delete_failed" -> "Не удалось удалить резервную копию из Google Drive."
-        else -> "Не удалось обработать резервную копию."
+        "backup_failed" -> "Не удалось обработать резервную копию. Возможно, файл повреждён."
+        else -> if (code.length > 50 || code.contains(" ")) code else "Ошибка: $code"
     }
 }

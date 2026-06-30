@@ -1,12 +1,13 @@
 package org.cyblight.android.ui.messages
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -57,12 +58,12 @@ fun EncryptionReminderBanner(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(
-                        start = if (compact) 14.dp else 16.dp,
+                        start = if (compact) 18.dp else 22.dp,
                         end = if (compact) 36.dp else 16.dp,
                         top = if (compact) 12.dp else 14.dp,
                         bottom = if (compact) 12.dp else 14.dp,
                     ),
-                horizontalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp),
                 verticalAlignment = Alignment.Top,
             ) {
                 Text(
@@ -87,17 +88,15 @@ fun EncryptionReminderBanner(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
                         modifier = Modifier.padding(top = 6.dp, bottom = if (compact) 8.dp else 10.dp),
                     )
-                    TextButton(
-                        onClick = onOpenSecurityBackup,
-                        modifier = Modifier.padding(start = 0.dp),
-                        contentPadding = PaddingValues(0.dp),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.encryption_reminder_link),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
+                    Text(
+                        text = stringResource(R.string.encryption_reminder_link),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable { onOpenSecurityBackup() }
+                            .padding(top = 4.dp, bottom = 4.dp),
+                    )
                 }
             }
         }

@@ -6,12 +6,15 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextGeometricTransform
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 
-object ChatInputVisualTransformation : VisualTransformation {
+class ChatInputVisualTransformation(
+    private val quoteColor: Color = Color(0xFF60A5FA),
+) : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
         val source = text.text
         if (source.isEmpty()) {
@@ -56,6 +59,7 @@ object ChatInputVisualTransformation : VisualTransformation {
                     else -> base.textDecoration
                 },
                 background = extra.background ?: base.background,
+                textGeometricTransform = extra.textGeometricTransform ?: base.textGeometricTransform,
             )
         }
 
@@ -65,16 +69,32 @@ object ChatInputVisualTransformation : VisualTransformation {
                 val atLineStart = cursor == start && (cursor == 0 || source[cursor - 1] == '\n')
 
                 if (atLineStart && source.startsWith("> ", cursor) && cursor + 2 <= end) {
-                    mapSkippedRange(cursor, cursor + 2)
                     val lineEnd = source.indexOf('\n', cursor + 2).let { if (it == -1 || it > end) end else it }
+                    
+                    val barStyle = SpanStyle(
+                        color = quoteColor,
+                        background = quoteColor.copy(alpha = 0.2f),
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    appendVisibleChar(cursor, barStyle) // '>'
+                    appendVisibleChar(cursor + 1, barStyle) // ' '
+                    
+                    val quoteStyle = mergeStyles(
+                        baseStyle,
+                        SpanStyle(
+                            background = quoteColor.copy(alpha = 0.15f),
+                            fontStyle = FontStyle.Italic,
+                            textGeometricTransform = TextGeometricTransform(1.0f, -0.2f)
+                        ),
+                    )
+                    
                     renderRange(
                         start = cursor + 2,
                         end = lineEnd,
-                        baseStyle = mergeStyles(
-                            baseStyle,
-                            SpanStyle(color = Color(0xFF8B9DC3), fontStyle = FontStyle.Italic),
-                        ),
+                        baseStyle = quoteStyle
                     )
+
                     cursor = lineEnd
                     continue
                 }
@@ -94,7 +114,7 @@ object ChatInputVisualTransformation : VisualTransformation {
                     Triple("~~", "~~", SpanStyle(textDecoration = TextDecoration.LineThrough)),
                     Triple("||", "||", SpanStyle(background = Color(0x55FFD54F))),
                     Triple("`", "`", SpanStyle(fontFamily = FontFamily.Monospace)),
-                    Triple("_", "_", SpanStyle(fontStyle = FontStyle.Italic)),
+                    Triple("_", "_", SpanStyle(fontStyle = FontStyle.Italic, textGeometricTransform = TextGeometricTransform(1.0f, -0.15f))),
                 )
 
                 var earliest: TokenMatch? = null
